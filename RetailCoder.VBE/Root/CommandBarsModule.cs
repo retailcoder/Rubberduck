@@ -185,10 +185,10 @@ namespace Rubberduck.Root
             {
                 _kernel.Get<CodeExplorerCommandMenuItem>(),
                 _kernel.Get<ToDoExplorerCommandMenuItem>(),
+                _kernel.Get<RegexSearchReplaceCommandMenuItem>(),
                 _kernel.Get<FindSymbolCommandMenuItem>(),
                 _kernel.Get<FindAllReferencesCommandMenuItem>(),
                 _kernel.Get<FindAllImplementationsCommandMenuItem>(),
-                _kernel.Get<RegexSearchReplaceCommandMenuItem>(),
             };
             return new NavigateParentMenu(items);
         }
@@ -217,6 +217,7 @@ namespace Rubberduck.Root
             return new IMenuItem[]
             {
                 _kernel.Get<RefactorRenameCommandMenuItem>(), 
+                _kernel.Get<RegexSearchReplaceCommandMenuItem>(),
                 _kernel.Get<FindSymbolCommandMenuItem>(),
                 _kernel.Get<FindAllReferencesCommandMenuItem>(),
                 _kernel.Get<FindAllImplementationsCommandMenuItem>(),

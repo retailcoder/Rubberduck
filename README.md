@@ -1,14 +1,12 @@
-![Rubberduck](http://i.stack.imgur.com/taIMg.png)
+![Rubberduck](http://i.stack.imgur.com/vmqXM.png)
 
 | Branch     | Build Status |
 |------------|--------------|
-| **master** | [![master branch build status][masterBuildStatus]][masterBuild] |
-| **next**   | [![next branch build status][nextBuildStatus]][nextBuild] |
+| **master** | ![master branch build status][masterBuildStatus] |
+| **next**   | ![next branch build status][nextBuildStatus] |
 
-[nextBuild]:https://ci.appveyor.com/project/ckuhn203/rubberduck-3v9qv/branch/next
-[nextBuildStatus]:https://ci.appveyor.com/api/projects/status/bfwl1pwu9eeqd11o/branch/next?svg=true
-[masterBuild]:https://ci.appveyor.com/project/ckuhn203/rubberduck-3v9qv/branch/master
-[masterBuildStatus]:https://ci.appveyor.com/api/projects/status/bfwl1pwu9eeqd11o/branch/master?svg=true
+[nextBuildStatus]:https://ci.appveyor.com/api/projects/status/we3pdnkeebo4nlck/branch/next?svg=true
+[masterBuildStatus]:https://ci.appveyor.com/api/projects/status/we3pdnkeebo4nlck/branch/master?svg=true
 
 Rubberduck is a COM Add-In for the VBA IDE that makes VBA development even more enjoyable, by extending the Visual Basic Editor (VBE) with menus, toolbars and toolwindows that enable things we didn't even think were possible when we first started this project.
 
@@ -20,21 +18,22 @@ If you're learning VBA, Rubberduck can help you avoid a few common beginner mist
 
 ---
 
-#Contributing
+#[Contributing](https://github.com/rubberduck-vba/Rubberduck/wiki/Contributing)
 
 If you're a C# developer looking for a fun project to contribute to, feel free to fork the project and 
-[come meet the devs in Code Review's "VBA" chatroom][chat] - we'll be happy to answer your questions and help you help us take the VBE into the 21st century!
-
-Some issues are tagged with [help-wanted][helpwanted], but that doesn't mean we can't use some help with anything else in the project - if this project interests you, we want to hear from you!
+[come meet the devs in Code Review's "VBA Rubberducking" chatroom][chat] - we'll be happy to answer your questions and help you help us!
 
 We follow a [development branch workflow][branch], so please submit any Pull Requests to the `next` branch.
 
-There is additonal information about [building the project in our wiki][install].
+  [chat]:http://chat.stackexchange.com/rooms/14929
+  [helpwanted]:https://github.com/rubberduck-vba/Rubberduck/labels/help-wanted
+  [branch]:https://github.com/rubberduck-vba/Rubberduck/issues/288
 
-  [chat]:http://chat.stackexchange.com/rooms/14929/vba
-  [helpwanted]:https://github.com/retailcoder/Rubberduck/labels/help-wanted
-  [install]:https://github.com/retailcoder/Rubberduck/wiki/Building-&-Installation
-  [branch]:https://github.com/retailcoder/Rubberduck/issues/288
+---
+
+#[Installing](https://github.com/rubberduck-vba/Rubberduck/wiki/Installing)
+
+This section was moved to a dedicated wiki page.
 
 ---
 
@@ -42,7 +41,7 @@ There is additonal information about [building the project in our wiki][install]
 
 Rubberduck is a COM add-in for the VBA IDE (VBE).
 
-Copyright (C) 2014-2015 Mathieu Guindon & Christopher McClellan
+Copyright (C) 2014-2016 Mathieu Guindon & Christopher McClellan
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -56,24 +55,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see http://www.gnu.org/licenses/.
-
----
-
-#Installation
-
-Visit our releases page, [download the installer](https://github.com/retailcoder/Rubberduck/releases/latest), and run the Setup.exe.
-
-If you're **upgrading** from version 1.0, you will need to completely uninstall it before installing the newest release. This isn't necessary when upgrading from newer versions. Also, be sure to back up the `rubberduck.config` file in the `\AppData\Roaming\Rubberduck\` directory prior to installation.
-
-##System Requirements
-
-- Windows Vista or more recent (tested on Win7 and Win8.1)
-- .Net Framework 4.5
-- Microsoft Office 97-2003 or higher
-
-Please feel free to test it on other versions and [submit any bugs on our issue tracker](https://github.com/retailcoder/Rubberduck/issues).
-
-**Note:** The 1.2 installer doesn't work for 64 bit versions of office. You can find the [work around here](https://rubberduckvba.wordpress.com/2015/03/11/64-bit-rubberduck-a-work-around-until-release-1-21-soon/).
 
 ---
 
@@ -104,6 +85,18 @@ LibGit2Sharp is the library that has allowed us to integrate Git right into the 
 > libgit2 is a portable, pure C implementation of the Git core methods provided as a re-entrant linkable library with a solid API, allowing you to write native speed custom Git applications in any language which supports C bindings.
 
 Which basically means it's a reimplementation of Git in C. It also [happens to be the technology Microsoft uses for their own Git integration with Visual Studio](http://www.hanselman.com/blog/GitSupportForVisualStudioGitTFSAndVSPutIntoContext.aspx).
+
+###[WPF Localization Using RESX Files](http://www.codeproject.com/Articles/35159/WPF-Localization-Using-RESX-Files)
+
+This library makes localizing WPF applications at runtime using resx files a breeze. Thank you [Grant Frisken](http://www.codeproject.com/script/Membership/View.aspx?mid=1079060)!
+
+> Licensed under [The Code Project Open License](http://www.codeproject.com/info/cpol10.aspx).
+
+###[EventHook](https://github.com/justcoding121/Windows-User-Action-Hook)
+
+> A one stop library for global windows user actions such mouse, keyboard, clipboard, website visit & print events.
+
+This library allows Rubberduck to detect righ-click actions in the active code pane, to dynamically enable/disable menu commands depending on the current context/selection. We're also using it to capture keypresses, to trigger a reparse of the current module as it's being modified.
 
 ##Icons
 

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Windows.Input;
+﻿using System.Globalization;
 using System.Xml.Serialization;
 using Rubberduck.UI;
 
@@ -23,21 +22,9 @@ namespace Rubberduck.Settings
         public bool HasCtrlModifier { get; set; }
 
         [XmlIgnore]
-        public ICommand Command { get; set; }
-
-        [XmlIgnore]
         public string Prompt
         {
-            get { return RubberduckUI.ResourceManager.GetString("HotkeyDescription_" + Name); } 
-        }
-
-        public string ToMenuHotkeyString()
-        {
-            return string.Format("{0}{1}{2}+{3}",
-                HasCtrlModifier ? RubberduckUI.GeneralSettings_HotkeyCtrl : string.Empty,
-                HasShiftModifier ? (HasCtrlModifier ? "+" : string.Empty) + RubberduckUI.GeneralSettings_HotkeyShift : string.Empty,
-                HasAltModifier ? (HasCtrlModifier | HasShiftModifier ? "+" : string.Empty) + RubberduckUI.GeneralSettings_HotkeyAlt : string.Empty,
-                Key1);
+            get { return RubberduckUI.ResourceManager.GetString("HotkeyDescription_" + Name, CultureInfo.CurrentUICulture); } 
         }
 
         public override string ToString()

@@ -44,14 +44,15 @@
     <Reference Include="LibGit2Sharp">
       <HintPath>..\packages\LibGit2Sharp.0.22.0-pre20150516171636\lib\net40\LibGit2Sharp.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.Vbe.Interop, Version=15.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
       <HintPath>..\libs\Microsoft.Vbe.Interop.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Vbe.Interop.Forms, Version=11.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
       <HintPath>..\libs\Microsoft.Vbe.Interop.Forms.dll</HintPath>
     </Reference>
     <Reference Include="Moq">
@@ -77,14 +78,59 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
-    <Compile Include="ComponentTypeExtensionTests.cs" />
+    <Compile Include="Binding\IndexDefaultBindingTests.cs" />
+    <Compile Include="Binding\MemberAccessDefaultBindingTests.cs" />
+    <Compile Include="Binding\MemberAccessTypeBindingTests.cs" />
+    <Compile Include="Binding\MemberAccessProcedurePointerBindingTests.cs" />
+    <Compile Include="Binding\SimpleNameProcedurePointerBindingTests.cs" />
+    <Compile Include="Binding\SimpleNameDefaultBindingTests.cs" />
+    <Compile Include="Binding\SimpleNameTypeBindingTests.cs" />
+    <Compile Include="CodeExplorer\CodeExplorerTests.cs" />
+    <Compile Include="Commands\RefactorCommandTests.cs" />
+    <Compile Include="Commands\IndentCommandTests.cs" />
+    <Compile Include="Commands\UnitTestCommandTests.cs" />
+    <Compile Include="Grammar\ParserRuleContextExtensionTests.cs" />
+    <Compile Include="Inspections\ApplicationWorksheetFunctionInspectionTests.cs" />
+    <Compile Include="Inspections\AssignedByValParameterMakeLocalCopyQuickFixTests.cs" />
+    <Compile Include="Inspections\HostSpecificExpressionInspectionTests.cs" />
+    <Compile Include="Inspections\HungarianNotationInspectionTests.cs" />
+    <Compile Include="Inspections\IgnoreOnceQuickFixTests.cs" />
+    <Compile Include="Inspections\ImplicitActiveWorkbookReferenceInspectionTests.cs" />
+    <Compile Include="Inspections\MemberNotOnInterfaceInspectionTests.cs" />
+    <Compile Include="Inspections\PassParameterByReferenceQuickFixTests.cs" />
+    <Compile Include="Inspections\UndeclaredVariableInspectionTests.cs" />
+    <Compile Include="SmartIndenter\VerticalSpacingTests.cs" />
+    <Compile Include="Symbols\AccessibilityCheckTests.cs" />
+    <Compile Include="Symbols\ClassModuleDeclarationTests.cs" />
+    <Compile Include="Symbols\ProjectDeclarationTests.cs" />
+    <Compile Include="Symbols\ConstantDeclarationTests.cs" />
+    <Compile Include="Symbols\ProceduralModuleDeclarationTests.cs" />
+    <Compile Include="Symbols\ParameterDeclarationTests.cs" />
+    <Compile Include="Symbols\ExternalProcedureDeclarationTests.cs" />
+    <Compile Include="Symbols\SubroutineDeclarationTests.cs" />
+    <Compile Include="Symbols\FunctionDeclarationTests.cs" />
+    <Compile Include="Symbols\PropertyGetDeclarationTests.cs" />
+    <Compile Include="Symbols\PropertyLetDeclarationTests.cs" />
+    <Compile Include="Symbols\PropertySetDeclarationTests.cs" />
     <Compile Include="ConfigurationTests.cs" />
+    <Compile Include="Commands\FindAllImplementationsTests.cs" />
+    <Compile Include="Commands\FindAllReferencesTests.cs" />
+    <Compile Include="Grammar\AnnotationTests.cs" />
     <Compile Include="Grammar\ResolverTests.cs" />
     <Compile Include="Grammar\VBAParserTests.cs" />
     <Compile Include="Grammar\VBAParserValidityTests.cs" />
     <Compile Include="Inspections\EncapsulatePublicFieldInspectionTests.cs" />
     <Compile Include="Inspections\FunctionReturnValueNotUsedInspectionTests.cs" />
-    <Compile Include="MockParser.cs" />
+    <Compile Include="Inspections\GeneralInspectionTests.cs" />
+    <Compile Include="Inspections\ImplicitActiveSheetReferenceInspectionTests.cs" />
+    <Compile Include="Inspections\MultipleFolderAnnotationsInspectionTests.cs" />
+    <Compile Include="Inspections\ObjectVariableNotSetInpsectionTests.cs" />
+    <Compile Include="Inspections\MalformedAnnotationInspectionTests.cs" />
+    <Compile Include="Inspections\SelfAssignedDeclarationInspectionTests.cs" />
+    <Compile Include="Inspections\UntypedFunctionUsageInspectionTests.cs" />
+    <Compile Include="Inspections\UnassignedVariableUsageInspectionTests.cs" />
+    <Compile Include="Inspections\WriteOnlyPropertyInspectionTests.cs" />
+    <Compile Include="Mocks\MockParser.cs" />
     <Compile Include="Inspections\MoveFieldCloserToUsageInspectionTests.cs" />
     <Compile Include="Inspections\AssignedByValParameterInspectionTests.cs" />
     <Compile Include="Inspections\ConstantNotUsedInspectionTests.cs" />
@@ -108,46 +154,66 @@
     <Compile Include="Inspections\ParameterCanBeByValInspectionTests.cs" />
     <Compile Include="Inspections\ParameterNotUsedInspectionTests.cs" />
     <Compile Include="Inspections\ProcedureNotUsedInspectionTests.cs" />
-    <Compile Include="Inspections\VariableIsNeverAssignedInspectionTests.cs" />
-    <Compile Include="Inspections\VariableNeverUsedInspectionTests.cs" />
+    <Compile Include="Inspections\VariableNotAssignedInspectionTests.cs" />
+    <Compile Include="Inspections\VariableNotUsedInspectionTests.cs" />
     <Compile Include="Inspections\VariableTypeNotDeclaredInspectionTests.cs" />
-    <Compile Include="Mocks\MockFactory.cs" />
     <Compile Include="Mocks\MockProjectBuilder.cs" />
     <Compile Include="Mocks\MockUserFormBuilder.cs" />
     <Compile Include="Mocks\MockVbeBuilder.cs" />
-    <Compile Include="Mocks\MockWindowsCollection.cs" />
+    <Compile Include="Mocks\Windows.cs" />
     <Compile Include="MultiAssert.cs" />
     <Compile Include="Preprocessing\VBAPreprocessorTests.cs" />
     <Compile Include="Preprocessing\VBAPreprocessorVisitorTests.cs" />
     <Compile Include="Refactoring\EncapsulateFieldTests.cs" />
-    <Compile Include="Refactoring\ExtractMethodTests.cs" />
+    <Compile Include="Refactoring\ExtractInterfaceTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractedMethodRefactoringTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodExtractionTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodParameterClassificationTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodRuleExternalReferenceTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodRuleInSelectionTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodRuleIsAssignedInSelectionTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodRuleUsedAfterTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodRuleUsedBeforeTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodSelectionValidationTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodTests.cs" />
+    <Compile Include="Refactoring\ExtractMethod\ExtractMethodModelTests.cs" />
+    <Compile Include="Refactoring\ImplementInterfaceTests.cs" />
     <Compile Include="Refactoring\IntroduceFieldTests.cs" />
     <Compile Include="Refactoring\MoveCloserToUsageTests.cs" />
     <Compile Include="Refactoring\IntroduceParameterTests.cs" />
     <Compile Include="Refactoring\RemoveParametersTests.cs" />
     <Compile Include="Refactoring\RenameTests.cs" />
     <Compile Include="Refactoring\ReorderParametersTests.cs" />
+    <Compile Include="Settings\HotkeySettingsTests.cs" />
     <Compile Include="Settings\InspectionSettingsTests.cs" />
     <Compile Include="Settings\GeneralSettingsTests.cs" />
     <Compile Include="Settings\IndenterSettingsTests.cs" />
-    <Compile Include="Settings\SettingsControlTests.cs" />
     <Compile Include="Settings\TodoSettingsTests.cs" />
     <Compile Include="Settings\UnitTestSettingsTests.cs" />
+    <Compile Include="SmartIndenter\EndOfLineCommentTests.cs" />
+    <Compile Include="SmartIndenter\LineContinuationTests.cs" />
+    <Compile Include="SmartIndenter\MiscAndCornerCaseTests.cs" />
+    <Compile Include="SmartIndenter\MultiSegmentLineTests.cs" />
+    <Compile Include="SmartIndenter\SpecificSettingTests.cs" />
     <Compile Include="SourceControlConfig.cs" />
     <Compile Include="SourceControl\BranchesViewModelTests.cs" />
     <Compile Include="SourceControl\ChangesViewModelTests.cs" />
     <Compile Include="SourceControl\SettingsViewModelTests.cs" />
-    <Compile Include="SourceControl\SourceControlTests.cs" />
     <Compile Include="SourceControl\SourceControlViewModelTests.cs" />
     <Compile Include="SourceControl\UnsyncedCommitsViewModelTests.cs" />
     <Compile Include="StringExtensionsTests.cs" />
-    <Compile Include="TodoControllerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TodoExplorer\TodoExplorerTests.cs" />
     <Compile Include="UnitTesting\AssertTests.cs" />
     <Compile Include="UnitTesting\EngineTests.cs" />
+    <Compile Include="UnitTesting\DiscoveryTests.cs" />
+    <Compile Include="UnitTesting\ViewModelTests.cs" />
     <Compile Include="VbeTestBase.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="NLog.dll.nlog">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -158,6 +224,10 @@
     <ProjectReference Include="..\Rubberduck.Parsing\Rubberduck.Parsing.csproj">
       <Project>{a4a618e1-cbca-435f-9c6c-5181e030adfc}</Project>
       <Name>Rubberduck.Parsing</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Rubberduck.SettingsProvider\Rubberduck.SettingsProvider.csproj">
+      <Project>{e85e1253-86d6-45ee-968b-f37348d44132}</Project>
+      <Name>Rubberduck.SettingsProvider</Name>
     </ProjectReference>
     <ProjectReference Include="..\Rubberduck.SmartIndenter\Rubberduck.SmartIndenter.csproj">
       <Project>{b9c0bf22-4d8a-4bf4-89f9-e789c0063deb}</Project>
@@ -250,6 +320,42 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Testfiles\Preprocessor\Reference_Module_1.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\ADODB.6.1.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\ADOR.6.0.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\Excel.1.8.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\MSForms.2.0.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\MSXML2.6.0.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\Office.2.7.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\Scripting.1.0.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\SHDocVw.1.1.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\stdole.2.0.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\VBA.4.2.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\VBIDE.5.3.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Testfiles\Resolver\VBScript_RegExp_55.5.5.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

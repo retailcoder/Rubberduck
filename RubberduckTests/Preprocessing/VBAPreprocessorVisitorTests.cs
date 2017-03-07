@@ -2,8 +2,8 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Preprocessing;
-using Rubberduck.Parsing.Symbols;
 using System;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace RubberduckTests.Preprocessing
@@ -34,12 +34,14 @@ namespace RubberduckTests.Preprocessing
 #Const c = doesNotExist
 #Const d& = 1
 #Const e = d%
+#Const f = [a]
 ";
             var result = Preprocess(code);
             Assert.AreEqual(result.Item1.Get("b"), result.Item1.Get("a"));
             Assert.AreEqual(EmptyValue.Value, result.Item1.Get("c"));
             Assert.AreEqual(1m, result.Item1.Get("d").AsDecimal);
             Assert.AreEqual(1m, result.Item1.Get("e").AsDecimal);
+            Assert.AreEqual(5m, result.Item1.Get("f").AsDecimal);
         }
 
         [TestMethod]
@@ -364,15 +366,15 @@ namespace RubberduckTests.Preprocessing
 #Const c = CStr(True)
 #Const d = CStr(False)
 #Const e = CStr(345.23)
-#Const f = CStr(#30-12-1899 02:01#) #30-12-1899 02:01#
-#Const g = CStr(#1/31/2016#) 31.01.2016
+#Const f = CStr(#30-12-1899 02:01#)
+#Const g = CStr(#1/31/2016#)
 ";
             var result = Preprocess(code);
             Assert.AreEqual(null, result.Item1.Get("a"));
             Assert.AreEqual(string.Empty, result.Item1.Get("b").AsString);
             Assert.AreEqual("True", result.Item1.Get("c").AsString);
             Assert.AreEqual("False", result.Item1.Get("d").AsString);
-            Assert.AreEqual(345.23.ToString(), result.Item1.Get("e").AsString);
+            Assert.AreEqual(345.23.ToString(CultureInfo.InvariantCulture), result.Item1.Get("e").AsString);
             Assert.AreEqual(new DateTime(1899, 12, 30, 2, 1, 0).ToLongTimeString(), result.Item1.Get("f").AsString);
             Assert.AreEqual(new DateTime(2016, 1, 31).ToShortDateString(), result.Item1.Get("g").AsString);
         }
@@ -999,8 +1001,8 @@ namespace RubberduckTests.Preprocessing
         public void TestNumberLiteral()
         {
             string code = @"
-#Const a = &HAF$
-#Const b = &O423#
+#Const a = &HAF%
+#Const b = &O423^
 #Const c = -50.323e5
 ";
             var result = Preprocess(code);
@@ -1179,6 +1181,85 @@ End Sub
             var result = Preprocess(code);
             Assert.AreEqual(evaluated, result.Item2.AsString);
         }
+
+        [TestMethod]
+        public void TestLogicalLinesHasConditionalCompilationKeywords()
+        {
+            string code = @"
+Sub FileTest()
+    Open ""TESTFILE"" For Input As #iFile
+    Close #iFile
+End Sub
+";
+
+            string evaluated = @"
+Sub FileTest()
+    Open ""TESTFILE"" For Input As #iFile
+    Close #iFile
+End Sub
+";
+            var result = Preprocess(code);
+            Assert.AreEqual(evaluated, result.Item2.AsString);
+        }
+
+        [TestMethod]
+        public void TestPtrSafeKeywordAsConstant()
+        {
+            string code = @"
+#Const PtrSafe = True
+#If PtrSafe Then
+    Public Declare PtrSafe Function GetActiveWindow Lib ""User32"" () As LongPtr
+#Else
+    Public Declare Function GetActiveWindow Lib ""User32""() As Long
+#End If
+";
+
+            string evaluated = @"
+
+
+    Public Declare PtrSafe Function GetActiveWindow Lib ""User32"" () As LongPtr
+
+
+
+";
+            var result = Preprocess(code);
+            Assert.AreEqual(evaluated, result.Item2.AsString);
+        }
+
+        [TestMethod]
+        public void TestIgnoresComment()
+        {
+            string code = @"
+       ' #if defined(WIN32)
+        '    unsigned long cbElements;   // Size of an element of the array.
+        '                                // Does not include size of
+        '                                // pointed-to data.
+        '    unsigned long cLocks;       // Number of times the array has been
+        '                                // locked without corresponding unlock.
+        ' #Else
+        '    unsigned short cbElements;
+        '    unsigned short cLocks;
+        '    unsigned long handle;       // Used on Macintosh only.
+        ' #End If
+";
+
+            string evaluated = @"
+       ' #if defined(WIN32)
+        '    unsigned long cbElements;   // Size of an element of the array.
+        '                                // Does not include size of
+        '                                // pointed-to data.
+        '    unsigned long cLocks;       // Number of times the array has been
+        '                                // locked without corresponding unlock.
+        ' #Else
+        '    unsigned short cbElements;
+        '    unsigned short cLocks;
+        '    unsigned long handle;       // Used on Macintosh only.
+        ' #End If
+";
+            var result = Preprocess(code);
+            Assert.AreEqual(evaluated, result.Item2.AsString);
+        }
+
         private Tuple<SymbolTable<string, IValue>, IValue> Preprocess(string code)
         {
             SymbolTable<string, IValue> symbolTable = new SymbolTable<string, IValue>();
@@ -1186,10 +1267,13 @@ End Sub
             var lexer = new VBALexer(stream);
             var tokens = new CommonTokenStream(lexer);
             var parser = new VBAConditionalCompilationParser(tokens);
-            parser.AddErrorListener(new ExceptionErrorListener());
-            var evaluator = new VBAPreprocessorVisitor(symbolTable, new VBAPredefinedCompilationConstants(7.01));
+            parser.ErrorHandler = new BailErrorStrategy();
+            //parser.AddErrorListener(new ExceptionErrorListener());
             var tree = parser.compilationUnit();
+            var evaluator = new VBAPreprocessorVisitor(symbolTable, new VBAPredefinedCompilationConstants(7.01), tree.start.InputStream);
             var expr = evaluator.Visit(tree);
+
+            Debug.Assert(parser.NumberOfSyntaxErrors == 0);
             return Tuple.Create(symbolTable, expr.Evaluate());
         }
     }

@@ -1,30 +1,36 @@
 ﻿using Rubberduck.Parsing.VBA;
-using Rubberduck.VBEditor;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.Refactorings.EncapsulateField
 {
     public class EncapsulateFieldPresenterFactory : IRefactoringPresenterFactory<EncapsulateFieldPresenter>
     {
-        private readonly IActiveCodePaneEditor _editor;
-        private readonly IEncapsulateFieldView _view;
-        private readonly RubberduckParserState _parseResult;
+        private readonly IVBE _vbe;
+        private readonly IEncapsulateFieldDialog _view;
+        private readonly RubberduckParserState _state;
 
-        public EncapsulateFieldPresenterFactory(RubberduckParserState parseResult, IActiveCodePaneEditor editor, IEncapsulateFieldView view)
+        public EncapsulateFieldPresenterFactory(IVBE vbe, RubberduckParserState state, IEncapsulateFieldDialog view)
         {
-            _editor = editor;
+            _vbe = vbe;
             _view = view;
-            _parseResult = parseResult;
+            _state = state;
         }
 
         public EncapsulateFieldPresenter Create()
         {
-            var selection = _editor.GetSelection();
-            if (selection == null)
+            var pane = _vbe.ActiveCodePane;
+            if (pane == null || pane.IsWrappingNullReference)
             {
                 return null;
             }
 
-            var model = new EncapsulateFieldModel(_parseResult, selection.Value);
+            var selection = pane.GetQualifiedSelection();
+            if (!selection.HasValue)
+            {
+                return null;
+            }
+
+            var model = new EncapsulateFieldModel(_state, selection.Value);
             return new EncapsulateFieldPresenter(_view, model);
         }
     }

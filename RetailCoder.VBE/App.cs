@@ -1,371 +1,205 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using System.Runtime.InteropServices.ComTypes;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using Microsoft.Vbe.Interop;
+﻿using System.Collections.Generic;
+using System.IO;
+using Infralution.Localization.Wpf;
 using NLog;
 using Rubberduck.Common;
-using Rubberduck.Parsing;
-using Rubberduck.Parsing.VBA;
 using Rubberduck.Settings;
-using Rubberduck.SmartIndenter;
 using Rubberduck.UI;
 using Rubberduck.UI.Command.MenuItems;
-using Infralution.Localization.Wpf;
-using Rubberduck.Common.Dispatch;
+using System;
+using System.Globalization;
+using System.Windows.Forms;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.UI.Command;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using Rubberduck.VersionCheck;
+using Application = System.Windows.Forms.Application;
 
 namespace Rubberduck
 {
-    public class App : IDisposable
+    public sealed class App : IDisposable
     {
-        private readonly VBE _vbe;
         private readonly IMessageBox _messageBox;
-        private readonly IRubberduckParser _parser;
         private readonly AutoSave.AutoSave _autoSave;
         private readonly IGeneralConfigService _configService;
         private readonly IAppMenu _appMenus;
-        private readonly RubberduckCommandBar _stateBar;
-        private readonly IIndenter _indenter;
         private readonly IRubberduckHooks _hooks;
+        private readonly IVersionCheck _version;
+        private readonly CommandBase _checkVersionCommand;
 
-        private readonly Logger _logger;
-
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        
         private Configuration _config;
 
-        private readonly IConnectionPoint _projectsEventsConnectionPoint;
-        private readonly int _projectsEventsCookie;
-
-        private readonly IDictionary<VBProjectsEventsSink, Tuple<IConnectionPoint, int>>  _componentsEventsConnectionPoints = 
-            new Dictionary<VBProjectsEventsSink, Tuple<IConnectionPoint, int>>();
-        private readonly IDictionary<VBProjectsEventsSink, Tuple<IConnectionPoint, int>> _referencesEventsConnectionPoints =
-            new Dictionary<VBProjectsEventsSink, Tuple<IConnectionPoint, int>>();
-
-        public App(VBE vbe, IMessageBox messageBox,
-            IRubberduckParser parser,
+        public App(IVBE vbe, 
+            IMessageBox messageBox,
             IGeneralConfigService configService,
             IAppMenu appMenus,
-            RubberduckCommandBar stateBar,
-            IIndenter indenter,
-            IRubberduckHooks hooks)
+            IRubberduckHooks hooks,
+            IVersionCheck version,
+            CommandBase checkVersionCommand)
         {
-            _vbe = vbe;
             _messageBox = messageBox;
-            _parser = parser;
             _configService = configService;
-            _autoSave = new AutoSave.AutoSave(_vbe, _configService);
+            _autoSave = new AutoSave.AutoSave(vbe, _configService);
             _appMenus = appMenus;
-            _stateBar = stateBar;
-            _indenter = indenter;
             _hooks = hooks;
-            _logger = LogManager.GetCurrentClassLogger();
+            _version = version;
+            _checkVersionCommand = checkVersionCommand;
 
-            _hooks.MessageReceived += _hooks_MessageReceived;
             _configService.SettingsChanged += _configService_SettingsChanged;
-            _configService.LanguageChanged += ConfigServiceLanguageChanged;
-            _parser.State.StateChanged += Parser_StateChanged;
-            _parser.State.StatusMessageUpdate += State_StatusMessageUpdate;
-            _stateBar.Refresh += _stateBar_Refresh;
-
-            var sink = new VBProjectsEventsSink();
-            var connectionPointContainer = (IConnectionPointContainer)_vbe.VBProjects;
-            var interfaceId = typeof (_dispVBProjectsEvents).GUID;
-            connectionPointContainer.FindConnectionPoint(ref interfaceId, out _projectsEventsConnectionPoint);
             
-            sink.ProjectAdded += sink_ProjectAdded;
-            sink.ProjectRemoved += sink_ProjectRemoved;
-            sink.ProjectActivated += sink_ProjectActivated;
-            sink.ProjectRenamed += sink_ProjectRenamed;
-
-            _projectsEventsConnectionPoint.Advise(sink, out _projectsEventsCookie);
-
             UiDispatcher.Initialize();
         }
 
-        private void State_StatusMessageUpdate(object sender, RubberduckStatusMessageEventArgs e)
+        private void _configService_SettingsChanged(object sender, ConfigurationChangedEventArgs e)
         {
-            var message = e.Message;
-            if (message == ParserState.LoadingReference.ToString())
-            {
-                // note: ugly hack to enable Rubberduck.Parsing assembly to do this
-                message = RubberduckUI.ParserState_LoadingReference;
-            }
-
-            _stateBar.SetStatusText(message);
-        }
-
-        private void _hooks_MessageReceived(object sender, HookEventArgs e)
-        {
-            RefreshSelection();
-        }
-
-        private ParserState _lastStatus;
-        private void RefreshSelection()
-        {
-            _stateBar.SetSelectionText(_parser.State.FindSelectedDeclaration(_vbe.ActiveCodePane));
-
-            var currentStatus = _parser.State.Status;
-            if (_lastStatus != currentStatus)
-            {
-                _appMenus.EvaluateCanExecute(_parser.State);
-            }
-
-            _lastStatus = currentStatus;
-        }
-
-        private void _configService_SettingsChanged(object sender, EventArgs e)
-        {
+            _config = _configService.LoadConfiguration();
+            _hooks.HookHotkeys();
             // also updates the ShortcutKey text
             _appMenus.Localize();
-            _hooks.HookHotkeys();
+            UpdateLoggingLevel();
+
+            if (e.LanguageChanged)
+            {
+                LoadConfig();
+            }
+        }
+
+        private static void EnsureLogFolderPathExists()
+        {
+            try
+            {
+                if (!Directory.Exists(ApplicationConstants.LOG_FOLDER_PATH))
+                {
+                    Directory.CreateDirectory(ApplicationConstants.LOG_FOLDER_PATH);
+                }
+            }
+            catch
+            {
+                //Does this need to display some sort of dialog?
+            }
+        }
+
+        private void UpdateLoggingLevel()
+        {
+            LogLevelHelper.SetMinimumLogLevel(LogLevel.FromOrdinal(_config.UserSettings.GeneralSettings.MinimumLogLevel));
         }
 
         public void Startup()
         {
-            CleanReloadConfig();
-
-            foreach (var project in _vbe.VBProjects.Cast<VBProject>())
-            {
-                _parser.State.AddProject(project);
-            }
-
+            EnsureLogFolderPathExists();
+            LogRubberduckSart();
+            LoadConfig();
+            CheckForLegacyIndenterSettings();
             _appMenus.Initialize();
+            _hooks.HookHotkeys(); // need to hook hotkeys before we localize menus, to correctly display ShortcutTexts
             _appMenus.Localize();
 
-            Task.Delay(1000).ContinueWith(t =>
+            UpdateLoggingLevel();
+
+            if (_config.UserSettings.GeneralSettings.CheckVersion)
             {
-                // run this on UI thread
-                UiDispatcher.Invoke(() =>
-                {
-                    _parser.State.OnParseRequested(this);
-                });
-            }).ConfigureAwait(false);
-
-            _hooks.HookHotkeys();
-        }
-
-        #region sink handlers. todo: move to another class
-        async void sink_ProjectRemoved(object sender, DispatcherEventArgs<VBProject> e)
-        {
-            var sink = (VBProjectsEventsSink)sender;
-            _componentsEventSinks.Remove(sink);
-            _referencesEventsSinks.Remove(sink);
-            _parser.State.RemoveProject(e.Item);
-
-            Debug.WriteLine(string.Format("Project '{0}' was removed.", e.Item.Name));
-            Tuple<IConnectionPoint, int> componentsTuple;
-            if (_componentsEventsConnectionPoints.TryGetValue(sink, out componentsTuple))
-            {
-                componentsTuple.Item1.Unadvise(componentsTuple.Item2);
-                _componentsEventsConnectionPoints.Remove(sink);
+                _checkVersionCommand.Execute(null);
             }
+        }
 
-            Tuple<IConnectionPoint, int> referencesTuple;
-            if (_referencesEventsConnectionPoints.TryGetValue(sink, out referencesTuple))
+        public void Shutdown()
+        {
+            try
             {
-                referencesTuple.Item1.Unadvise(referencesTuple.Item2);
-                _referencesEventsConnectionPoints.Remove(sink);
+                _hooks.Detach();
             }
-
-            _parser.State.ClearDeclarations(e.Item);
-        }
-
-        private readonly IDictionary<VBProjectsEventsSink, VBComponentsEventsSink> _componentsEventSinks = 
-            new Dictionary<VBProjectsEventsSink, VBComponentsEventsSink>();
-
-        private readonly IDictionary<VBProjectsEventsSink, ReferencesEventsSink> _referencesEventsSinks = 
-            new Dictionary<VBProjectsEventsSink, ReferencesEventsSink>();
-
-        async void sink_ProjectAdded(object sender, DispatcherEventArgs<VBProject> e)
-        {
-            var sink = (VBProjectsEventsSink)sender;
-            RegisterComponentsEventSink(e, sink);
-            _parser.State.AddProject(e.Item);
-
-            if (!_parser.State.AllDeclarations.Any())
+            catch
             {
-                // forces menus to evaluate their CanExecute state:
-                Parser_StateChanged(this, new ParserStateEventArgs(ParserState.Pending));
-                _stateBar.SetStatusText();
-                return;
+                // Won't matter anymore since we're shutting everything down anyway.
             }
-
-            Debug.WriteLine(string.Format("Project '{0}' was added.", e.Item.Name));
-            _parser.State.OnParseRequested(sender);
-        }
-
-        private void RegisterComponentsEventSink(DispatcherEventArgs<VBProject> e, VBProjectsEventsSink sink)
-        {
-            var connectionPointContainer = (IConnectionPointContainer) e.Item.VBComponents;
-            var interfaceId = typeof (_dispVBComponentsEvents).GUID;
-
-            IConnectionPoint connectionPoint;
-            connectionPointContainer.FindConnectionPoint(ref interfaceId, out connectionPoint);
-
-            var componentsSink = new VBComponentsEventsSink();
-            componentsSink.ComponentActivated += sink_ComponentActivated;
-            componentsSink.ComponentAdded += sink_ComponentAdded;
-            componentsSink.ComponentReloaded += sink_ComponentReloaded;
-            componentsSink.ComponentRemoved += sink_ComponentRemoved;
-            componentsSink.ComponentRenamed += sink_ComponentRenamed;
-            componentsSink.ComponentSelected += sink_ComponentSelected;
-            _componentsEventSinks.Add(sink, componentsSink);
-
-            int cookie;
-            connectionPoint.Advise(componentsSink, out cookie);
-
-            _componentsEventsConnectionPoints.Add(sink, Tuple.Create(connectionPoint, cookie));
-        }
-
-        async void sink_ComponentSelected(object sender, DispatcherEventArgs<VBComponent> e)
-        {
-            if (!_parser.State.AllDeclarations.Any())
-            {
-                return;
-            }
-
-            Debug.WriteLine(string.Format("Component '{0}' was selected.", e.Item.Name));
-            // do something?
-        }
-
-        async void sink_ComponentRenamed(object sender, DispatcherRenamedEventArgs<VBComponent> e)
-        {
-            if (!_parser.State.AllDeclarations.Any())
-            {
-                return;
-            }
-
-            Debug.WriteLine(string.Format("Component '{0}' was renamed.", e.Item.Name));
-
-            _parser.State.OnParseRequested(sender, e.Item);
-        }
-
-        async void sink_ComponentRemoved(object sender, DispatcherEventArgs<VBComponent> e)
-        {
-            if (!_parser.State.AllDeclarations.Any())
-            {
-                return;
-            }
-
-            Debug.WriteLine(string.Format("Component '{0}' was removed.", e.Item.Name));
-            _parser.State.ClearDeclarations(e.Item);
-        }
-
-        async void sink_ComponentReloaded(object sender, DispatcherEventArgs<VBComponent> e)
-        {
-            if (!_parser.State.AllDeclarations.Any())
-            {
-                return;
-            }
-
-            Debug.WriteLine(string.Format("Component '{0}' was reloaded.", e.Item.Name));
-            _parser.State.OnParseRequested(sender, e.Item);
-        }
-
-        async void sink_ComponentAdded(object sender, DispatcherEventArgs<VBComponent> e)
-        {
-            if (!_parser.State.AllDeclarations.Any())
-            {
-                return;
-            }
-
-            Debug.WriteLine(string.Format("Component '{0}' was added.", e.Item.Name));
-            _parser.State.OnParseRequested(sender, e.Item);
-        }
-
-        async void sink_ComponentActivated(object sender, DispatcherEventArgs<VBComponent> e)
-        {
-            if (!_parser.State.AllDeclarations.Any())
-            {
-                return;
-            }
-
-            Debug.WriteLine(string.Format("Component '{0}' was activated.", e.Item.Name));
-            // do something?
-        }
-
-        async void sink_ProjectRenamed(object sender, DispatcherRenamedEventArgs<VBProject> e)
-        {
-            if (!_parser.State.AllDeclarations.Any())
-            {
-                return;
-            }
-
-            Debug.WriteLine("Project '{0}' (ID {1}) was renamed to '{2}'.", e.OldName, e.Item.HelpFile, e.Item.Name);
-            _parser.State.RemoveProject(e.Item.HelpFile);
-            _parser.State.OnParseRequested(sender);
-        }
-
-        async void sink_ProjectActivated(object sender, DispatcherEventArgs<VBProject> e)
-        {
-            if (!_parser.State.AllDeclarations.Any())
-            {
-                return;
-            }
-
-            Debug.WriteLine(string.Format("Project '{0}' was activated.", e.Item.Name));
-            // do something?
-        }
-        #endregion
-
-        private void _stateBar_Refresh(object sender, EventArgs e)
-        {
-            // handles "refresh" button click on "Rubberduck" command bar
-            _parser.State.OnParseRequested(sender);
-        }
-
-        private void Parser_StateChanged(object sender, EventArgs e)
-        {
-            Debug.WriteLine("App handles StateChanged ({0}), evaluating menu states...", _parser.State.Status);
-            _appMenus.EvaluateCanExecute(_parser.State);
-        }
-
-        private void CleanReloadConfig()
-        {
-            LoadConfig();
-        }
-
-        private void ConfigServiceLanguageChanged(object sender, EventArgs e)
-        {
-            CleanReloadConfig();
         }
 
         private void LoadConfig()
         {
-            _logger.Debug("Loading configuration");
             _config = _configService.LoadConfiguration();
+            _autoSave.ConfigServiceSettingsChanged(this, EventArgs.Empty);
 
             var currentCulture = RubberduckUI.Culture;
             try
             {
                 CultureManager.UICulture = CultureInfo.GetCultureInfo(_config.UserSettings.GeneralSettings.Language.Code);
+                RubberduckUI.Culture = CultureInfo.CurrentUICulture;
+                InspectionsUI.Culture = CultureInfo.CurrentUICulture;
                 _appMenus.Localize();
             }
             catch (CultureNotFoundException exception)
             {
-                _logger.Error(exception, "Error Setting Culture for Rubberduck");
+                Logger.Error(exception, "Error Setting Culture for Rubberduck");
                 _messageBox.Show(exception.Message, "Rubberduck", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 _config.UserSettings.GeneralSettings.Language.Code = currentCulture.Name;
                 _configService.SaveConfiguration(_config);
             }
         }
 
+        private void CheckForLegacyIndenterSettings()
+        {
+            try
+            {
+                Logger.Trace("Checking for legacy Smart Indenter settings.");
+                if (_config.UserSettings.GeneralSettings.SmartIndenterPrompted ||
+                    !_config.UserSettings.IndenterSettings.LegacySettingsExist())
+                {
+                    return;
+                }
+                var response =
+                    _messageBox.Show(RubberduckUI.SmartIndenter_LegacySettingPrompt, "Rubberduck", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (response == DialogResult.Yes)
+                {
+                    Logger.Trace("Attempting to load legacy Smart Indenter settings.");
+                    _config.UserSettings.IndenterSettings.LoadLegacyFromRegistry();
+                }
+                _config.UserSettings.GeneralSettings.SmartIndenterPrompted = true;
+                _configService.SaveConfiguration(_config);
+            }
+            catch 
+            {
+                //Meh.
+            }
+        }
+
+        private void LogRubberduckSart()
+        {
+            var version = _version.CurrentVersion;
+            GlobalDiagnosticsContext.Set("RubberduckVersion", version.ToString());
+            var headers = new List<string>
+            {
+                string.Format("Rubberduck version {0} loading:", version),
+                string.Format("\tOperating System: {0} {1}", Environment.OSVersion.VersionString, Environment.Is64BitOperatingSystem ? "x64" : "x86"),
+                string.Format("\tHost Product: {0} {1}", Application.ProductName, Environment.Is64BitProcess ? "x64" : "x86"),
+                string.Format("\tHost Version: {0}", Application.ProductVersion),
+                string.Format("\tHost Executable: {0}", Path.GetFileName(Application.ExecutablePath)),
+            };
+            Logger.Log(LogLevel.Info, string.Join(Environment.NewLine, headers));
+        }
+
+        private bool _disposed;
         public void Dispose()
         {
-            _configService.LanguageChanged -= ConfigServiceLanguageChanged;
-            _parser.State.StateChanged -= Parser_StateChanged;
-            _autoSave.Dispose();
-
-            _projectsEventsConnectionPoint.Unadvise(_projectsEventsCookie);
-            foreach (var item in _componentsEventsConnectionPoints)
+            if (_disposed)
             {
-                item.Value.Item1.Unadvise(item.Value.Item2);
+                return;
             }
 
-            _hooks.Dispose();
+            if (_configService != null)
+            {
+                _configService.SettingsChanged -= _configService_SettingsChanged;
+            }
+
+            if (_autoSave != null)
+            {
+                _autoSave.Dispose();
+            }
+
+            UiDispatcher.Shutdown();
+
+            _disposed = true;
         }
     }
 }

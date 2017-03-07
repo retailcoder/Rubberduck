@@ -1,4 +1,6 @@
-﻿using Microsoft.Vbe.Interop;
+﻿using Rubberduck.Settings;
+using Rubberduck.SettingsProvider;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.ToDoItems
 {
@@ -7,9 +9,8 @@ namespace Rubberduck.UI.ToDoItems
     /// </summary>
     public class ToDoExplorerDockablePresenter : DockableToolwindowPresenter
     {
-
-        public ToDoExplorerDockablePresenter(VBE vbe, AddIn addin, IDockableUserControl window)
-            : base(vbe, addin, window)
+        public ToDoExplorerDockablePresenter(IVBE vbe, IAddIn addin, ToDoExplorerWindow window, IConfigProvider<WindowSettings> settings)
+            : base(vbe, addin, window, settings)
         {
         }
     }

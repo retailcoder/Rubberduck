@@ -1,13 +1,10 @@
 using System.Linq;
-using Microsoft.Vbe.Interop;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
 using System.Runtime.InteropServices;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.Rename;
 using Rubberduck.UI.Refactorings;
-using Rubberduck.VBEditor.Extensions;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
@@ -15,21 +12,26 @@ namespace Rubberduck.UI.Command.Refactorings
     public class ProjectExplorerRefactorRenameCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
-        private readonly ICodePaneWrapperFactory _wrapperWrapperFactory;
+        private readonly IMessageBox _msgBox;
 
-        public ProjectExplorerRefactorRenameCommand(VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor, ICodePaneWrapperFactory wrapperWrapperFactory) 
-            : base (vbe, editor)
+        public ProjectExplorerRefactorRenameCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgBox) 
+            : base (vbe)
         {
             _state = state;
-            _wrapperWrapperFactory = wrapperWrapperFactory;
+            _msgBox = msgBox;
         }
 
-        public override void Execute(object parameter)
+        protected override bool CanExecuteImpl(object parameter)
+        {
+            return _state.Status == ParserState.Ready;
+        }
+
+        protected override void ExecuteImpl(object parameter)
         {
             using (var view = new RenameDialog())
             {
-                var factory = new RenamePresenterFactory(Vbe, view, _state, new MessageBox(), _wrapperWrapperFactory);
-                var refactoring = new RenameRefactoring(factory, Editor, new MessageBox(), _state);
+                var factory = new RenamePresenterFactory(Vbe, view, _state, _msgBox);
+                var refactoring = new RenameRefactoring(Vbe, factory, _msgBox, _state);
 
                 var target = GetTarget();
 
@@ -54,9 +56,9 @@ namespace Rubberduck.UI.Command.Refactorings
                             t.ProjectId == Vbe.ActiveVBProject.HelpFile &&
                             new[]
                                 {
-                                    DeclarationType.Class,
+                                    DeclarationType.ClassModule,
                                     DeclarationType.Document,
-                                    DeclarationType.Module,
+                                    DeclarationType.ProceduralModule,
                                     DeclarationType.UserForm
                                 }.Contains(t.DeclarationType));
         }

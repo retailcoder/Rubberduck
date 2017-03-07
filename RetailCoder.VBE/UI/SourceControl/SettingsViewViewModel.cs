@@ -2,40 +2,57 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
-using System.Windows.Input;
-using Rubberduck.Settings;
+using NLog;
+using Rubberduck.SettingsProvider;
 using Rubberduck.UI.Command;
 using Rubberduck.SourceControl;
 
 namespace Rubberduck.UI.SourceControl
 {
-    public class SettingsViewViewModel : ViewModelBase, IControlViewModel
+    public class SettingsViewViewModel : ViewModelBase, IControlViewModel, IDisposable
     {
-        private readonly IConfigurationService<SourceControlConfiguration> _configService;
+        private readonly IConfigProvider<SourceControlSettings> _configService;
         private readonly IFolderBrowserFactory _folderBrowserFactory;
-        private readonly SourceControlConfiguration _config;
+        private readonly IOpenFileDialog _openFileDialog;
+        private readonly SourceControlSettings _config;
 
         public SettingsViewViewModel(
-            IConfigurationService<SourceControlConfiguration> configService,
-            IFolderBrowserFactory folderBrowserFactory)
+            IConfigProvider<SourceControlSettings> configService,
+            IFolderBrowserFactory folderBrowserFactory,
+            IOpenFileDialog openFileDialog)
         {
             _configService = configService;
             _folderBrowserFactory = folderBrowserFactory;
-            _config = _configService.LoadConfiguration();
+            _config = _configService.Create();
+
+            _openFileDialog = openFileDialog;
+            _openFileDialog.Filter = "Executables (*.exe)|*.exe|All files (*.*)|*.*";
+            _openFileDialog.Multiselect = false;
+            _openFileDialog.ReadOnlyChecked = true;
+            _openFileDialog.CheckFileExists = true;
 
             UserName = _config.UserName;
             EmailAddress = _config.EmailAddress;
             DefaultRepositoryLocation = _config.DefaultRepositoryLocation;
+            CommandPromptLocation = _config.CommandPromptLocation;
 
-            _showFilePickerCommand = new DelegateCommand(_ => ShowFilePicker());
-            _cancelSettingsChangesCommand = new DelegateCommand(_ => CancelSettingsChanges());
-            _updateSettingsCommand = new DelegateCommand(_ => UpdateSettings());
-            _showGitIgnoreCommand = new DelegateCommand(_ => ShowGitIgnore(), _ => Provider != null);
-            _showGitAttributesCommand = new DelegateCommand(_ => ShowGitAttributes(), _ => Provider != null);
+            _showDefaultRepoFolderPickerCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => ShowDefaultRepoFolderPicker());
+            _showCommandPromptExePickerCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => ShowCommandPromptExePicker());
+            _cancelSettingsChangesCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => CancelSettingsChanges());
+            _updateSettingsCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => UpdateSettings());
+            _showGitIgnoreCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => ShowGitIgnore(), _ => Provider != null);
+            _showGitAttributesCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => ShowGitAttributes(), _ => Provider != null);
         }
 
         public ISourceControlProvider Provider { get; set; }
-        public void RefreshView() {} // nothing to refresh here
+        public void RefreshView() { } // nothing to refresh here
+
+        public void ResetView()
+        {
+            Provider = null;
+        }
+
+        public SourceControlTab Tab { get { return SourceControlTab.Settings; } }
 
         private string _userName;
         public string UserName
@@ -79,9 +96,23 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private void ShowFilePicker()
+        private string _commandPromptExeLocation;
+        public string CommandPromptLocation
         {
-            using (var folderPicker = _folderBrowserFactory.CreateFolderBrowser("Default Repository Directory"))
+            get { return _commandPromptExeLocation; }
+            set
+            {
+                if (_commandPromptExeLocation != value)
+                {
+                    _commandPromptExeLocation = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private void ShowDefaultRepoFolderPicker()
+        {
+            using (var folderPicker = _folderBrowserFactory.CreateFolderBrowser(RubberduckUI.SourceControl_FilePickerDefaultRepoHeader))
             {
                 if (folderPicker.ShowDialog() == DialogResult.OK)
                 {
@@ -90,11 +121,20 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
+        private void ShowCommandPromptExePicker()
+        {
+            if (_openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                CommandPromptLocation = _openFileDialog.FileName;
+            }
+        }
+
         private void CancelSettingsChanges()
         {
             UserName = _config.UserName;
             EmailAddress = _config.EmailAddress;
             DefaultRepositoryLocation = _config.DefaultRepositoryLocation;
+            CommandPromptLocation = _config.CommandPromptLocation;
         }
 
         private void UpdateSettings()
@@ -102,11 +142,12 @@ namespace Rubberduck.UI.SourceControl
             _config.UserName = UserName;
             _config.EmailAddress = EmailAddress;
             _config.DefaultRepositoryLocation = DefaultRepositoryLocation;
+            _config.CommandPromptLocation = CommandPromptLocation;
 
-            _configService.SaveConfiguration(_config);
+            _configService.Save(_config);
 
             RaiseErrorEvent(RubberduckUI.SourceControl_UpdateSettingsTitle,
-                RubberduckUI.SourceControl_UpdateSettingsMessage);
+                RubberduckUI.SourceControl_UpdateSettingsMessage, NotificationType.Info);
         }
 
         private void ShowGitIgnore()
@@ -146,17 +187,26 @@ namespace Rubberduck.UI.SourceControl
             Process.Start(filePath);
         }
 
-        private readonly ICommand _showFilePickerCommand;
-        public ICommand ShowFilePickerCommand
+        private readonly CommandBase _showDefaultRepoFolderPickerCommand;
+        public CommandBase ShowDefaultRepoFolderPickerCommand
         {
             get
             {
-                return _showFilePickerCommand;
+                return _showDefaultRepoFolderPickerCommand;
             }
         }
 
-        private readonly ICommand _cancelSettingsChangesCommand;
-        public ICommand CancelSettingsChangesCommand
+        private readonly CommandBase _showCommandPromptExePickerCommand;
+        public CommandBase ShowCommandPromptExePickerCommand
+        {
+            get
+            {
+                return _showCommandPromptExePickerCommand;
+            }
+        }
+
+        private readonly CommandBase _cancelSettingsChangesCommand;
+        public CommandBase CancelSettingsChangesCommand
         {
             get
             {
@@ -164,8 +214,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _updateSettingsCommand;
-        public ICommand UpdateSettingsCommand
+        private readonly CommandBase _updateSettingsCommand;
+        public CommandBase UpdateSettingsCommand
         {
             get
             {
@@ -173,8 +223,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _showGitIgnoreCommand;
-        public ICommand ShowGitIgnoreCommand
+        private readonly CommandBase _showGitIgnoreCommand;
+        public CommandBase ShowGitIgnoreCommand
         {
             get
             {
@@ -182,8 +232,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _showGitAttributesCommand;
-        public ICommand ShowGitAttributesCommand
+        private readonly CommandBase _showGitAttributesCommand;
+        public CommandBase ShowGitAttributesCommand
         {
             get
             {
@@ -192,12 +242,29 @@ namespace Rubberduck.UI.SourceControl
         }
 
         public event EventHandler<ErrorEventArgs> ErrorThrown;
-        private void RaiseErrorEvent(string message, string innerMessage)
+        private void RaiseErrorEvent(string message, Exception innerException, NotificationType notificationType)
         {
             var handler = ErrorThrown;
             if (handler != null)
             {
-                handler(this, new ErrorEventArgs(message, innerMessage));
+                handler(this, new ErrorEventArgs(message, innerException, notificationType));
+            }
+        }
+
+        private void RaiseErrorEvent(string title, string message, NotificationType notificationType)
+        {
+            var handler = ErrorThrown;
+            if (handler != null)
+            {
+                handler(this, new ErrorEventArgs(title, message, notificationType));
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_openFileDialog != null)
+            {
+                _openFileDialog.Dispose();
             }
         }
     }

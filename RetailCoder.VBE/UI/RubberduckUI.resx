@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -59,7 +59,7 @@
             : using a System.ComponentModel.TypeConverter
             : and then encoded with base64 encoding.
     -->
-  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+  <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" id="root">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
       <xsd:complexType>
@@ -120,7 +120,7 @@
   <data name="CancelButtonText" xml:space="preserve">
     <value>Cancel</value>
   </data>
-  <data name="DeclarationType_Class" xml:space="preserve">
+  <data name="DeclarationType_ClassModule" xml:space="preserve">
     <value>class</value>
   </data>
   <data name="DeclarationType_Constant" xml:space="preserve">
@@ -141,7 +141,7 @@
   <data name="DeclarationType_LibraryFunction" xml:space="preserve">
     <value>library function</value>
   </data>
-  <data name="DeclarationType_Module" xml:space="preserve">
+  <data name="DeclarationType_ProceduralModule" xml:space="preserve">
     <value>module</value>
   </data>
   <data name="DeclarationType_Parameter" xml:space="preserve">
@@ -338,10 +338,10 @@
   <data name="RubberduckMenu_Refactor" xml:space="preserve">
     <value>&amp;Refactor</value>
   </data>
-  <data name="RubberduckMenu_SourceControl" xml:space="preserve">
+  <data name="ToolsMenu_SourceControl" xml:space="preserve">
     <value>&amp;Source Control</value>
   </data>
-  <data name="RubberduckMenu_TodoItems" xml:space="preserve">
+  <data name="ToolsMenu_TodoItems" xml:space="preserve">
     <value>To&amp;Do Items</value>
   </data>
   <data name="RubberduckMenu_UnitTests" xml:space="preserve">
@@ -385,8 +385,7 @@ Warning: All customized settings will be lost.  Your old file will be saved in '
     <value>Rubberduck Add-In could not be loaded</value>
   </data>
   <data name="Rubberduck_AboutBuild" xml:space="preserve">
-    <value>Build {0} ({1})</value>
-    <comment>0: Version; 1: ProcessorArchitecture</comment>
+    <value>Version {0}</value>
   </data>
   <data name="TodoMarkerBug" xml:space="preserve">
     <value>BUG </value>
@@ -446,9 +445,6 @@ Warning: All customized settings will be lost.  Your old file will be saved in '
   <data name="SourceControl_CreateNewRepo" xml:space="preserve">
     <value>Create New Repository</value>
   </data>
-  <data name="SourceControl_OpenWorkingDirectory" xml:space="preserve">
-    <value>Open Working Directory</value>
-  </data>
   <data name="TestExplorer_TestNumberFailed" xml:space="preserve">
     <value>{0} Failed</value>
   </data>
@@ -497,9 +493,6 @@ Warning: All customized settings will be lost.  Your old file will be saved in '
   <data name="Language_FR" xml:space="preserve">
     <value>French</value>
   </data>
-  <data name="Language_JA" xml:space="preserve">
-    <value>Japanese</value>
-  </data>
   <data name="RemoveParamsDialog_Caption" xml:space="preserve">
     <value>Rubberduck - Remove Parameters</value>
   </data>
@@ -512,17 +505,20 @@ Warning: All customized settings will be lost.  Your old file will be saved in '
   <data name="ParseErrors_Caption" xml:space="preserve">
     <value>Rubberduck - Parser Errors</value>
   </data>
-  <data name="CodeExplorer_AddClassText" xml:space="preserve">
-    <value>&amp;Class module (.cls)</value>
+  <data name="CodeExplorer_AddClassModuleText" xml:space="preserve">
+    <value>Class module (.cls)</value>
   </data>
   <data name="CodeExplorer_AddFormText" xml:space="preserve">
-    <value>User &amp;form</value>
+    <value>User form (.frm)</value>
+    <comment>TC</comment>
   </data>
   <data name="CodeExplorer_AddStdModuleText" xml:space="preserve">
-    <value>&amp;Standard module (.bas)</value>
+    <value>Standard module (.bas)</value>
+    <comment>TC</comment>
   </data>
   <data name="CodeExplorer_AddTestModuleText" xml:space="preserve">
-    <value>&amp;Test module</value>
+    <value>Test module</value>
+    <comment>TC</comment>
   </data>
   <data name="CodeExplorer_DisplayMemberNamesText" xml:space="preserve">
     <value>Display member &amp;names</value>
@@ -531,10 +527,12 @@ Warning: All customized settings will be lost.  Your old file will be saved in '
     <value>Display full &amp;signatures</value>
   </data>
   <data name="CodeExplorer_FindAllImplementationsText" xml:space="preserve">
-    <value>Find &amp;All Implementations...</value>
+    <value>Find All Implementations...</value>
+    <comment>TC</comment>
   </data>
   <data name="CodeExplorer_FindAllReferencesText" xml:space="preserve">
-    <value>&amp;Find All References...</value>
+    <value>Find All References...</value>
+    <comment>TC</comment>
   </data>
   <data name="Inspect" xml:space="preserve">
     <value>Inspect</value>
@@ -551,14 +549,14 @@ Warning: All customized settings will be lost.  Your old file will be saved in '
   <data name="CodeExplorer_RunAllTestsText" xml:space="preserve">
     <value>Run All &amp;Tests</value>
   </data>
-  <data name="CodeExplorer_ShowDesignerText" xml:space="preserve">
-    <value>&amp;Show Designer</value>
-  </data>
   <data name="CodeExplorer_ShowDesignerToolTip" xml:space="preserve">
     <value>Open Designer</value>
   </data>
   <data name="CodeExplorer_ShowFoldersToolTip" xml:space="preserve">
     <value>Toggle folders</value>
+  </data>
+  <data name="CodeExplorer_CopyToolTip" xml:space="preserve">
+    <value>Copy to clipboard</value>
   </data>
   <data name="CodeInspections_CopyToolTip" xml:space="preserve">
     <value>Copy inspection results to clipboard</value>
@@ -684,7 +682,7 @@ Warning: All customized settings will be lost.  Your old file will be saved in '
     <value>Navigation</value>
   </data>
   <data name="TodoSettings_Caption" xml:space="preserve">
-    <value>To-Do Explorer</value>
+    <value>TODO Explorer</value>
   </data>
   <data name="CodeInspections_NumberOfIssuesFound_Plural" xml:space="preserve">
     <value>Rubberduck Code Inspections - {0}
@@ -711,11 +709,11 @@ Warning: All customized settings will be lost.  Your old file will be saved in '
     <value>Renaming to '{0}' clashes with '{1}' in the same scope.
 Are you sure you want to proceed with this rename?</value>
   </data>
+  <data name="RenameDialog_AmbiguousSelection" xml:space="preserve">
+    <value>Please ensure that exactly 1 control is selected before renaming.</value>
+  </data>
   <data name="Rename_DeclarationType" xml:space="preserve">
     <value>Rename {0}</value>
-  </data>
-  <data name="Language_SV" xml:space="preserve">
-    <value>Swedish</value>
   </data>
   <data name="CodeExplorerDockablePresenter_Caption" xml:space="preserve">
     <value>Code Explorer</value>
@@ -727,7 +725,7 @@ Are you sure you want to proceed with this rename?</value>
     <value>About Rubberduck</value>
   </data>
   <data name="AboutWindow_Copyright" xml:space="preserve">
-    <value>© Copyright 2014-2016 Mathieu Guindon &amp; Christopher McClellan</value>
+    <value>© Copyright 2014-2017 Mathieu Guindon &amp; Christopher McClellan</value>
   </data>
   <data name="AboutWindow_SpecialThanksLabel" xml:space="preserve">
     <value>Special Thanks</value>
@@ -754,9 +752,6 @@ Are you sure you want to proceed with this rename?</value>
   <data name="SourceControl_IgnoreFile" xml:space="preserve">
     <value>'.gitignore' File</value>
     <comment>TC</comment>
-  </data>
-  <data name="SourceControl_InitRepoButtonToolTip" xml:space="preserve">
-    <value>Init New Repo from this Project</value>
   </data>
   <data name="SourceControl_RefreshButtonToolTip" xml:space="preserve">
     <value>Refreshes pending changes</value>
@@ -845,9 +840,6 @@ Are you sure you want to proceed with this rename?</value>
   </data>
   <data name="SourceControl_UntrackedFiles" xml:space="preserve">
     <value>Untracked files</value>
-  </data>
-  <data name="CodeExplorer_Inspect" xml:space="preserve">
-    <value>&amp;Inspect</value>
   </data>
   <data name="CodeExplorer_Navigate" xml:space="preserve">
     <value>Na&amp;vigate</value>
@@ -949,7 +941,7 @@ Are you sure you want to proceed with this rename?</value>
   <data name="RegexSearchReplace_Caption" xml:space="preserve">
     <value>Regex Search &amp; Replace</value>
   </data>
-  <data name="RegexSearchReplace_FindButtonLabel" xml:space="preserve">
+  <data name="Find" xml:space="preserve">
     <value>Find</value>
   </data>
   <data name="RegexSearchReplace_ReplaceAllButtonLabel" xml:space="preserve">
@@ -986,19 +978,19 @@ Are you sure you want to proceed with this rename?</value>
     <value>Find symbol</value>
   </data>
   <data name="IndentCurrentModule" xml:space="preserve">
-    <value>Current module</value>
+    <value>Current &amp;Module</value>
   </data>
   <data name="IndentCurrentProcedure" xml:space="preserve">
-    <value>Current procedure</value>
+    <value>Current &amp;Procedure</value>
   </data>
   <data name="IndentCurrentProject" xml:space="preserve">
     <value>Entire project</value>
   </data>
   <data name="SmartIndenterMenu" xml:space="preserve">
-    <value>Indent</value>
+    <value>In&amp;dent</value>
   </data>
   <data name="RefactorMenu_IntroduceParameter" xml:space="preserve">
-    <value>&amp;Introduce Parameter</value>
+    <value>Introduce &amp;Parameter</value>
   </data>
   <data name="RefactorMenu_IntroduceField" xml:space="preserve">
     <value>Introduce &amp;Field</value>
@@ -1062,7 +1054,7 @@ Are you sure you want to proceed with this rename?</value>
     <value>E&amp;xtract Interface</value>
   </data>
   <data name="RefactorMenu_ImplementInterface" xml:space="preserve">
-    <value>Implement Interface</value>
+    <value>&amp;Implement Interface</value>
   </data>
   <data name="ImplementInterface_Caption" xml:space="preserve">
     <value>Rubberduck - Implement Interface</value>
@@ -1094,6 +1086,9 @@ Are you sure you want to proceed with this rename?</value>
   <data name="SettingsCaption_UnitTestSettings" xml:space="preserve">
     <value>Unit Test Settings</value>
   </data>
+  <data name="SettingsCaption_WindowSettings" xml:space="preserve">
+    <value>Window Settings</value>
+  </data>
   <data name="SeverityLabelText" xml:space="preserve">
     <value>Severity:</value>
   </data>
@@ -1105,6 +1100,9 @@ Are you sure you want to proceed with this rename?</value>
   </data>
   <data name="SettingsInstructions_UnitTestSettings" xml:space="preserve">
     <value>Configure the settings for new unit test modules and methods.</value>
+  </data>
+  <data name="SettingsInstructions_WindowSettings" xml:space="preserve">
+    <value>Configure the settings for window visibility.</value>
   </data>
   <data name="UnitTestSettings_AssertMode" xml:space="preserve">
     <value>Type safety:</value>
@@ -1135,6 +1133,9 @@ Are you sure you want to proceed with this rename?</value>
   </data>
   <data name="UnitTestSettings_TestModuleTemplateHeader" xml:space="preserve">
     <value>Test Module Template</value>
+  </data>
+  <data name="WindowSettings_StartupVisibilityHeader" xml:space="preserve">
+    <value>Window visibility at startup</value>
   </data>
   <data name="TestOutcome_Failed" xml:space="preserve">
     <value>Failed</value>
@@ -1271,7 +1272,10 @@ Are you sure you want to proceed with this rename?</value>
   <data name="AboutWindow_AttributionList" xml:space="preserve">
     <value>Parsing powered by ANTLR
 GitHub integration powered by LibGit2Sharp
-Fugue icons by Yusuke Kamiyamane</value>
+Syntax highlighting powered by AvalonEdit
+Fugue icons by Yusuke Kamiyamane
+IDE icons from SharpDevelop
+WPF localization support by Grant Frisken</value>
   </data>
   <data name="AboutWindow_GeneralThanks" xml:space="preserve">
     <value>All contributors to our GitHub repository
@@ -1304,9 +1308,6 @@ All our stargazers, likers &amp; followers, for the warm fuzzies
   <data name="SearchResults_AllReferencesTabFormat" xml:space="preserve">
     <value>All references: '{0}'</value>
     <comment>0: declaration.identifiername</comment>
-  </data>
-  <data name="SourceControl_CloneRepoButtonToolTip" xml:space="preserve">
-    <value>Clone Repository</value>
   </data>
   <data name="Rubberduck" xml:space="preserve">
     <value>Rubberduck</value>
@@ -1398,8 +1399,8 @@ All our stargazers, likers &amp; followers, for the warm fuzzies
   <data name="ParserState_ResolverError" xml:space="preserve">
     <value>Resolver Error</value>
   </data>
-  <data name="ParserState_Resolving" xml:space="preserve">
-    <value>Resolving...</value>
+  <data name="ParserState_ResolvingDeclarations" xml:space="preserve">
+    <value>Resolving declarations...</value>
   </data>
   <data name="AboutWindow_BlogsHeader" xml:space="preserve">
     <value>Blogs:</value>
@@ -1411,7 +1412,7 @@ All our stargazers, likers &amp; followers, for the warm fuzzies
     <value>Contributors &amp; supporters:</value>
   </data>
   <data name="SourceControl_MergeStatus" xml:space="preserve">
-    <value>Merge status</value>
+    <value>Merge status.</value>
   </data>
   <data name="SourceControl_UpdateSettingsMessage" xml:space="preserve">
     <value>Your user name, email address, and default repository location have been saved.</value>
@@ -1455,12 +1456,6 @@ All our stargazers, likers &amp; followers, for the warm fuzzies
   <data name="HotkeyDescription_TestExplorer" xml:space="preserve">
     <value>Test Explorer</value>
   </data>
-  <data name="UnitTest_NewModule_UncommentLateBinding" xml:space="preserve">
-    <value>uncomment for late-binding</value>
-  </data>
-  <data name="UnitTest_NewModule_CommentEarlyBinding" xml:space="preserve">
-    <value>early-binding requires reference to Rubberduck.UnitTesting.tlb</value>
-  </data>
   <data name="UnitTest_NewModule_RunOnce" xml:space="preserve">
     <value>this method runs once per module</value>
   </data>
@@ -1498,7 +1493,7 @@ All our stargazers, likers &amp; followers, for the warm fuzzies
     <value>Find symbol</value>
   </data>
   <data name="HotkeyDescription_RefactorMoveCloserToUsage" xml:space="preserve">
-    <value>Move declaration closer to usage</value>
+    <value>Refactor / Move declaration closer to usage</value>
   </data>
   <data name="RubberduckMenu_RegexSearchReplace" xml:space="preserve">
     <value>Rege&amp;x Search/Replace</value>
@@ -1508,5 +1503,465 @@ All our stargazers, likers &amp; followers, for the warm fuzzies
   </data>
   <data name="GroupingStyle_ByMarker" xml:space="preserve">
     <value>By marker</value>
+  </data>
+  <data name="DeclarationType_LibraryProcedure" xml:space="preserve">
+    <value>Library procedure</value>
+  </data>
+  <data name="CodeExplorer_ShowSignaturesToolTip" xml:space="preserve">
+    <value>Toggle signatures</value>
+  </data>
+  <data name="CodeExplorer_Export" xml:space="preserve">
+    <value>Export...</value>
+  </data>
+  <data name="CodeExplorer_Import" xml:space="preserve">
+    <value>Import...</value>
+  </data>
+  <data name="CodeExplorer_Print" xml:space="preserve">
+    <value>Print...</value>
+  </data>
+  <data name="CodeExplorer_Remove" xml:space="preserve">
+    <value>Remove...</value>
+  </data>
+  <data name="GeneralSettings_FolderDelimiterLabel" xml:space="preserve">
+    <value>Folder Delimiter:</value>
+  </data>
+  <data name="GeneralSettings_PeriodDelimiter" xml:space="preserve">
+    <value>Period (.)</value>
+  </data>
+  <data name="GeneralSettings_SlashDelimiter" xml:space="preserve">
+    <value>Slash (/)</value>
+  </data>
+  <data name="CodeExplorer_Commit" xml:space="preserve">
+    <value>Commit...</value>
+  </data>
+  <data name="SourceControl_CommitStatus" xml:space="preserve">
+    <value>Commit status.</value>
+  </data>
+  <data name="SourceControl_CommitStatus_CommitAndPushSuccess" xml:space="preserve">
+    <value>Commit and push succeeded.</value>
+  </data>
+  <data name="SourceControl_CommitStatus_CommitAndSyncSuccess" xml:space="preserve">
+    <value>Commit and sync succeeded.</value>
+  </data>
+  <data name="SourceControl_CommitStatus_CommitSuccess" xml:space="preserve">
+    <value>Commit succeeded.</value>
+  </data>
+  <data name="SourceControl_MissingCredentials" xml:space="preserve">
+    <value>Missing credentials.</value>
+  </data>
+  <data name="CodeExplorer_Undo" xml:space="preserve">
+    <value>Undo...</value>
+  </data>
+  <data name="SourceControl_UndoPrompt" xml:space="preserve">
+    <value>Do you want to undo your changes to {0}?</value>
+  </data>
+  <data name="SourceControl_UndoTitle" xml:space="preserve">
+    <value>Source Control - Undo</value>
+  </data>
+  <data name="NoIndentAnnotation" xml:space="preserve">
+    <value>&amp;Add '@NoIndent</value>
+  </data>
+  <data name="CodeExplorer_Sort" xml:space="preserve">
+    <value>Sort</value>
+  </data>
+  <data name="SortStyle_ByName" xml:space="preserve">
+    <value>By name</value>
+  </data>
+  <data name="SortStyle_ByType" xml:space="preserve">
+    <value>By type</value>
+  </data>
+  <data name="SortStyle_ByCodeOrder" xml:space="preserve">
+    <value>As in module</value>
+  </data>
+  <data name="TestOutcome_Ignored" xml:space="preserve">
+    <value>Ignored</value>
+  </data>
+  <data name="UnitTest_TotalDuration" xml:space="preserve">
+    <value>Total Duration</value>
+  </data>
+  <data name="Parser_ParserError" xml:space="preserve">
+    <value>Parser Errors</value>
+  </data>
+  <data name="GeneralSettings_MinimumLogLevelLabel" xml:space="preserve">
+    <value>Minimum Log Level:</value>
+  </data>
+  <data name="GeneralSettings_DebugLogLevel" xml:space="preserve">
+    <value>Debug</value>
+  </data>
+  <data name="GeneralSettings_ErrorLogLevel" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="GeneralSettings_FatalLogLevel" xml:space="preserve">
+    <value>Fatal</value>
+  </data>
+  <data name="GeneralSettings_InfoLogLevel" xml:space="preserve">
+    <value>Info</value>
+  </data>
+  <data name="GeneralSettings_OffLogLevel" xml:space="preserve">
+    <value>No Logging</value>
+  </data>
+  <data name="GeneralSettings_TraceLogLevel" xml:space="preserve">
+    <value>Trace</value>
+  </data>
+  <data name="GeneralSettings_WarnLogLevel" xml:space="preserve">
+    <value>Warn</value>
+  </data>
+  <data name="GeneralSettings_ShowLogFolder" xml:space="preserve">
+    <value>Show Log Folder</value>
+  </data>
+  <data name="SourceControl_PublishRepo_FailureTitle" xml:space="preserve">
+    <value>Publish repository.</value>
+  </data>
+  <data name="SourceControl_PublishRepo_NoOpenRepo" xml:space="preserve">
+    <value>No open repository to push to specified remote location.</value>
+  </data>
+  <data name="SourceControl_ExternalModifications" xml:space="preserve">
+    <value>A source file was modified out of the editor; reload it?</value>
+  </data>
+  <data name="SourceControl_OpenCommandPromptButtonToolTip" xml:space="preserve">
+    <value>Open Command Prompt</value>
+  </data>
+  <data name="SourceControl_CommandPromptExeLabel" xml:space="preserve">
+    <value>Command prompt executable location</value>
+  </data>
+  <data name="SourceControl_FilePickerCommandPromptHeader" xml:space="preserve">
+    <value>Command Prompt Executable</value>
+  </data>
+  <data name="SourceControl_FilePickerDefaultRepoHeader" xml:space="preserve">
+    <value>Default Repository Directory</value>
+  </data>
+  <data name="SourceControl_OpenCommandPromptFailureTitle" xml:space="preserve">
+    <value>Failure opening command prompt</value>
+  </data>
+  <data name="SourceControl_ActivateProject" xml:space="preserve">
+    <value>Please open or activate a project and try again.</value>
+  </data>
+  <data name="SourceControl_NoActiveProject" xml:space="preserve">
+    <value>No active project</value>
+  </data>
+  <data name="ParserState_ResolvingReferences" xml:space="preserve">
+    <value>Resolving references...</value>
+  </data>
+  <data name="CodeExplorer_OpenProjectProperties" xml:space="preserve">
+    <value>Project properties</value>
+  </data>
+  <data name="SourceControl_UnknownErrorMessage" xml:space="preserve">
+    <value>If logging is enabled, you may create an issue on our GitHub page with the contents of your log file in '%AppData%\Roaming\Rubberduck\Logs' for support.</value>
+  </data>
+  <data name="SourceControl_UnknownErrorTitle" xml:space="preserve">
+    <value>An unknown error occurred.</value>
+  </data>
+  <data name="SourceControl_FileStatus_Added" xml:space="preserve">
+    <value>Added</value>
+  </data>
+  <data name="SourceControl_FileStatus_Ignored" xml:space="preserve">
+    <value>Ignored</value>
+  </data>
+  <data name="SourceControl_FileStatus_Missing" xml:space="preserve">
+    <value>Missing</value>
+  </data>
+  <data name="SourceControl_FileStatus_Modified" xml:space="preserve">
+    <value>Modified</value>
+  </data>
+  <data name="SourceControl_FileStatus_Nonexistent" xml:space="preserve">
+    <value>Nonexistent</value>
+  </data>
+  <data name="SourceControl_FileStatus_Removed" xml:space="preserve">
+    <value>Removed</value>
+  </data>
+  <data name="SourceControl_FileStatus_RenamedInIndex" xml:space="preserve">
+    <value>Renamed in index</value>
+  </data>
+  <data name="SourceControl_FileStatus_RenamedInWorkDir" xml:space="preserve">
+    <value>Renamed in working directory</value>
+  </data>
+  <data name="SourceControl_FileStatus_Staged" xml:space="preserve">
+    <value>Staged</value>
+  </data>
+  <data name="SourceControl_FileStatus_StagedTypeChange" xml:space="preserve">
+    <value>Staged type change</value>
+  </data>
+  <data name="SourceControl_FileStatus_TypeChanged" xml:space="preserve">
+    <value>Type changed</value>
+  </data>
+  <data name="SourceControl_FileStatus_Unaltered" xml:space="preserve">
+    <value>Unaltered</value>
+  </data>
+  <data name="SourceControl_FileStatus_Unreadable" xml:space="preserve">
+    <value>Unreadable</value>
+  </data>
+  <data name="SourceControl_FileStatus_Untracked" xml:space="preserve">
+    <value>Untracked</value>
+  </data>
+  <data name="SourceControl_CloneRepositoryDescription" xml:space="preserve">
+    <value>Clones remote repository from provided URI. Have an (empty) project active in the editor.</value>
+  </data>
+  <data name="SourceControl_CloneRepositoryTitle" xml:space="preserve">
+    <value>Clone Remote Repository</value>
+  </data>
+  <data name="SourceControl_InitializeRepositoryDescription" xml:space="preserve">
+    <value>Creates a new repository from the active project.</value>
+  </data>
+  <data name="SourceControl_InitializeRepositoryTitle" xml:space="preserve">
+    <value>Initialize New Repository</value>
+  </data>
+  <data name="SourceControl_ManageRepositories" xml:space="preserve">
+    <value>Manage</value>
+  </data>
+  <data name="SourceControl_OpenRepositoryDescription" xml:space="preserve">
+    <value>Open repository from disk. The active project will host the source code.</value>
+  </data>
+  <data name="SourceControl_OpenRepositoryTitle" xml:space="preserve">
+    <value>Open Existing Repository</value>
+  </data>
+  <data name="SourceControl_OpenWorkingDirectory" xml:space="preserve">
+    <value>Open Working Directory</value>
+  </data>
+  <data name="SourceControl_PublishRepositoryDescription" xml:space="preserve">
+    <value>Publishes an existing repository to a remote location. The active project must be connected to a repository.</value>
+  </data>
+  <data name="SourceControl_PublishRepositoryTitle" xml:space="preserve">
+    <value>Publish Existing Repository</value>
+  </data>
+  <data name="RubberduckFatalError" xml:space="preserve">
+    <value>Rubberduck encountered an error. Please save your work and restart the host program; if logging is enabled, you can upload your log file located at '%AppData%Roaming\Rubberduck\Logs\RubberduckLog.txt' to a GitHub issue at 'https://github.com/rubberduck-vba/Rubberduck/issues/new' and report the bug.</value>
+  </data>
+  <data name="TestExplorerMenu_AddExpectedErrorTestMethod" xml:space="preserve">
+    <value>Test Method (&amp;Expected Error)</value>
+  </data>
+  <data name="TestExplorerMenu_AddTestMethod" xml:space="preserve">
+    <value>Test &amp;Method</value>
+  </data>
+  <data name="TestExplorerMenu_AddTestModule" xml:space="preserve">
+    <value>Test M&amp;odule</value>
+  </data>
+  <data name="CodeExplorer_Indent" xml:space="preserve">
+    <value>Indent</value>
+  </data>
+  <data name="HotkeyDescription_SourceControl" xml:space="preserve">
+    <value>Source Control</value>
+  </data>
+  <data name="RegexAssistant_Caption" xml:space="preserve">
+    <value>Rubberduck - Regex Analyzer</value>
+  </data>
+  <data name="RegexAssistant_DescriptionResultsLabel" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="RegexAssistant_GlobalFlag" xml:space="preserve">
+    <value>Global</value>
+  </data>
+  <data name="RegexAssistant_IgnoreCaseFlag" xml:space="preserve">
+    <value>Ignore case</value>
+  </data>
+  <data name="RegexAssistant_RegexPatternLabel" xml:space="preserve">
+    <value>Pattern</value>
+  </data>
+  <data name="ToolsMenu_RegexAssistant" xml:space="preserve">
+    <value>Regex &amp;Assistant</value>
+  </data>
+  <data name="ToolsMenu" xml:space="preserve">
+    <value>T&amp;ools</value>
+  </data>
+  <data name="RegexAssistant_NoPatternError" xml:space="preserve">
+    <value>(no pattern)</value>
+  </data>
+  <data name="RegexAssistant_Instructions" xml:space="preserve">
+    <value>Enter a regular expression to analyze in the box below.</value>
+  </data>
+  <data name="RegexAssistant_Title" xml:space="preserve">
+    <value>Regular Expression Analyzer</value>
+  </data>
+  <data name="CodeInspectionSettings_WhitelistedIdentifiersLabel" xml:space="preserve">
+    <value>Whitelisted Identifiers</value>
+  </data>
+  <data name="CodeInspectionSettings_InspectionSeveritySettingsLabel" xml:space="preserve">
+    <value>Inspection Severities</value>
+  </data>
+  <data name="CodeInspectionSettings_WhitelistedIdentifiersDescription" xml:space="preserve">
+    <value>These identifiers will be ignored by the 'Use meaningful names' inspection</value>
+  </data>
+  <data name="HotkeyDescription_RefactorEncapsulateField" xml:space="preserve">
+    <value>Refactor / Encapsulate Field</value>
+  </data>
+  <data name="CodeExplorer_CollapseSubnodesToolTip" xml:space="preserve">
+    <value>Collapse node and all child nodes</value>
+  </data>
+  <data name="CodeExplorer_ExpandSubnodesToolTip" xml:space="preserve">
+    <value>Expand node and all child nodes</value>
+  </data>
+  <data name="CodeInspectionSettings_Misc" xml:space="preserve">
+    <value>Miscellaneous</value>
+  </data>
+  <data name="CodeInspectionSettings_Misc_RunInspectionsOnSuccessfulParse" xml:space="preserve">
+    <value>Run inspections automatically on successful parse</value>
+  </data>
+  <data name="GeneralSettings_ShowSplash" xml:space="preserve">
+    <value>Show splash screen at startup</value>
+  </data>
+  <data name="RubberduckReloadFailure_Message" xml:space="preserve">
+    <value>Toolwindows were not correctly destroyed and/or could not be recreated; the VBE may not be in a stable state. Rubberduck will load normally next time the VBE is initialized.</value>
+  </data>
+  <data name="RubberduckReloadFailure_Title" xml:space="preserve">
+    <value>Rubberduck will not reload</value>
+  </data>
+  <data name="ParserErrorToolTipText" xml:space="preserve">
+    <value>{0} module(s) failed to parse; click for details.</value>
+  </data>
+  <data name="ReparseToolTipText" xml:space="preserve">
+    <value>{0}. Click to refresh.</value>
+  </data>
+  <data name="IndenterSettings_IndentEnumTypeAsProcedure" xml:space="preserve">
+    <value>Indent comments in Enum and Type blocks like in procedures</value>
+  </data>
+  <data name="IndenterSettings_PreviewCode" xml:space="preserve">
+    <value>Public Enum ExampleEnum
+' Enum comment.
+Foo
+Bar ' Member comment.
+End Enum
+
+' Example Procedure
+Sub ExampleProc()
+
+' SMART INDENTER
+' Original VB6 code graciously offered to Rubberduck by Stephen Bullen &amp; Rob Bovey
+' © 2016 by Rubberduck VBA.
+
+Dim count As Integer
+Static name As String
+
+If YouLikeRubberduck Then
+' Star us on GitHub http://github.com/rubberduck-vba/Rubberduck
+' Follow us on Twitter @rubberduckvba
+' Visit http://rubberduckvba.com for news and updates
+
+Select Case X
+Case "A"
+' If you have any comments or suggestions, _
+or find valid VBA code that isn't indented correctly,
+
+#If VBA6 Then
+MsgBox "Contact contact@rubberduck-vba.com"
+#End If
+
+Case "Continued strings and parameters can be" _
+&amp; "lined up for easier reading, optionally ignoring" _
+&amp; "any operators (&amp;+, etc) at the start of the line."
+
+Debug.Print "X&lt;&gt;1"
+End Select      'Case X
+End If      'More Tools? Suggestions http://github.com/rubberduck-vba/Rubberduck/Issues/New
+
+End Sub</value>
+  </data>
+  <data name="DialogCaption_LoadIndenterSettings" xml:space="preserve">
+    <value>Load Indenter Settings</value>
+  </data>
+  <data name="DialogCaption_SaveIndenterSettings" xml:space="preserve">
+    <value>Save Indenter Settings</value>
+  </data>
+  <data name="DialogMask_XmlFilesOnly" xml:space="preserve">
+    <value>XML file (.xml)|*.xml|Rubberduck config file|*.config</value>
+  </data>
+  <data name="SettingsCaption_ExportSettings" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="SettingsCaption_ImportSettings" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="DialogCaption_LoadGeneralSettings" xml:space="preserve">
+    <value>Load General Settings</value>
+  </data>
+  <data name="DialogCaption_LoadInspectionSettings" xml:space="preserve">
+    <value>Load Inspection Settings</value>
+  </data>
+  <data name="DialogCaption_LoadToDoSettings" xml:space="preserve">
+    <value>Load Todo List Settings</value>
+  </data>
+  <data name="DialogCaption_LoadUnitTestSettings" xml:space="preserve">
+    <value>Load Unit Test Settings</value>
+  </data>
+  <data name="DialogCaption_LoadWindowSettings" xml:space="preserve">
+    <value>Load Window Settings</value>
+  </data>
+  <data name="DialogCaption_SaveGeneralSettings" xml:space="preserve">
+    <value>Save General Settings</value>
+  </data>
+  <data name="DialogCaption_SaveInspectionSettings" xml:space="preserve">
+    <value>Save Inspection Settings</value>
+  </data>
+  <data name="DialogCaption_SaveToDoSettings" xml:space="preserve">
+    <value>Save Todo List Settings</value>
+  </data>
+  <data name="DialogCaption_SaveUnitTestSettings" xml:space="preserve">
+    <value>Save Unit Test Settings</value>
+  </data>
+  <data name="DialogCaption_SaveWindowSettings" xml:space="preserve">
+    <value>Save Window Settings</value>
+  </data>
+  <data name="ContextReferences" xml:space="preserve">
+    <value>references</value>
+    <comment>Used to display number of references in commandbar's context selection</comment>
+  </data>
+  <data name="ContextMultipleControlsSelection" xml:space="preserve">
+    <value>multiple controls</value>
+    <comment>Used to display description of multiple control selection in commandbar's context selection</comment>
+  </data>
+  <data name="SmartIndenter_LegacySettingPrompt" xml:space="preserve">
+    <value>Smart Indenter settings were found in your registry.
+Would you like to import them to Rubberduck?</value>
+  </data>
+  <data name="IndenterSettings_VerticalSpacing" xml:space="preserve">
+    <value>Maintain vertical spacing</value>
+  </data>
+  <data name="IndenterSettings_VerticalSpacingLabel" xml:space="preserve">
+    <value>Vertical Spacing</value>
+  </data>
+  <data name="DeclarationType_BracketedExpression" xml:space="preserve">
+    <value>runtime expression</value>
+  </data>
+  <data name="AssignedByValParamQFixDialog_Caption" xml:space="preserve">
+    <value>Assigned ByVal parameter QuickFix - Make Local Copy</value>
+  </data>
+  <data name="AssignedByValParamQFixDialog_InstructionsLabelText" xml:space="preserve">
+    <value>Please specify a name to use for the local copy of ByVal {0} '{1}'</value>
+    <comment>0: DeclarationType; 1: IdentifierName</comment>
+  </data>
+  <data name="AssignedByValParamQFixDialog_TitleText" xml:space="preserve">
+    <value>Specify Local Copy Variable Name</value>
+  </data>
+  <data name="IndenterSettings_CodeSampleHeader" xml:space="preserve">
+    <value>Indented Code Sample</value>
+  </data>
+  <data name="VersionCheck_NewVersionAvailable" xml:space="preserve">
+    <value>Rubberduck version {0} is now available! Would you like to review the release notes now?</value>
+  </data>
+  <data name="GeneralSettings_CheckVersion" xml:space="preserve">
+    <value>Check if a newer version is available at startup</value>
+  </data>
+  <data name="AssignedByValDialog_DoesNotStartWithLetter" xml:space="preserve">
+    <value>Variable names must begin with a letter.</value>
+  </data>
+  <data name="AssignedByValDialog_InvalidCharacters" xml:space="preserve">
+    <value>Variable names cannot contain special characters other than underscores.</value>
+  </data>
+  <data name="AssignedByValDialog_IsByValIdentifierFormat" xml:space="preserve">
+    <value>The local variable cannot be the same as the '{0}' parameter it replaces</value>
+    <comment>{0} = proposed variable name.</comment>
+  </data>
+  <data name="AssignedByValDialog_NewNameAlreadyUsedFormat" xml:space="preserve">
+    <value>'{0}' is already accessible to this scope.</value>
+    <comment>{0} = proposed variable name.</comment>
+  </data>
+  <data name="AssignedByValDialog_QuestionableEntryFormat" xml:space="preserve">
+    <value>The identifier '{0}' will trigger a "Use meaningful name" inspection result. Consider choosing a different name.</value>
+    <comment>{0} = proposed variable name.</comment>
+  </data>
+  <data name="AssignedByValDialog_ReservedKeywordFormat" xml:space="preserve">
+    <value>'{0}' is a reserved keyword.</value>
+    <comment>{0} = proposed variable name.</comment>
+  </data>
+  <data name="ConfirmRemoveAssignmentWithUnusedDeclaration" xml:space="preserve">
+    <value>Variable '{0}' is assigned. Remove assignment instruction(s)?</value>
   </data>
 </root>

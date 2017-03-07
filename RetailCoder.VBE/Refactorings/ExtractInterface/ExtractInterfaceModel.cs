@@ -18,7 +18,7 @@ namespace Rubberduck.Refactorings.ExtractInterface
 
         private static readonly DeclarationType[] ModuleTypes =
         {
-            DeclarationType.Class,
+            DeclarationType.ClassModule,
             DeclarationType.Document,
             DeclarationType.UserForm
         };
@@ -42,7 +42,6 @@ namespace Rubberduck.Refactorings.ExtractInterface
 
             if (_targetDeclaration == null)
             {
-                //throw new InvalidOperationException();
                 return;
             }
 

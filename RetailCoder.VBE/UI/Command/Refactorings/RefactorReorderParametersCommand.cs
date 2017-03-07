@@ -1,28 +1,26 @@
-﻿using System.Diagnostics;
-using System.Linq;
+﻿using System.Linq;
 using System.Runtime.InteropServices;
-using Microsoft.Vbe.Interop;
 using Rubberduck.Common;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.ReorderParameters;
 using Rubberduck.UI.Refactorings;
 using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
     [ComVisible(false)]
-    class RefactorReorderParametersCommand : RefactorCommandBase
+    public class RefactorReorderParametersCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
-        private readonly ICodePaneWrapperFactory _wrapperWrapperFactory;
+        private readonly IMessageBox _msgbox;
 
-        public RefactorReorderParametersCommand(VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor, ICodePaneWrapperFactory wrapperWrapperFactory) 
-            : base (vbe, editor)
+        public RefactorReorderParametersCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgbox) 
+            : base (vbe)
         {
             _state = state;
-            _wrapperWrapperFactory = wrapperWrapperFactory;
+            _msgbox = msgbox;
         }
 
         private static readonly DeclarationType[] ValidDeclarationTypes =
@@ -35,43 +33,48 @@ namespace Rubberduck.UI.Command.Refactorings
             DeclarationType.PropertySet
         };
 
-        public override bool CanExecute(object parameter)
+        protected override bool CanExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null || _state.Status != ParserState.Ready)
+            var pane = Vbe.ActiveCodePane;
             {
-                return false;
+                if (pane.IsWrappingNullReference || _state.Status != ParserState.Ready)
+                {
+                    return false;
+                }
+
+                var selection = pane.GetQualifiedSelection();
+                var member = _state.AllUserDeclarations.FindTarget(selection.Value, ValidDeclarationTypes);
+                if (member == null)
+                {
+                    return false;
+                }
+
+                var parameters = _state.AllUserDeclarations.Where(item => item.DeclarationType == DeclarationType.Parameter && member.Equals(item.ParentScopeDeclaration)).ToList();
+                var canExecute = (member.DeclarationType == DeclarationType.PropertyLet || member.DeclarationType == DeclarationType.PropertySet)
+                        ? parameters.Count > 2
+                        : parameters.Count > 1;
+
+                return canExecute;
             }
-
-            var selection = Vbe.ActiveCodePane.GetSelection();
-            var member = _state.AllUserDeclarations.FindTarget(selection, ValidDeclarationTypes);
-            if (member == null)
-            {
-                return false;
-            }
-
-            var parameters = _state.AllUserDeclarations.Where(item => member.Equals(item.ParentScopeDeclaration)).ToList();
-            var canExecute = (member.DeclarationType == DeclarationType.PropertyLet || member.DeclarationType == DeclarationType.PropertySet)
-                    ? parameters.Count > 2
-                    : parameters.Count > 1;
-
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
-            return canExecute;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null)
+            var pane = Vbe.ActiveCodePane;
+            var module = pane.CodeModule;
             {
-                return;
-            }
-            var codePane = _wrapperWrapperFactory.Create(Vbe.ActiveCodePane);
-            var selection = new QualifiedSelection(new QualifiedModuleName(codePane.CodeModule.Parent), codePane.Selection);
+                if (pane.IsWrappingNullReference)
+                {
+                    return;
+                }
+                var selection = new QualifiedSelection(new QualifiedModuleName(module.Parent), pane.Selection);
 
-            using (var view = new ReorderParametersDialog())
-            {
-                var factory = new ReorderParametersPresenterFactory(Editor, view, _state, new MessageBox());
-                var refactoring = new ReorderParametersRefactoring(factory, Editor, new MessageBox());
-                refactoring.Refactor(selection);
+                using (var view = new ReorderParametersDialog())
+                {
+                    var factory = new ReorderParametersPresenterFactory(Vbe, view, _state, _msgbox);
+                    var refactoring = new ReorderParametersRefactoring(Vbe, factory, _msgbox);
+                    refactoring.Refactor(selection);
+                }
             }
         }
     }

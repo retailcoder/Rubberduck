@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Windows.Input;
 using Rubberduck.Properties;
 using Rubberduck.UI.Command.MenuItems.ParentMenus;
 
@@ -7,12 +6,12 @@ namespace Rubberduck.UI.Command.MenuItems
 {
     public class AddTestMethodExpectedErrorCommandMenuItem : CommandMenuItemBase
     {
-        public AddTestMethodExpectedErrorCommandMenuItem(ICommand command)
+        public AddTestMethodExpectedErrorCommandMenuItem(CommandBase command)
             : base(command)
         {
         }
 
-        public override string Key { get { return "TestExplorer_AddExpectedErrorTestMethod"; } }
+        public override string Key { get { return "TestExplorerMenu_AddExpectedErrorTestMethod"; } }
         public override int DisplayOrder { get { return (int)UnitTestingMenuItemDisplayOrder.AddTestMethodExpectedError; } }
 
         public override Image Image { get { return Resources.flask_exclamation; } }

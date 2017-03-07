@@ -1,18 +1,19 @@
 ﻿using System;
-using System.Reflection;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
-using Microsoft.Vbe.Interop;
 using Rubberduck.Parsing;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Symbols;
+using Rubberduck.Parsing.VBA;
 using Rubberduck.Properties;
 using Rubberduck.UI;
 using Rubberduck.VBEditor;
+using Rubberduck.VBEditor.SafeComWrappers;
+
 // ReSharper disable LocalizableElement
 
 namespace Rubberduck.Common
@@ -23,7 +24,7 @@ namespace Rubberduck.Common
 
         public static string ToLocalizedString(this DeclarationType type)
         {
-            return RubberduckUI.ResourceManager.GetString("DeclarationType_" + type);
+            return RubberduckUI.ResourceManager.GetString("DeclarationType_" + type, CultureInfo.CurrentUICulture);
         }
 
         public static BitmapImage BitmapImage(this Declaration declaration)
@@ -44,7 +45,26 @@ namespace Rubberduck.Common
                 throw new ArgumentException("Target DeclarationType is not Variable.", "target");
             }
 
-            var statement = GetVariableStmtContext(target);
+            var statement = GetVariableStmtContext(target) ?? target.Context; // undeclared variables don't have a VariableStmtContext
+
+            return new Selection(statement.Start.Line, statement.Start.Column,
+                    statement.Stop.Line, statement.Stop.Column);
+        }
+
+        /// <summary>
+        /// Returns the Selection of a ConstStmtContext.
+        /// </summary>
+        /// <exception cref="ArgumentException">Throws when target's DeclarationType is not Constant.</exception>
+        /// <param name="target"></param>
+        /// <returns></returns>
+        public static Selection GetConstStmtContextSelection(this Declaration target)
+        {
+            if (target.DeclarationType != DeclarationType.Constant)
+            {
+                throw new ArgumentException("Target DeclarationType is not Constant.", "target");
+            }
+
+            var statement = GetConstStmtContext(target);
 
             return new Selection(statement.Start.Line, statement.Start.Column,
                     statement.Stop.Line, statement.Stop.Column);
@@ -64,6 +84,28 @@ namespace Rubberduck.Common
             }
 
             var statement = target.Context.Parent.Parent as VBAParser.VariableStmtContext;
+            if (statement == null && !target.IsUndeclared)
+            {
+                throw new MissingMemberException("Statement not found");
+            }
+
+            return statement;
+        }
+
+        /// <summary>
+        /// Returns a ConstStmtContext.
+        /// </summary>
+        /// <exception cref="ArgumentException">Throws when target's DeclarationType is not Constant.</exception>
+        /// <param name="target"></param>
+        /// <returns></returns>
+        public static VBAParser.ConstStmtContext GetConstStmtContext(this Declaration target)
+        {
+            if (target.DeclarationType != DeclarationType.Constant)
+            {
+                throw new ArgumentException("Target DeclarationType is not Constant.", "target");
+            }
+
+            var statement = target.Context.Parent as VBAParser.ConstStmtContext;
             if (statement == null)
             {
                 throw new MissingMemberException("Statement not found");
@@ -191,10 +233,8 @@ namespace Rubberduck.Common
 
         public static IEnumerable<Declaration> FindInterfaces(this IEnumerable<Declaration> declarations)
         {
-            var classes = declarations.Where(item => item.DeclarationType == DeclarationType.Class);
-            var interfaces = classes.Where(item => item.References.Any(reference =>
-                reference.Context.Parent is VBAParser.ImplementsStmtContext));
-
+            var classes = declarations.Where(item => item.DeclarationType == DeclarationType.ClassModule);
+            var interfaces = classes.Where(item => ((ClassModuleDeclaration)item).Subtypes.Any(s => !s.IsBuiltIn));
             return interfaces;
         }
 
@@ -224,19 +264,25 @@ namespace Rubberduck.Common
                 && declaration.IdentifierName.StartsWith(control.IdentifierName + "_"));
         }
 
-        public static IEnumerable<Declaration> FindBuiltInEventHandlers(this IEnumerable<Declaration> declarations)
+        public static IEnumerable<Declaration> FindUserEventHandlers(this IEnumerable<Declaration> declarations)
         {
-            var handlerNames = declarations.Where(declaration => declaration.IsBuiltIn && declaration.DeclarationType == DeclarationType.Event)
-                                           .Select(e => e.ParentDeclaration.IdentifierName + "_" + e.IdentifierName);
+            var declarationList = declarations.ToList();
 
-            return declarations.Where(declaration => !declaration.IsBuiltIn
-                                                     && declaration.DeclarationType == DeclarationType.Procedure
-                                                     && handlerNames.Contains(declaration.IdentifierName));
+            var userEvents =
+                declarationList.Where(item => !item.IsBuiltIn && item.DeclarationType == DeclarationType.Event).ToList();
+
+            var handlers = new List<Declaration>();
+            foreach (var @event in userEvents)
+            {
+                handlers.AddRange(declarationList.FindHandlersForEvent(@event).Select(s => s.Item2));
+            }
+            
+            return handlers;
         }
 
         /// <summary>
-        /// Gets the <see cref="Declaration"/> of the specified <see cref="type"/>, 
-        /// at the specified <see cref="selection"/>.
+        /// Gets the <see cref="Declaration"/> of the specified <see cref="DeclarationType"/>, 
+        /// at the specified <see cref="QualifiedSelection"/>.
         /// Returns the declaration if selection is on an identifier reference.
         /// </summary>
         public static Declaration FindSelectedDeclaration(this IEnumerable<Declaration> declarations, QualifiedSelection selection, DeclarationType type, Func<Declaration, Selection> selector = null)
@@ -245,8 +291,8 @@ namespace Rubberduck.Common
         }
 
         /// <summary>
-        /// Gets the <see cref="Declaration"/> of the specified <see cref="types"/>, 
-        /// at the specified <see cref="selection"/>.
+        /// Gets the <see cref="Declaration"/> of the specified <see cref="DeclarationType"/>, 
+        /// at the specified <see cref="QualifiedSelection"/>.
         /// Returns the declaration if selection is on an identifier reference.
         /// </summary>
         public static Declaration FindSelectedDeclaration(this IEnumerable<Declaration> declarations, QualifiedSelection selection, IEnumerable<DeclarationType> types, Func<Declaration, Selection> selector = null)
@@ -275,30 +321,30 @@ namespace Rubberduck.Common
             return declaration;
         }
 
-        public static IEnumerable<Declaration> FindFormEventHandlers(this IEnumerable<Declaration> declarations)
+        public static IEnumerable<Declaration> FindFormEventHandlers(this RubberduckParserState state)
         {
-            var items = declarations.ToList();
+            var items = state.AllDeclarations.ToList();
 
-            var forms = items.Where(item => item.DeclarationType == DeclarationType.Class
-                && item.QualifiedName.QualifiedModuleName.Component != null
-                && item.QualifiedName.QualifiedModuleName.Component.Type == vbext_ComponentType.vbext_ct_MSForm)
+            var forms = items.Where(item => item.DeclarationType == DeclarationType.ClassModule
+                && item.QualifiedName.QualifiedModuleName.ComponentType == ComponentType.UserForm)
                 .ToList();
 
             var result = new List<Declaration>();
             foreach (var declaration in forms)
             {
-                result.AddRange(FindFormEventHandlers(items, declaration));
+                result.AddRange(FindFormEventHandlers(state, declaration));
             }
 
             return result;
         }
 
-        public static IEnumerable<Declaration> FindFormEventHandlers(this IEnumerable<Declaration> declarations, Declaration userForm)
+        public static IEnumerable<Declaration> FindFormEventHandlers(this RubberduckParserState state, Declaration userForm)
         {
-            var items = declarations as IList<Declaration> ?? declarations.ToList();
+            var items = state.AllDeclarations.ToList();
             var events = items.Where(item => item.IsBuiltIn
-                                                     && item.ParentScope == "MSForms.UserForm"
+                                                     && item.ParentScope == "FM20.DLL;MSForms.FormEvents"
                                                      && item.DeclarationType == DeclarationType.Event).ToList();
+
             var handlerNames = events.Select(item => "UserForm_" + item.IdentifierName);
             var handlers = items.Where(item => item.ParentScope == userForm.Scope
                                                        && item.DeclarationType == DeclarationType.Procedure
@@ -318,7 +364,7 @@ namespace Rubberduck.Common
             .Select(item => new
             {
                 WithEventDeclaration = item, 
-                EventProvider = items.SingleOrDefault(type => type.DeclarationType == DeclarationType.Class && type.QualifiedName.QualifiedModuleName == item.QualifiedName.QualifiedModuleName)
+                EventProvider = items.SingleOrDefault(type => type.DeclarationType == DeclarationType.ClassModule && type.QualifiedName.QualifiedModuleName == item.QualifiedName.QualifiedModuleName)
             })
             .Select(item => new
             {
@@ -341,9 +387,7 @@ namespace Rubberduck.Common
             }
 
             var items = declarations as IList<Declaration> ?? declarations.ToList();
-            var type = items.SingleOrDefault(item => item.DeclarationType == DeclarationType.Class
-                                                             && item.Project != null
-                                                             && item.IdentifierName == withEventsDeclaration.AsTypeName.Split('.').Last());
+            var type = withEventsDeclaration.AsTypeDeclaration;
 
             if (type == null)
             {
@@ -364,10 +408,10 @@ namespace Rubberduck.Common
 
         private static IEnumerable<Declaration> GetTypeMembers(this IEnumerable<Declaration> declarations, Declaration type)
         {
-            return declarations.Where(item => item.Project != null && item.ProjectId == type.ProjectId && item.ParentScope == type.Scope);
+            return declarations.Where(item => Equals(item.ParentScopeDeclaration, type));
         }
 
-            /// <summary>
+        /// <summary>
         /// Finds all class members that are interface implementation members.
         /// </summary>
         public static IEnumerable<Declaration> FindInterfaceImplementationMembers(this IEnumerable<Declaration> declarations)
@@ -389,14 +433,20 @@ namespace Rubberduck.Common
                 .Where(m => m.IdentifierName.EndsWith(interfaceMember));
         }
 
+        public static IEnumerable<Declaration> FindInterfaceImplementationMembers(this IEnumerable<Declaration> declarations, Declaration interfaceDeclaration)
+        {
+            return FindInterfaceImplementationMembers(declarations)
+                .Where(m => m.IdentifierName == interfaceDeclaration.ComponentName + "_" + interfaceDeclaration.IdentifierName);
+        }
+
         public static Declaration FindInterfaceMember(this IEnumerable<Declaration> declarations, Declaration implementation)
         {
             var members = FindInterfaceMembers(declarations);
             var matches = members.Where(m => !m.IsBuiltIn && implementation.IdentifierName == m.ComponentName + '_' + m.IdentifierName).ToList();
 
-            return matches.Count > 1 
-                ? matches.SingleOrDefault(m => m.ProjectId == implementation.ProjectId) 
-                : matches.First();
+            return matches.Count > 1
+                ? matches.SingleOrDefault(m => m.ProjectId == implementation.ProjectId)
+                : matches.FirstOrDefault();
         }
 
         public static Declaration FindTarget(this IEnumerable<Declaration> declarations, QualifiedSelection selection)
@@ -417,9 +467,11 @@ namespace Rubberduck.Common
         {
             var items = declarations.ToList();
 
+            // TODO: Due to the new binding mechanism this can have more than one match (e.g. in the case of index expressions + simple name expressions)
+            // Left as is for now because the binding is not fully integrated yet.
             var target = items
                 .Where(item => !item.IsBuiltIn && validDeclarationTypes.Contains(item.DeclarationType))
-                .SingleOrDefault(item => item.IsSelected(selection)
+                .FirstOrDefault(item => item.IsSelected(selection)
                                      || item.References.Any(r => r.IsSelected(selection)));
 
             if (target != null)
@@ -532,7 +584,7 @@ namespace Rubberduck.Common
             {
                 foreach (var reference in declaration.References)
                 {
-                    var implementsStmt = reference.Context.Parent as VBAParser.ImplementsStmtContext;
+                    var implementsStmt = ParserRuleContextHelper.GetParent<VBAParser.ImplementsStmtContext>(reference.Context);
 
                     if (implementsStmt == null) { continue; }
 

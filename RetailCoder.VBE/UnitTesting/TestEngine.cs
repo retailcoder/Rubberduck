@@ -1,31 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using Microsoft.Vbe.Interop;
-using Rubberduck.Parsing;
-using Rubberduck.Parsing.Reflection;
+using Rubberduck.Parsing.Annotations;
+using Rubberduck.Parsing.Symbols;
+using Rubberduck.Parsing.VBA;
 using Rubberduck.UI.UnitTesting;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.Extensions;
-using Rubberduck.VBEditor.VBEHost;
+using Rubberduck.VBEditor.Application;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UnitTesting
 {
     public class TestEngine : ITestEngine
     {
-        private readonly TestExplorerModelBase _model;
-        private readonly VBE _vbe;
+        private readonly TestExplorerModel _model;
+        private readonly IVBE _vbe;
+        private readonly RubberduckParserState _state;
 
         // can't be assigned from constructor because ActiveVBProject is null at startup:
         private IHostApplication _hostApplication; 
 
-        public TestEngine(TestExplorerModelBase model, VBE vbe)
+        public TestEngine(TestExplorerModel model, IVBE vbe, RubberduckParserState state)
         {
             _model = model;
             _vbe = vbe;
+            _state = state;
         }
 
-        public TestExplorerModelBase Model { get { return _model; } }
+        public TestExplorerModel Model { get { return _model; } }
 
         public event EventHandler TestCompleted;
 
@@ -57,29 +59,46 @@ namespace Rubberduck.UnitTesting
                 return;
             }
 
-            var modules = testMethods.GroupBy(test => test.QualifiedMemberName.QualifiedModuleName);
+            var modules = testMethods.GroupBy(test => test.Declaration.QualifiedName.QualifiedModuleName);
             foreach (var module in modules)
             {
-                var testInitialize = FindTestInitializeMethods(module.Key).ToList();
-                var testCleanup = FindTestCleanupMethods(module.Key).ToList();
+                var testInitialize = module.Key.FindTestInitializeMethods(_state).ToList();
+                var testCleanup = module.Key.FindTestCleanupMethods(_state).ToList();
 
-                Run(FindModuleInitializeMethods(module.Key));
-                foreach (var test in module)
+                var capturedModule = module;
+                var moduleTestMethods = testMethods
+                    .Where(test => test.Declaration.QualifiedName.QualifiedModuleName.ProjectId == capturedModule.Key.ProjectId
+                                && test.Declaration.QualifiedName.QualifiedModuleName.ComponentName == capturedModule.Key.ComponentName);
+
+                Run(module.Key.FindModuleInitializeMethods(_state));
+                foreach (var test in moduleTestMethods)
                 {
+                    // no need to run setup/teardown for ignored tests
+                    if (test.Declaration.Annotations.Any(a => a.AnnotationType == AnnotationType.IgnoreTest))
+                    {
+                        test.UpdateResult(TestOutcome.Ignored);
+                        OnTestCompleted();
+                        continue;
+                    }
+
+                    var stopwatch = new Stopwatch();
+                    stopwatch.Start();
+
                     Run(testInitialize);
                     test.Run();
+                    Run(testCleanup);
+
+                    stopwatch.Stop();
+                    test.Result.SetDuration(stopwatch.ElapsedMilliseconds);
 
                     OnTestCompleted();
                     _model.AddExecutedTest(test);
-
-                    Run(testCleanup);
-
                 }
-                Run(FindModuleCleanupMethods(module.Key));
+                Run(module.Key.FindModuleCleanupMethods(_state));
             }
         }
 
-        private void Run(IEnumerable<QualifiedMemberName> members)
+        private void Run(IEnumerable<Declaration> members)
         {
             if (_hostApplication == null)
             {
@@ -90,34 +109,6 @@ namespace Rubberduck.UnitTesting
             {
                 _hostApplication.Run(member);
             }
-        }
-
-        private static IEnumerable<QualifiedMemberName> FindModuleInitializeMethods(QualifiedModuleName module)
-        {
-            return module.Component.GetMembers(vbext_ProcKind.vbext_pk_Proc)
-                .Where(m => m.HasAttribute<ModuleInitializeAttribute>())
-                .Select(m => m.QualifiedMemberName);
-        }
-
-        private static IEnumerable<QualifiedMemberName> FindModuleCleanupMethods(QualifiedModuleName module)
-        {
-            return module.Component.GetMembers(vbext_ProcKind.vbext_pk_Proc)
-                .Where(m => m.HasAttribute<ModuleCleanupAttribute>())
-                .Select(m => m.QualifiedMemberName);
-        }
-
-        private static IEnumerable<QualifiedMemberName> FindTestInitializeMethods(QualifiedModuleName module)
-        {
-            return module.Component.GetMembers(vbext_ProcKind.vbext_pk_Proc)
-                .Where(m => m.HasAttribute<TestInitializeAttribute>())
-                .Select(m => m.QualifiedMemberName);
-        }
-
-        private static IEnumerable<QualifiedMemberName> FindTestCleanupMethods(QualifiedModuleName module)
-        {
-            return module.Component.GetMembers(vbext_ProcKind.vbext_pk_Proc)
-                .Where(m => m.HasAttribute<TestCleanupAttribute>())
-                .Select(m => m.QualifiedMemberName);
         }
     }
 }

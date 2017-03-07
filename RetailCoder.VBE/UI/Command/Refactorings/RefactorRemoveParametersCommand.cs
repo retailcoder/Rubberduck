@@ -1,25 +1,24 @@
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Microsoft.Vbe.Interop;
 using Rubberduck.Common;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.RemoveParameters;
 using Rubberduck.UI.Refactorings;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
     [ComVisible(false)]
     public class RefactorRemoveParametersCommand : RefactorCommandBase
     {
+        private readonly IMessageBox _msgbox;
         private readonly RubberduckParserState _state;
 
-        public RefactorRemoveParametersCommand(VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor) 
-            : base (vbe, editor)
+        public RefactorRemoveParametersCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgbox) 
+            : base (vbe)
         {
+            _msgbox = msgbox;
             _state = state;
         }
 
@@ -32,43 +31,46 @@ namespace Rubberduck.UI.Command.Refactorings
             DeclarationType.PropertyLet,
             DeclarationType.PropertySet
         };
-        
-        public override bool CanExecute(object parameter)
+
+        protected override bool CanExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null || _state.Status != ParserState.Ready)
+            var pane = Vbe.ActiveCodePane;
             {
-                return false;
+                if (pane.IsWrappingNullReference || _state.Status != ParserState.Ready)
+                {
+                    return false;
+                }
+
+                var selection = pane.GetQualifiedSelection();
+                var member = _state.AllUserDeclarations.FindTarget(selection.Value, ValidDeclarationTypes);
+                if (member == null)
+                {
+                    return false;
+                }
+
+                var parameters = _state.AllUserDeclarations.Where(item => item.DeclarationType == DeclarationType.Parameter && member.Equals(item.ParentScopeDeclaration)).ToList();
+                return member.DeclarationType == DeclarationType.PropertyLet || member.DeclarationType == DeclarationType.PropertySet
+                        ? parameters.Count > 1
+                        : parameters.Any();
             }
-
-            var selection = Vbe.ActiveCodePane.GetSelection();
-            var member = _state.AllUserDeclarations.FindTarget(selection, ValidDeclarationTypes);
-            if (member == null)
-            {
-                return false;
-            }
-
-            var parameters = _state.AllUserDeclarations.Where(item => member.Equals(item.ParentScopeDeclaration)).ToList();
-            var canExecute = (member.DeclarationType == DeclarationType.PropertyLet || member.DeclarationType == DeclarationType.PropertySet)
-                    ? parameters.Count > 1
-                    : parameters.Any();
-
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
-            return canExecute;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null)
+            var pane = Vbe.ActiveCodePane;
             {
-                return;
-            }
+                if (pane.IsWrappingNullReference)
+                {
+                    return;
+                }
 
-            var selection = Vbe.ActiveCodePane.GetSelection();
-            using (var view = new RemoveParametersDialog())
-            {
-                var factory = new RemoveParametersPresenterFactory(Editor, view, _state, new MessageBox());
-                var refactoring = new RemoveParametersRefactoring(factory, Editor);
-                refactoring.Refactor(selection);
+                var selection = pane.GetQualifiedSelection();
+                using (var view = new RemoveParametersDialog())
+                {
+                    var factory = new RemoveParametersPresenterFactory(Vbe, view, _state, _msgbox);
+                    var refactoring = new RemoveParametersRefactoring(Vbe, factory);
+                    refactoring.Refactor(selection.Value);
+                }
             }
         }
     }

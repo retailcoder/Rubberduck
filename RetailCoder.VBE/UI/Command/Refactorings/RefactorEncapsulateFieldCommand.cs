@@ -1,11 +1,11 @@
-﻿using System.Diagnostics;
-using Microsoft.Vbe.Interop;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.EncapsulateField;
 using Rubberduck.UI.Refactorings;
-using Rubberduck.VBEditor;
+using Rubberduck.SmartIndenter;
+using Rubberduck.Settings;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
@@ -13,14 +13,16 @@ namespace Rubberduck.UI.Command.Refactorings
     public class RefactorEncapsulateFieldCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
+        private readonly Indenter _indenter;
 
-        public RefactorEncapsulateFieldCommand(VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor)
-            : base(vbe, editor)
+        public RefactorEncapsulateFieldCommand(IVBE vbe, RubberduckParserState state, Indenter indenter)
+            : base(vbe)
         {
             _state = state;
+            _indenter = indenter;
         }
 
-        public override bool CanExecute(object parameter)
+        protected override bool CanExecuteImpl(object parameter)
         {
             var pane = Vbe.ActiveCodePane;
             if (pane == null || _state.Status != ParserState.Ready)
@@ -34,23 +36,27 @@ namespace Rubberduck.UI.Command.Refactorings
                 && target.DeclarationType == DeclarationType.Variable
                 && !target.ParentScopeDeclaration.DeclarationType.HasFlag(DeclarationType.Member);
 
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
             return canExecute;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
             if (Vbe.ActiveCodePane == null)
             {
                 return;
             }
 
-            using (var view = new EncapsulateFieldDialog())
+            using (var view = new EncapsulateFieldDialog(_state, _indenter))
             {
-                var factory = new EncapsulateFieldPresenterFactory(_state, Editor, view);
-                var refactoring = new EncapsulateFieldRefactoring(factory, Editor);
+                var factory = new EncapsulateFieldPresenterFactory(Vbe, _state, view);
+                var refactoring = new EncapsulateFieldRefactoring(Vbe, _indenter, factory);
                 refactoring.Refactor();
             }
+        }
+
+        public override RubberduckHotkey Hotkey
+        {
+            get { return RubberduckHotkey.RefactorEncapsulateField; }
         }
     }
 }

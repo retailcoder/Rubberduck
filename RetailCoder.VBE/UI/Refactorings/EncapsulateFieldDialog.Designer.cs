@@ -106,6 +106,7 @@
             this.PreviewBox.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             this.PreviewBox.Size = new System.Drawing.Size(467, 177);
             this.PreviewBox.TabIndex = 23;
+            this.PreviewBox.TabStop = false;
             this.PreviewBox.WordWrap = false;
             // 
             // PreviewLabel
@@ -122,7 +123,7 @@
             this.PropertyNameTextBox.Location = new System.Drawing.Point(17, 92);
             this.PropertyNameTextBox.Name = "PropertyNameTextBox";
             this.PropertyNameTextBox.Size = new System.Drawing.Size(344, 20);
-            this.PropertyNameTextBox.TabIndex = 16;
+            this.PropertyNameTextBox.TabIndex = 0;
             // 
             // PropertyNameLabel
             // 
@@ -131,7 +132,7 @@
             this.PropertyNameLabel.Name = "PropertyNameLabel";
             this.PropertyNameLabel.Size = new System.Drawing.Size(80, 13);
             this.PropertyNameLabel.TabIndex = 15;
-            this.PropertyNameLabel.Text = "Property Name:";
+            this.PropertyNameLabel.Text = "&Property Name:";
             // 
             // flowLayoutPanel2
             // 
@@ -153,8 +154,8 @@
             this.CancelDialogButton.Location = new System.Drawing.Point(414, 11);
             this.CancelDialogButton.Name = "CancelDialogButton";
             this.CancelDialogButton.Size = new System.Drawing.Size(75, 23);
-            this.CancelDialogButton.TabIndex = 0;
-            this.CancelDialogButton.Text = "Cancel";
+            this.CancelDialogButton.TabIndex = 5;
+            this.CancelDialogButton.Text = "&Cancel";
             this.CancelDialogButton.UseVisualStyleBackColor = false;
             // 
             // OkButton
@@ -164,8 +165,8 @@
             this.OkButton.Location = new System.Drawing.Point(333, 11);
             this.OkButton.Name = "OkButton";
             this.OkButton.Size = new System.Drawing.Size(75, 23);
-            this.OkButton.TabIndex = 1;
-            this.OkButton.Text = "Ok";
+            this.OkButton.TabIndex = 4;
+            this.OkButton.Text = "&Ok";
             this.OkButton.UseVisualStyleBackColor = false;
             // 
             // InvalidVariableNameIcon
@@ -184,7 +185,7 @@
             this.ParameterNameTextBox.Location = new System.Drawing.Point(17, 135);
             this.ParameterNameTextBox.Name = "ParameterNameTextBox";
             this.ParameterNameTextBox.Size = new System.Drawing.Size(344, 20);
-            this.ParameterNameTextBox.TabIndex = 29;
+            this.ParameterNameTextBox.TabIndex = 1;
             this.ParameterNameTextBox.Text = "value";
             // 
             // VariableNameLabel
@@ -194,7 +195,7 @@
             this.VariableNameLabel.Name = "VariableNameLabel";
             this.VariableNameLabel.Size = new System.Drawing.Size(89, 13);
             this.VariableNameLabel.TabIndex = 28;
-            this.VariableNameLabel.Text = "Parameter Name:";
+            this.VariableNameLabel.Text = "Parameter &Name:";
             // 
             // SetterTypeGroupBox
             // 
@@ -205,7 +206,7 @@
             this.SetterTypeGroupBox.Name = "SetterTypeGroupBox";
             this.SetterTypeGroupBox.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
             this.SetterTypeGroupBox.Size = new System.Drawing.Size(106, 70);
-            this.SetterTypeGroupBox.TabIndex = 31;
+            this.SetterTypeGroupBox.TabIndex = 2;
             this.SetterTypeGroupBox.TabStop = false;
             this.SetterTypeGroupBox.Text = "Assignment:";
             // 
@@ -217,7 +218,7 @@
             this.SetSetterTypeCheckBox.Name = "SetSetterTypeCheckBox";
             this.SetSetterTypeCheckBox.Size = new System.Drawing.Size(42, 17);
             this.SetSetterTypeCheckBox.TabIndex = 3;
-            this.SetSetterTypeCheckBox.Text = "Set";
+            this.SetSetterTypeCheckBox.Text = "&Set";
             this.SetSetterTypeCheckBox.UseVisualStyleBackColor = true;
             // 
             // LetSetterTypeCheckBox
@@ -228,7 +229,7 @@
             this.LetSetterTypeCheckBox.Name = "LetSetterTypeCheckBox";
             this.LetSetterTypeCheckBox.Size = new System.Drawing.Size(41, 17);
             this.LetSetterTypeCheckBox.TabIndex = 2;
-            this.LetSetterTypeCheckBox.Text = "Let";
+            this.LetSetterTypeCheckBox.Text = "&Let";
             this.LetSetterTypeCheckBox.UseVisualStyleBackColor = true;
             // 
             // EncapsulateFieldDialog

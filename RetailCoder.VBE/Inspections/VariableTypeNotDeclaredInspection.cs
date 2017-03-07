@@ -1,5 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.Inspections.Results;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 
@@ -21,8 +24,9 @@ namespace Rubberduck.Inspections
             var issues = from item in UserDeclarations
                          where (item.DeclarationType == DeclarationType.Variable
                             || item.DeclarationType == DeclarationType.Constant
-                            || (item.DeclarationType == DeclarationType.Parameter && !item.IsArray()))
-                         && !item.IsTypeSpecified()
+                            || (item.DeclarationType == DeclarationType.Parameter && !item.IsArray))
+                         && !item.IsTypeSpecified
+                         && !item.IsUndeclared
                          select new VariableTypeNotDeclaredInspectionResult(this, item);
 
             return issues;

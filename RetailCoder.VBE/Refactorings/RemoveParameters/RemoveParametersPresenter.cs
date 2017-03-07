@@ -10,11 +10,11 @@ namespace Rubberduck.Refactorings.RemoveParameters
 
     public class RemoveParametersPresenter : IRemoveParametersPresenter
     {
-        private readonly IRemoveParametersView _view;
+        private readonly IRemoveParametersDialog _view;
         private readonly RemoveParametersModel _model;
         private readonly IMessageBox _messageBox;
 
-        public RemoveParametersPresenter(IRemoveParametersView view, RemoveParametersModel model, IMessageBox messageBox)
+        public RemoveParametersPresenter(IRemoveParametersDialog view, RemoveParametersModel model, IMessageBox messageBox)
         {
             _view = view;
             _model = model;
@@ -23,7 +23,10 @@ namespace Rubberduck.Refactorings.RemoveParameters
 
         public RemoveParametersModel Show()
         {
-            if (_model.TargetDeclaration == null) { return null; }
+            if (_model.TargetDeclaration == null)
+            {
+                return null;
+            }
 
             if (_model.Parameters.Count == 0)
             {

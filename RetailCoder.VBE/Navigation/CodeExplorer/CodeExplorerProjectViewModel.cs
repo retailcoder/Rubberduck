@@ -1,37 +1,44 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Windows.Media.Imaging;
-using Microsoft.Vbe.Interop;
+using Rubberduck.Navigation.Folders;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.VBEditor;
+using Rubberduck.VBEditor.SafeComWrappers;
 using resx = Rubberduck.UI.CodeExplorer.CodeExplorer;
 
 namespace Rubberduck.Navigation.CodeExplorer
 {
-    public class CodeExplorerProjectViewModel : CodeExplorerItemViewModel
+    public class CodeExplorerProjectViewModel : CodeExplorerItemViewModel, ICodeExplorerDeclarationViewModel
     {
         private readonly Declaration _declaration;
+        public Declaration Declaration { get { return _declaration; } }
+        private readonly CodeExplorerCustomFolderViewModel _folderTree;
 
         private static readonly DeclarationType[] ComponentTypes =
         {
-            DeclarationType.Class, 
+            DeclarationType.ClassModule, 
             DeclarationType.Document, 
-            DeclarationType.Module, 
+            DeclarationType.ProceduralModule, 
             DeclarationType.UserForm, 
         };
 
-        public CodeExplorerProjectViewModel(Declaration declaration, IEnumerable<Declaration> declarations)
+        public CodeExplorerProjectViewModel(FolderHelper folderHelper, Declaration declaration, IEnumerable<Declaration> declarations)
         {
+            _declaration = declaration;
+            _name = _declaration.IdentifierName;
+            IsExpanded = true;
+            _folderTree = folderHelper.GetFolderTree(declaration);
+
             try
             {
-                _declaration = declaration;
-                Items = FindFolders(declarations.ToList(), '.');
+                FillFolders(declarations.ToList());
+                Items = _folderTree.Items.ToList();
 
-                _icon = _declaration.Project.Protection == vbext_ProjectProtection.vbext_pp_locked
+                _icon = _declaration.Project.Protection == ProjectProtection.Locked
                     ? GetImageSource(resx.lock__exclamation)
-                    : GetImageSource(resx.VSObject_Library);
+                    : GetImageSource(resx.ObjectLibrary);
             }
             catch (NullReferenceException e)
             {
@@ -39,51 +46,66 @@ namespace Rubberduck.Navigation.CodeExplorer
             }
         }
 
-        private static IEnumerable<CodeExplorerItemViewModel> FindFolders(IEnumerable<Declaration> declarations, char delimiter)
+        private void FillFolders(IEnumerable<Declaration> declarations)
         {
-            var root = new CodeExplorerCustomFolderViewModel(string.Empty, new List<Declaration>());
-
             var items = declarations.ToList();
-            var folders = items.Where(item => ComponentTypes.Contains(item.DeclarationType))
+            var groupedItems = items.Where(item => ComponentTypes.Contains(item.DeclarationType))
                                .GroupBy(item => item.CustomFolder)
                                .OrderBy(item => item.Key);
-            foreach (var grouping in folders)
+
+            // set parent so we can walk up to the project node
+            // we haven't added the nodes yet, so this cast is valid
+            // ReSharper disable once PossibleInvalidCastExceptionInForeachLoop
+            foreach (CodeExplorerCustomFolderViewModel item in _folderTree.Items)
             {
-                CodeExplorerItemViewModel node = root;
-                var parts = grouping.Key.Split(delimiter);
-                var path = new StringBuilder();
-                foreach (var part in parts)
-                {
-                    if (path.Length != 0)
-                    {
-                        path.Append(delimiter);
-                    }
-
-                    path.Append(part);
-                    var next = node.GetChild(part);
-                    if (next == null)
-                    {
-                        var currentPath = path.ToString();
-                        var parents = grouping.Where(item => ComponentTypes.Contains(item.DeclarationType) && item.CustomFolder == currentPath).ToList();
-
-                        next = new CodeExplorerCustomFolderViewModel(part, items.Where(item => 
-                            parents.Contains(item) || parents.Any(parent => 
-                                (item.ParentDeclaration != null && item.ParentDeclaration.Equals(parent)) || item.ComponentName == parent.ComponentName)));
-                        node.AddChild(next);
-                    }
-
-                    node = next;
-                }
+                item.SetParent(this);
             }
 
-            return root.Items;
+            foreach (var grouping in groupedItems)
+            {
+                AddNodesToTree(_folderTree, items, grouping);
+            }
+        }
+
+        private bool AddNodesToTree(CodeExplorerCustomFolderViewModel tree, List<Declaration> items, IGrouping<string, Declaration> grouping)
+        {
+            foreach (var folder in tree.Items.OfType<CodeExplorerCustomFolderViewModel>())
+            {
+                if (grouping.Key.Replace("\"", string.Empty) != folder.FullPath)
+                {
+                    continue;
+                }
+
+                var parents = grouping.Where(
+                        item => ComponentTypes.Contains(item.DeclarationType) &&
+                            item.CustomFolder.Replace("\"", string.Empty) == folder.FullPath)
+                        .ToList();
+
+                folder.AddNodes(items.Where(item => parents.Contains(item) || parents.Any(parent =>
+                    (item.ParentDeclaration != null && item.ParentDeclaration.Equals(parent)) ||
+                    item.ComponentName == parent.ComponentName)).ToList());
+
+                return true;
+            }
+
+            return tree.Items.OfType<CodeExplorerCustomFolderViewModel>().Any(node => AddNodesToTree(node, items, grouping));
         }
 
         private readonly BitmapImage _icon;
         public override BitmapImage CollapsedIcon { get { return _icon; } }
         public override BitmapImage ExpandedIcon { get { return _icon; } }
+        
+        // projects are always at the top of the tree
+        public override CodeExplorerItemViewModel Parent { get { return null; } }
 
-        public override string Name { get { return _declaration.IdentifierName; } }
+        private string _name;
+        public override string Name { get { return _name; } }
+        public override string NameWithSignature { get { return _name; } }
         public override QualifiedSelection? QualifiedSelection { get { return _declaration.QualifiedSelection; } }
+
+        public void SetParenthesizedName(string parenthesizedName)
+        {
+            _name += " (" + parenthesizedName + ")";
+        }
     }
 }

@@ -1,12 +1,19 @@
 using System.Linq;
-using Microsoft.Vbe.Interop;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Rubberduck.Inspections;
 using Rubberduck.Parsing.VBA;
-using Rubberduck.VBEditor.Extensions;
-using Rubberduck.VBEditor.VBEHost;
 using RubberduckTests.Mocks;
+using Rubberduck.Settings;
+using System.Threading;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Concrete.Rubberduck.Inspections;
+using Rubberduck.Inspections.QuickFixes;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.VBEditor.Application;
+using Rubberduck.VBEditor.Events;
+using Rubberduck.VBEditor.SafeComWrappers;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace RubberduckTests.Inspections
 {
@@ -14,6 +21,7 @@ namespace RubberduckTests.Inspections
     public class ProcedureShouldBeFunctionInspectionTests
     {
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_ReturnsResult()
         {
             const string inputCode =
@@ -21,23 +29,32 @@ namespace RubberduckTests.Inspections
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
+
 
             Assert.AreEqual(1, inspectionResults.Count());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_ReturnsResult_MultipleSubs()
         {
             const string inputCode =
@@ -48,23 +65,30 @@ Private Sub Goo(ByRef foo As Integer)
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             Assert.AreEqual(2, inspectionResults.Count());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_DoesNotReturnResult_Function()
         {
             const string inputCode =
@@ -73,23 +97,30 @@ End Sub";
 End Function";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             Assert.AreEqual(0, inspectionResults.Count());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_DoesNotReturnResult_SingleByValParam()
         {
             const string inputCode =
@@ -97,23 +128,30 @@ End Function";
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             Assert.AreEqual(0, inspectionResults.Count());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_DoesNotReturnsResult_MultipleByValParams()
         {
             const string inputCode =
@@ -121,23 +159,30 @@ End Sub";
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             Assert.AreEqual(0, inspectionResults.Count());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_DoesNotReturnsResult_MultipleByRefParams()
         {
             const string inputCode =
@@ -145,24 +190,30 @@ End Sub";
 End Sub";
 
             //Arrange
+            var settings = new Mock<ConfigurationLoader>(null, null, null, null, null, null, null);
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             Assert.AreEqual(0, inspectionResults.Count());
         }
 
-        [Ignore]
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_DoesNotReturnResult_InterfaceImplementation()
         {
             //Input
@@ -176,27 +227,34 @@ Private Sub IClass1_DoSomething(ByRef a As Integer)
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            var project = builder.ProjectBuilder("TestProject1", vbext_ProjectProtection.vbext_pp_none)
-                .AddComponent("IClass1", vbext_ComponentType.vbext_ct_ClassModule, inputCode1)
-                .AddComponent("Class1", vbext_ComponentType.vbext_ct_ClassModule, inputCode2)
+            var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
+                .AddComponent("IClass1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode2)
                 .Build();
             var vbe = builder.AddProject(project).Build();
 
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             Assert.AreEqual(0, inspectionResults.Count());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_DoesNotReturnResult_EventImplementation()
         {
             //Input
@@ -209,27 +267,68 @@ Private Sub abc_Foo(ByRef arg1 As Integer)
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            var project = builder.ProjectBuilder("TestProject1", vbext_ProjectProtection.vbext_pp_none)
-                .AddComponent("Class1", vbext_ComponentType.vbext_ct_ClassModule, inputCode1)
-                .AddComponent("Class2", vbext_ComponentType.vbext_ct_ClassModule, inputCode2)
+            var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
                 .Build();
             var vbe = builder.AddProject(project).Build();
 
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             Assert.AreEqual(0, inspectionResults.Count());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
+        public void ProcedureShouldBeFunction_Ignored_DoesNotReturnResult()
+        {
+            const string inputCode =
+@"'@Ignore ProcedureCanBeWrittenAsFunction
+Private Sub Foo(ByRef foo As Boolean)
+End Sub";
+
+            //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
+            var builder = new MockVbeBuilder();
+            IVBComponent component;
+            var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
+            var mockHost = new Mock<IHostApplication>();
+            mockHost.SetupAllProperties();
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+
+
+            var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
+
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
+
+
+            Assert.IsFalse(inspectionResults.Any());
+        }
+
+        [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_QuickFixWorks()
         {
             const string inputCode =
@@ -242,27 +341,74 @@ End Sub";
 End Function";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
-            var project = vbe.Object.VBProjects.Item(0);
-            var module = project.VBComponents.Item(0).CodeModule;
+            var project = vbe.Object.VBProjects[0];
+            var module = project.VBComponents[0].CodeModule;
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             inspectionResults.First().QuickFixes.First().Fix();
 
-            Assert.AreEqual(expectedCode, module.Lines());
+            Assert.AreEqual(expectedCode, module.Content());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
+        public void ProcedureShouldBeFunction_QuickFixWorks_NoAsTypeClauseInParam()
+        {
+            const string inputCode =
+@"Private Sub Foo(ByRef arg1)
+End Sub";
+
+            const string expectedCode =
+@"Private Function Foo(ByVal arg1) As Variant
+    Foo = arg1
+End Function";
+
+            //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
+            var builder = new MockVbeBuilder();
+            IVBComponent component;
+            var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
+            var project = vbe.Object.VBProjects[0];
+            var module = project.VBComponents[0].CodeModule;
+            var mockHost = new Mock<IHostApplication>();
+            mockHost.SetupAllProperties();
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+
+            var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
+
+            inspectionResults.First().QuickFixes.First().Fix();
+
+            Assert.AreEqual(expectedCode, module.Content());
+        }
+
+        [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_QuickFixWorks_DoesNotInterfereWithBody()
         {
             const string inputCode =
@@ -285,27 +431,34 @@ Sub Goo(ByVal a As Integer)
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
-            var project = vbe.Object.VBProjects.Item(0);
-            var module = project.VBComponents.Item(0).CodeModule;
+            var project = vbe.Object.VBProjects[0];
+            var module = project.VBComponents[0].CodeModule;
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             inspectionResults.First().QuickFixes.First().Fix();
 
-            Assert.AreEqual(expectedCode, module.Lines());
+            Assert.AreEqual(expectedCode, module.Content());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_QuickFixWorks_DoesNotInterfereWithBody_BodyOnSingleLine()
         {
             const string inputCode =
@@ -325,27 +478,34 @@ Sub Goo(ByVal a As Integer)
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
-            var project = vbe.Object.VBProjects.Item(0);
-            var module = project.VBComponents.Item(0).CodeModule;
+            var project = vbe.Object.VBProjects[0];
+            var module = project.VBComponents[0].CodeModule;
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             inspectionResults.First().QuickFixes.First().Fix();
 
-            Assert.AreEqual(expectedCode, module.Lines());
+            Assert.AreEqual(expectedCode, module.Content());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_QuickFixWorks_DoesNotInterfereWithBody_BodyOnSingleLine_BodyHasStringLiteralContainingColon()
         {
             const string inputCode =
@@ -365,27 +525,34 @@ Sub Goo(ByVal a As String)
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
-            var project = vbe.Object.VBProjects.Item(0);
-            var module = project.VBComponents.Item(0).CodeModule;
+            var project = vbe.Object.VBProjects[0];
+            var module = project.VBComponents[0].CodeModule;
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             inspectionResults.First().QuickFixes.First().Fix();
 
-            Assert.AreEqual(expectedCode, module.Lines());
+            Assert.AreEqual(expectedCode, module.Content());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_QuickFixWorks_UpdatesCallsAbove()
         {
             const string inputCode =
@@ -408,27 +575,34 @@ Private Function Foo(ByVal arg1 As Integer) As Integer
 End Function";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
-            var project = vbe.Object.VBProjects.Item(0);
-            var module = project.VBComponents.Item(0).CodeModule;
+            var project = vbe.Object.VBProjects[0];
+            var module = project.VBComponents[0].CodeModule;
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             inspectionResults.First().QuickFixes.First().Fix();
 
-            Assert.AreEqual(expectedCode, module.Lines());
+            Assert.AreEqual(expectedCode, module.Content());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
         public void ProcedureShouldBeFunction_QuickFixWorks_UpdatesCallsBelow()
         {
             const string inputCode =
@@ -451,27 +625,74 @@ Sub Goo(ByVal a As Integer)
 End Sub";
 
             //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
-            var project = vbe.Object.VBProjects.Item(0);
-            var module = project.VBComponents.Item(0).CodeModule;
+            var project = vbe.Object.VBProjects[0];
+            var module = project.VBComponents[0].CodeModule;
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState());
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
 
-            parser.Parse();
-            if (parser.State.Status == ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
 
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
 
             inspectionResults.First().QuickFixes.First().Fix();
 
-            Assert.AreEqual(expectedCode, module.Lines());
+            Assert.AreEqual(expectedCode, module.Content());
         }
 
         [TestMethod]
+        [TestCategory("Inspections")]
+        public void ProcedureShouldBeFunction_IgnoreQuickFixWorks()
+        {
+            const string inputCode =
+@"Private Sub Foo(ByRef arg1 As Integer)
+End Sub";
+
+            const string expectedCode =
+@"'@Ignore ProcedureCanBeWrittenAsFunction
+Private Sub Foo(ByRef arg1 As Integer)
+End Sub";
+
+            //Arrange
+            var settings = new Mock<IGeneralConfigService>();
+            var config = GetTestConfig();
+            settings.Setup(x => x.LoadConfiguration()).Returns(config);
+
+            var builder = new MockVbeBuilder();
+            IVBComponent component;
+            var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
+            var project = vbe.Object.VBProjects[0];
+            var module = project.VBComponents[0].CodeModule;
+            var mockHost = new Mock<IHostApplication>();
+            mockHost.SetupAllProperties();
+            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+
+            parser.Parse(new CancellationTokenSource());
+            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+
+            var inspection = new ProcedureCanBeWrittenAsFunctionInspection(parser.State);
+            var inspector = new Inspector(settings.Object, new IInspection[] { inspection });
+
+            var inspectionResults = inspector.FindIssuesAsync(parser.State, CancellationToken.None).Result;
+
+            inspectionResults.First().QuickFixes.Single(s => s is IgnoreOnceQuickFix).Fix();
+
+            Assert.AreEqual(expectedCode, module.Content());
+        }
+
+        [TestMethod]
+        [TestCategory("Inspections")]
         public void InspectionType()
         {
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(null);
@@ -485,6 +706,20 @@ End Sub";
             var inspection = new ProcedureCanBeWrittenAsFunctionInspection(null);
 
             Assert.AreEqual(inspectionName, inspection.Name);
+        }
+
+        private Configuration GetTestConfig()
+        {
+            var settings = new CodeInspectionSettings();
+            settings.CodeInspections.Add(new CodeInspectionSetting
+            {
+                Description = new ProcedureCanBeWrittenAsFunctionInspection(null).Description,
+                Severity = CodeInspectionSeverity.Suggestion
+            });
+            return new Configuration
+            {
+                UserSettings = new UserSettings(null, null, null, settings, null, null, null)
+            };
         }
     }
 }

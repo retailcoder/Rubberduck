@@ -1,20 +1,21 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Windows.Forms;
-using System.Windows.Input;
 using Rubberduck.Common.WinAPI;
+using NLog;
+using Rubberduck.UI;
+using Rubberduck.UI.Command;
 
 namespace Rubberduck.Common.Hotkeys
 {
     public class Hotkey : IHotkey
     {
         private readonly string _key;
-        private readonly ICommand _command;
+        private readonly CommandBase _command;
         private readonly IntPtr _hWndVbe;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public Hotkey(IntPtr hWndVbe, string key, ICommand command, Keys secondKey = Keys.None)
+        public Hotkey(IntPtr hWndVbe, string key, CommandBase command, Keys secondKey = Keys.None)
         {
             _hWndVbe = hWndVbe;
 
@@ -25,7 +26,7 @@ namespace Rubberduck.Common.Hotkeys
             SecondKey = secondKey;
         }
 
-        public ICommand Command { get { return _command; } }
+        public CommandBase Command { get { return _command; } }
         public string Key { get { return _key; } }
         public HotkeyInfo HotkeyInfo { get; private set; }
         public Keys Combo { get; private set; }
@@ -57,6 +58,7 @@ namespace Rubberduck.Common.Hotkeys
             }
 
             HookKey(key, shift);
+            SetCommandShortcutText();
         }
 
         public void Detach()
@@ -70,6 +72,7 @@ namespace Rubberduck.Common.Hotkeys
             Kernel32.GlobalDeleteAtom(HotkeyInfo.HookId);
 
             IsAttached = false;
+            ClearCommandShortcutText();
         }
 
         private void HookKey(Keys key, uint shift)
@@ -83,14 +86,31 @@ namespace Rubberduck.Common.Hotkeys
             var success = User32.RegisterHotKey(_hWndVbe, hookId, shift, (uint)key);
             if (!success)
             {
-                Debug.WriteLine(Rubberduck.UI.RubberduckUI.CommonHotkey_KeyNotRegistered, key);
-                //throw new Win32Exception(Rubberduck.UI.RubberduckUI.CommonHotkey_KeyNotRegistered, key);
+                Logger.Debug(RubberduckUI.CommonHotkey_KeyNotRegistered, key);
             }
 
             HotkeyInfo = new HotkeyInfo(hookId, Combo);
             IsAttached = true;
-            Debug.WriteLine("Hotkey '{0}' hooked successfully to command '{1}'", Key, Command.GetType());  //no translation needed for Debug.Writeline
         }
+
+        private void SetCommandShortcutText()
+        {
+            var command = Command as CommandBase;
+            if (command != null)
+            {
+                command.ShortcutText = HotkeyInfo.ToString();
+            }
+        }
+
+        private void ClearCommandShortcutText()
+        {
+            var command = Command as CommandBase;
+            if (command != null)
+            {
+                command.ShortcutText = string.Empty;
+            }
+        }
+
 
         private static readonly IDictionary<char,uint> Modifiers = new Dictionary<char, uint>
         {

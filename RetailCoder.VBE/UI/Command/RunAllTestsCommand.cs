@@ -1,5 +1,11 @@
+using System;
+using System.Diagnostics;
+using NLog;
+using Rubberduck.Parsing.VBA;
 using Rubberduck.UI.UnitTesting;
 using Rubberduck.UnitTesting;
+using System.Linq;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command
 {
@@ -8,22 +14,102 @@ namespace Rubberduck.UI.Command
     /// </summary>
     public class RunAllTestsCommand : CommandBase
     {
+        private readonly IVBE _vbe;
         private readonly ITestEngine _engine;
-        private readonly TestExplorerModelBase _model;
+        private readonly TestExplorerModel _model;
+        private readonly IDockablePresenter _presenter;
+        private readonly RubberduckParserState _state;
 
-        public RunAllTestsCommand(ITestEngine engine, TestExplorerModelBase model)
+        public RunAllTestsCommand(IVBE vbe, RubberduckParserState state, ITestEngine engine, TestExplorerModel model, IDockablePresenter presenter) 
+            : base(LogManager.GetCurrentClassLogger())
         {
+            _vbe = vbe;
             _engine = engine;
             _model = model;
+            _state = state;
+            _presenter = presenter;
         }
 
-        public override void Execute(object parameter)
+        private static readonly ParserState[] AllowedRunStates = { ParserState.ResolvedDeclarations, ParserState.ResolvingReferences, ParserState.Ready };
+
+        protected override bool CanExecuteImpl(object parameter)
         {
-            _model.Refresh();
+            return _vbe.IsInDesignMode && AllowedRunStates.Contains(_state.Status);
+        }
+
+        protected override void ExecuteImpl(object parameter)
+        {
+            EnsureRubberduckIsReferencedForEarlyBoundTests();
+
+            if (!_state.IsDirty())
+            {
+                RunTests();
+            }
+            else
+            {
+                _model.TestsRefreshed += TestsRefreshed;
+                _model.Refresh();
+            }
+        }
+
+        private void EnsureRubberduckIsReferencedForEarlyBoundTests()
+        {
+            foreach (var member in _state.AllUserDeclarations)
+            {
+                if (member.AsTypeName == "Rubberduck.PermissiveAssertClass" ||
+                    member.AsTypeName == "Rubberduck.AssertClass")
+                {
+                    member.Project.EnsureReferenceToAddInLibrary();
+                }
+            }
+        }
+
+        private void TestsRefreshed(object sender, EventArgs e)
+        {
+            RunTests();
+        }
+
+        private void RunTests()
+        {
+            _model.TestsRefreshed -= TestsRefreshed;
+
+            var stopwatch = new Stopwatch();
+
             _model.ClearLastRun();
             _model.IsBusy = true;
+
+            if (_presenter != null)
+            {
+                _presenter.Show();
+            }
+
+            stopwatch.Start();
             _engine.Run(_model.Tests);
+            stopwatch.Stop();
+
             _model.IsBusy = false;
+
+            OnRunCompleted(new TestRunEventArgs(stopwatch.ElapsedMilliseconds));
+        }
+
+        public event EventHandler<TestRunEventArgs> RunCompleted;
+        protected virtual void OnRunCompleted(TestRunEventArgs e)
+        {
+            var handler = RunCompleted;
+            if (handler != null)
+            {
+                handler.Invoke(this, e);
+            }
+        }
+    }
+    
+    public class TestRunEventArgs : EventArgs
+    {
+        public long Duration { get; private set; }
+
+        public TestRunEventArgs(long duration)
+        {
+            Duration = duration;
         }
     }
 }

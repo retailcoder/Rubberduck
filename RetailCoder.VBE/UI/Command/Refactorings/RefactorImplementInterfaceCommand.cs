@@ -1,13 +1,10 @@
-using System.Diagnostics;
 using System.Linq;
-using Microsoft.Vbe.Interop;
 using System.Runtime.InteropServices;
 using Rubberduck.Common;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.ImplementInterface;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
@@ -15,44 +12,52 @@ namespace Rubberduck.UI.Command.Refactorings
     public class RefactorImplementInterfaceCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
+        private readonly IMessageBox _msgBox;
 
-        public RefactorImplementInterfaceCommand(VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor)
-            : base(vbe, editor)
+        public RefactorImplementInterfaceCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgBox)
+            : base(vbe)
         {
             _state = state;
+            _msgBox = msgBox;
         }
 
-        public override bool CanExecute(object parameter)
+        protected override bool CanExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null || _state.Status != ParserState.Ready)
+            var pane = Vbe.ActiveCodePane;
             {
-                return false;
+                if (_state.Status != ParserState.Ready || pane.IsWrappingNullReference)
+                {
+                    return false;
+                }
+
+                var selection = pane.GetQualifiedSelection();
+                if (!selection.HasValue)
+                {
+                    return false;
+                }
+
+                var targetInterface = _state.AllUserDeclarations.FindInterface(selection.Value);
+
+                var targetClass = _state.AllUserDeclarations.SingleOrDefault(d =>
+                    !d.IsBuiltIn && d.DeclarationType == DeclarationType.ClassModule &&
+                    d.QualifiedSelection.QualifiedName.Equals(selection.Value.QualifiedName));
+
+                return targetInterface != null && targetClass != null;
             }
-
-            //var target = _state.FindSelectedDeclaration(Vbe.ActiveCodePane); // nope. logic is a bit more complex here.
-
-            var selection = Vbe.ActiveCodePane.GetSelection();
-            var targetInterface = _state.AllUserDeclarations.FindInterface(selection);
-
-            var targetClass = _state.AllUserDeclarations.SingleOrDefault(d =>
-                        !d.IsBuiltIn && d.DeclarationType == DeclarationType.Class &&
-                        d.QualifiedSelection.QualifiedName.Equals(selection.QualifiedName));
-
-            var canExecute = targetInterface != null && targetClass != null;
-
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
-            return canExecute;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null)
+            var pane = Vbe.ActiveCodePane;
             {
-                return;
-            }
+                if (pane.IsWrappingNullReference)
+                {
+                    return;
+                }
 
-            var refactoring = new ImplementInterfaceRefactoring(_state, Editor, new MessageBox());
-            refactoring.Refactor();
+                var refactoring = new ImplementInterfaceRefactoring(Vbe, _state, _msgBox);
+                refactoring.Refactor();
+            }
         }
     }
 }

@@ -1,11 +1,10 @@
-using System.Windows.Input;
 using Rubberduck.UI.Command.MenuItems.ParentMenus;
 
 namespace Rubberduck.UI.Command.MenuItems
 {
     public class RegexSearchReplaceCommandMenuItem : CommandMenuItemBase
     {
-        public RegexSearchReplaceCommandMenuItem(ICommand command)
+        public RegexSearchReplaceCommandMenuItem(CommandBase command)
             : base(command)
         {
         }

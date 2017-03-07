@@ -15,7 +15,7 @@
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* VBA grammar based on Microsoft's [MS-VBAL]: VBA Language Specification. */
+/* VBA grammar based on MS VBAL */
 
 parser grammar VBAParser;
 
@@ -23,515 +23,544 @@ options { tokenVocab = VBALexer; }
 
 startRule : module EOF;
 
-module : 
-	whiteSpace?
-	endOfStatement
-	(moduleHeader endOfStatement)?
-	moduleConfig? endOfStatement
-	moduleAttributes? endOfStatement
-	moduleDeclarations? endOfStatement
-	moduleBody? endOfStatement
-	whiteSpace?
+module :
+    endOfStatement
+    moduleAttributes
+    moduleHeader?
+    moduleAttributes
+    moduleConfig?
+    moduleAttributes
+    moduleDeclarations
+    moduleAttributes
+    moduleBody
+    moduleAttributes
+    // A module can consist of WS as well as line continuations only.
+    whiteSpace?
 ;
 
 moduleHeader : VERSION whiteSpace numberLiteral whiteSpace? CLASS? endOfStatement;
 
 moduleConfig :
-	BEGIN (whiteSpace GUIDLITERAL whiteSpace ambiguousIdentifier whiteSpace?)? endOfStatement
-	moduleConfigElement+
-	END
+    BEGIN (whiteSpace GUIDLITERAL whiteSpace unrestrictedIdentifier whiteSpace?)? endOfStatement
+    moduleConfigElement+
+    END endOfStatement
 ;
 
 moduleConfigElement :
-	ambiguousIdentifier whiteSpace* EQ whiteSpace* literal (COLON numberLiteral)? endOfStatement
+    unrestrictedIdentifier whiteSpace* EQ whiteSpace* expression (COLON numberLiteral)? endOfStatement
 ;
 
-moduleAttributes : (attributeStmt endOfStatement)+;
+moduleAttributes : (attributeStmt endOfStatement)*;
+attributeStmt : ATTRIBUTE whiteSpace attributeName whiteSpace? EQ whiteSpace? attributeValue (whiteSpace? COMMA whiteSpace? attributeValue)*;
+attributeName : lExpression;
+attributeValue : expression;
 
-moduleDeclarations : moduleDeclarationsElement (endOfStatement moduleDeclarationsElement)* endOfStatement;
+moduleDeclarations : (moduleDeclarationsElement endOfStatement)*;
 
 moduleOption : 
-	OPTION_BASE whiteSpace numberLiteral 					# optionBaseStmt
-	| OPTION_COMPARE whiteSpace (BINARY | TEXT | DATABASE) 	# optionCompareStmt
-	| OPTION_EXPLICIT 								        # optionExplicitStmt
-	| OPTION_PRIVATE_MODULE 						        # optionPrivateModuleStmt
+    OPTION_BASE whiteSpace numberLiteral                     # optionBaseStmt
+    | OPTION_COMPARE whiteSpace (BINARY | TEXT | DATABASE)     # optionCompareStmt
+    | OPTION_EXPLICIT                                         # optionExplicitStmt
+    | OPTION_PRIVATE_MODULE                                 # optionPrivateModuleStmt
 ;
 
 moduleDeclarationsElement :
-    declareStmt
-	| enumerationStmt 
-	| eventStmt
-	| constStmt
-	| implementsStmt
-	| variableStmt
-	| moduleOption
-	| typeStmt
+    whiteSpace?
+    (attributeStmt
+    | declareStmt
+    | defDirective
+    | enumerationStmt 
+    | eventStmt
+    | constStmt
+    | implementsStmt
+    | variableStmt
+    | moduleOption
+    | publicTypeDeclaration
+    | privateTypeDeclaration)
 ;
 
 moduleBody : 
-	moduleBodyElement (endOfStatement moduleBodyElement)* endOfStatement;
+    whiteSpace?
+    (moduleBodyElement endOfStatement)*;
 
 moduleBodyElement : 
-	functionStmt 
-	| propertyGetStmt 
-	| propertySetStmt 
-	| propertyLetStmt 
-	| subStmt 
+    functionStmt 
+    | propertyGetStmt 
+    | propertySetStmt 
+    | propertyLetStmt 
+    | subStmt 
 ;
 
-attributeStmt : ATTRIBUTE whiteSpace implicitCallStmt_InStmt whiteSpace? EQ whiteSpace? literal (whiteSpace? COMMA whiteSpace? literal)*;
-
-block : blockStmt (endOfStatement blockStmt)* endOfStatement;
+block : (blockStmt endOfStatement)*;
 
 blockStmt :
-	lineLabel
-    | appactivateStmt
-	| attributeStmt
-	| beepStmt
-	| chdirStmt
-	| chdriveStmt
-	| closeStmt
-	| constStmt
-	| dateStmt
-	| deleteSettingStmt
-	| deftypeStmt
-	| doLoopStmt
-	| endStmt
-	| eraseStmt
-	| errorStmt
-	| exitStmt
-	| explicitCallStmt
-	| filecopyStmt
-	| forEachStmt
-	| forNextStmt
-	| getStmt
-	| goSubStmt
-	| goToStmt
-	| ifThenElseStmt
-	| implementsStmt
-	| inputStmt
-	| killStmt
-	| letStmt
-	| lineInputStmt
-	| loadStmt
-	| lockStmt
-	| lsetStmt
-	| midStmt
-	| mkdirStmt
-	| nameStmt
-	| onErrorStmt
-	| onGoToStmt
-	| onGoSubStmt
-	| openStmt
-	| printStmt
-	| putStmt
-	| raiseEventStmt
-	| randomizeStmt
-	| redimStmt
-	| resetStmt
-	| resumeStmt
-	| returnStmt
-	| rmdirStmt
-	| rsetStmt
-	| savepictureStmt
-	| saveSettingStmt
-	| seekStmt
-	| selectCaseStmt
-	| sendkeysStmt
-	| setattrStmt
-	| setStmt
-	| stopStmt
-	| timeStmt
-	| unloadStmt
-	| unlockStmt
-	| variableStmt
-	| whileWendStmt
-	| widthStmt
-	| withStmt
-	| writeStmt
-	| implicitCallStmt_InBlock
+    statementLabelDefinition
+    | fileStmt
+    | attributeStmt
+    | constStmt
+    | doLoopStmt
+    | endStmt
+    | eraseStmt
+    | errorStmt
+    | exitStmt
+    | forEachStmt
+    | forNextStmt
+    | goSubStmt
+    | goToStmt
+    | ifStmt
+    | singleLineIfStmt
+    | implementsStmt
+    | letStmt
+    | lsetStmt
+    | onErrorStmt
+    | onGoToStmt
+    | onGoSubStmt
+    | raiseEventStmt
+    | redimStmt
+    | resumeStmt
+    | returnStmt
+    | rsetStmt
+    | selectCaseStmt
+    | setStmt
+    | stopStmt
+    | variableStmt
+    | whileWendStmt
+    | withStmt
+    | lineSpecialForm
+    | circleSpecialForm
+    | scaleSpecialForm
+    | callStmt
+    | nameStmt
 ;
 
-appactivateStmt : APPACTIVATE whiteSpace valueStmt (whiteSpace? COMMA whiteSpace? valueStmt)?;
+// 5.4.5 File Statements
+fileStmt :
+    openStmt
+    | resetStmt
+    | closeStmt
+    | seekStmt
+    | lockStmt
+    | unlockStmt
+    | lineInputStmt
+    | widthStmt
+    | debugPrintStmt
+    | printStmt
+    | writeStmt
+    | inputStmt
+    | putStmt
+    | getStmt
+;
 
-beepStmt : BEEP;
 
-chdirStmt : CHDIR whiteSpace valueStmt;
+// 5.4.5.1 Open Statement
+openStmt : OPEN whiteSpace pathName (whiteSpace modeClause)? (whiteSpace accessClause)? (whiteSpace lock)? whiteSpace AS whiteSpace fileNumber (whiteSpace lenClause)?;
+pathName : expression;
+modeClause : FOR whiteSpace fileMode;
+fileMode : APPEND | BINARY | INPUT | OUTPUT | RANDOM;
+accessClause : ACCESS whiteSpace access;
+access :
+    READ
+    | WRITE
+    | READ_WRITE
+;
+lock :
+    SHARED
+    | LOCK_READ
+    | LOCK_WRITE
+    | LOCK_READ_WRITE
+;
+lenClause : LEN whiteSpace? EQ whiteSpace? recLength;
+recLength : expression;
 
-chdriveStmt : CHDRIVE whiteSpace valueStmt;
 
-closeStmt : CLOSE (whiteSpace fileNumber (whiteSpace? COMMA whiteSpace? fileNumber)*)?;
+// 5.4.5.1.1 File Numbers
+fileNumber : markedFileNumber | unmarkedFileNumber;
+markedFileNumber : HASH expression;
+unmarkedFileNumber : expression;
+
+
+// 5.4.5.2 Close and Reset Statements
+closeStmt : CLOSE (whiteSpace fileNumberList)?;
+resetStmt : RESET;
+fileNumberList : fileNumber (whiteSpace? COMMA whiteSpace? fileNumber)*;
+
+
+// 5.4.5.3 Seek Statement
+seekStmt : SEEK whiteSpace fileNumber whiteSpace? COMMA whiteSpace? position;
+position : expression;
+
+
+// 5.4.5.4 Lock Statement
+lockStmt : LOCK whiteSpace fileNumber (whiteSpace? COMMA whiteSpace? recordRange)?;
+recordRange :
+    startRecordNumber
+    | (startRecordNumber whiteSpace)? TO whiteSpace endRecordNumber
+;
+startRecordNumber : expression;
+endRecordNumber : expression;
+
+
+// 5.4.5.5 Unlock Statement
+unlockStmt : UNLOCK whiteSpace fileNumber (whiteSpace? COMMA whiteSpace? recordRange)?;
+
+
+// 5.4.5.6 Line Input Statement
+lineInputStmt : LINE_INPUT whiteSpace markedFileNumber whiteSpace? COMMA whiteSpace? variableName;
+variableName : expression;
+
+
+// 5.4.5.7 Width Statement
+widthStmt : WIDTH whiteSpace markedFileNumber whiteSpace? COMMA whiteSpace? lineWidth;
+lineWidth : expression;
+
+
+// 5.4.5.8   Print Statement
+// Debug.Print is special because it seems to take an output list as argument.
+// To shield the rest of the parsing/binding from this peculiarity, we treat it as a statement
+// and let the resolver handle it.
+debugPrintStmt : debugPrint (whiteSpace outputList)?;
+// We split it up into separate rules so that we have context classes generated that can be used in declarations/references.
+debugPrint : debugModule whiteSpace? DOT whiteSpace? debugPrintSub;
+debugModule : DEBUG;
+debugPrintSub : PRINT;
+printStmt : PRINT whiteSpace markedFileNumber whiteSpace? COMMA (whiteSpace? outputList)?;
+
+// 5.4.5.8.1 Output Lists
+outputList : outputItem (whiteSpace? outputItem)*;
+outputItem :
+    outputClause
+    | charPosition
+    | outputClause whiteSpace? charPosition
+;
+outputClause : spcClause | tabClause | outputExpression;
+charPosition : SEMICOLON | COMMA;
+outputExpression : expression;
+spcClause : SPC whiteSpace? LPAREN whiteSpace? spcNumber whiteSpace? RPAREN;
+spcNumber : expression; 
+tabClause : TAB (whiteSpace? tabNumberClause)?;
+tabNumberClause : LPAREN whiteSpace? tabNumber whiteSpace? RPAREN;
+tabNumber : expression;
+
+
+// 5.4.5.9 Write Statement
+writeStmt : WRITE whiteSpace markedFileNumber whiteSpace? COMMA (whiteSpace? outputList)?;
+
+
+// 5.4.5.10 Input Statement
+inputStmt : INPUT whiteSpace markedFileNumber whiteSpace? COMMA whiteSpace? inputList;
+inputList : inputVariable (whiteSpace? COMMA whiteSpace? inputVariable)*;  
+inputVariable : expression;
+
+
+// 5.4.5.11   Put Statement
+putStmt : PUT whiteSpace fileNumber whiteSpace? COMMA whiteSpace? recordNumber? whiteSpace? COMMA whiteSpace? data;
+recordNumber : expression;
+data : expression;
+
+
+// 5.4.5.12 Get Statement
+getStmt : GET whiteSpace fileNumber whiteSpace? COMMA whiteSpace? recordNumber? whiteSpace? COMMA whiteSpace? variable; 
+variable : expression;
+
 
 constStmt : (visibility whiteSpace)? CONST whiteSpace constSubStmt (whiteSpace? COMMA whiteSpace? constSubStmt)*;
+constSubStmt : identifier (whiteSpace asTypeClause)? whiteSpace? EQ whiteSpace? expression;
 
-constSubStmt : ambiguousIdentifier typeHint? (whiteSpace asTypeClause)? whiteSpace? EQ whiteSpace? valueStmt;
-
-dateStmt : DATE whiteSpace? EQ whiteSpace? valueStmt;
-
-declareStmt : (visibility whiteSpace)? DECLARE whiteSpace (PTRSAFE whiteSpace)? ((FUNCTION typeHint?) | SUB) whiteSpace ambiguousIdentifier typeHint? whiteSpace LIB whiteSpace STRINGLITERAL (whiteSpace ALIAS whiteSpace STRINGLITERAL)? (whiteSpace? argList)? (whiteSpace asTypeClause)?;
-
-deftypeStmt : 
-	(
-		DEFBOOL | DEFBYTE | DEFINT | DEFLNG | DEFLNGLNG | DEFLNGPTR | DEFCUR |
-		DEFSNG | DEFDBL | DEFDATE | 
-		DEFSTR | DEFOBJ | DEFVAR
-	) whiteSpace
-	letterrange (whiteSpace? COMMA whiteSpace? letterrange)*
-;
-
-deleteSettingStmt :
-    DELETESETTING whiteSpace valueStmt whiteSpace?
-    | DELETESETTING whiteSpace valueStmt whiteSpace? COMMA whiteSpace? valueStmt
-    | DELETESETTING whiteSpace valueStmt whiteSpace? COMMA whiteSpace? valueStmt whiteSpace? COMMA whiteSpace? valueStmt;
-
-doLoopStmt :
-	DO endOfStatement 
-	block?
-	LOOP
-	|
-	DO whiteSpace (WHILE | UNTIL) whiteSpace valueStmt endOfStatement
-	block?
-	LOOP
-	| 
-	DO endOfStatement
-	block?
-	LOOP whiteSpace (WHILE | UNTIL) whiteSpace valueStmt
-;
-
-endStmt : END;
-
-enumerationStmt: 
-	(visibility whiteSpace)? ENUM whiteSpace ambiguousIdentifier endOfStatement 
-	enumerationStmt_Constant* 
-	END_ENUM
-;
-
-enumerationStmt_Constant : ambiguousIdentifier (whiteSpace? EQ whiteSpace? valueStmt)? endOfStatement;
-
-eraseStmt : ERASE whiteSpace valueStmt (whiteSpace? COMMA whiteSpace? valueStmt)*;
-
-errorStmt : ERROR whiteSpace valueStmt;
-
-eventStmt : (visibility whiteSpace)? EVENT whiteSpace ambiguousIdentifier whiteSpace? argList;
-
-exitStmt : EXIT_DO | EXIT_FOR | EXIT_FUNCTION | EXIT_PROPERTY | EXIT_SUB;
-
-filecopyStmt : FILECOPY whiteSpace valueStmt whiteSpace? COMMA whiteSpace? valueStmt;
-
-forEachStmt : 
-	FOR whiteSpace EACH whiteSpace ambiguousIdentifier typeHint? whiteSpace IN whiteSpace valueStmt endOfStatement
-	block?
-	NEXT (whiteSpace ambiguousIdentifier)?
-;
-
-forNextStmt : 
-	FOR whiteSpace ambiguousIdentifier typeHint? (whiteSpace asTypeClause)? whiteSpace? EQ whiteSpace? valueStmt whiteSpace TO whiteSpace valueStmt (whiteSpace STEP whiteSpace valueStmt)? endOfStatement 
-	block?
-	NEXT (whiteSpace ambiguousIdentifier typeHint?)?
-; 
-
-functionStmt :
-	(visibility whiteSpace)? (STATIC whiteSpace)? FUNCTION whiteSpace? ambiguousIdentifier typeHint? (whiteSpace? argList)? (whiteSpace? asTypeClause)? endOfStatement
-	block?
-	END_FUNCTION
-;
-
-getStmt : GET whiteSpace fileNumber whiteSpace? COMMA whiteSpace? valueStmt? whiteSpace? COMMA whiteSpace? valueStmt;
-
-goSubStmt : GOSUB whiteSpace valueStmt;
-
-goToStmt : GOTO whiteSpace valueStmt;
-
-ifThenElseStmt : 
-	IF whiteSpace ifConditionStmt whiteSpace THEN whiteSpace blockStmt (whiteSpace ELSE whiteSpace blockStmt)?	# inlineIfThenElse
-	| ifBlockStmt ifElseIfBlockStmt* ifElseBlockStmt? END_IF			# blockIfThenElse
-;
-
-ifBlockStmt : 
-	IF whiteSpace ifConditionStmt whiteSpace THEN endOfStatement 
-	block?
-;
-
-ifConditionStmt : valueStmt;
-
-ifElseIfBlockStmt : 
-	ELSEIF whiteSpace ifConditionStmt whiteSpace THEN endOfStatement
-	block?
-;
-
-ifElseBlockStmt : 
-	ELSE endOfStatement 
-	block?
-;
-
-implementsStmt : IMPLEMENTS whiteSpace ambiguousIdentifier;
-
-inputStmt : INPUT whiteSpace fileNumber (whiteSpace? COMMA whiteSpace? valueStmt)+;
-
-killStmt : KILL whiteSpace valueStmt;
-
-letStmt : (LET whiteSpace)? implicitCallStmt_InStmt whiteSpace? EQ whiteSpace? valueStmt;
-
-lineInputStmt : LINE_INPUT whiteSpace fileNumber whiteSpace? COMMA whiteSpace? valueStmt;
-
-loadStmt : LOAD whiteSpace valueStmt;
-
-lockStmt : LOCK whiteSpace valueStmt (whiteSpace? COMMA whiteSpace? valueStmt (whiteSpace TO whiteSpace valueStmt)?)?;
-
-lsetStmt : LSET whiteSpace implicitCallStmt_InStmt whiteSpace? EQ whiteSpace? valueStmt;
-
-midStmt : MID whiteSpace? LPAREN whiteSpace? argsCall whiteSpace? RPAREN;
-
-mkdirStmt : MKDIR whiteSpace valueStmt;
-
-nameStmt : NAME whiteSpace valueStmt whiteSpace AS whiteSpace valueStmt;
-
-onErrorStmt : (ON_ERROR | ON_LOCAL_ERROR) whiteSpace (GOTO whiteSpace valueStmt | RESUME whiteSpace NEXT);
-
-onGoToStmt : ON whiteSpace valueStmt whiteSpace GOTO whiteSpace valueStmt (whiteSpace? COMMA whiteSpace? valueStmt)*;
-
-onGoSubStmt : ON whiteSpace valueStmt whiteSpace GOSUB whiteSpace valueStmt (whiteSpace? COMMA whiteSpace? valueStmt)*;
-
-openStmt : 
-	OPEN whiteSpace valueStmt whiteSpace FOR whiteSpace (APPEND | BINARY | INPUT | OUTPUT | RANDOM) 
-	(whiteSpace ACCESS whiteSpace (READ | WRITE | READ_WRITE))?
-	(whiteSpace (SHARED | LOCK_READ | LOCK_WRITE | LOCK_READ_WRITE))?
-	whiteSpace AS whiteSpace fileNumber
-	(whiteSpace LEN whiteSpace? EQ whiteSpace? valueStmt)?
-;
-
-outputList :
-	outputList_Expression (whiteSpace? (SEMICOLON | COMMA) whiteSpace? outputList_Expression?)*
-	| outputList_Expression? (whiteSpace? (SEMICOLON | COMMA) whiteSpace? outputList_Expression?)+
-;
-
-outputList_Expression : 
-	valueStmt
-	| (SPC | TAB) (whiteSpace? LPAREN whiteSpace? argsCall whiteSpace? RPAREN)?
-;
-
-printStmt : PRINT whiteSpace fileNumber whiteSpace? COMMA (whiteSpace? outputList)?;
-
-propertyGetStmt : 
-	(visibility whiteSpace)? (STATIC whiteSpace)? PROPERTY_GET whiteSpace ambiguousIdentifier typeHint? (whiteSpace? argList)? (whiteSpace asTypeClause)? endOfStatement 
-	block? 
-	END_PROPERTY
-;
-
-propertySetStmt : 
-	(visibility whiteSpace)? (STATIC whiteSpace)? PROPERTY_SET whiteSpace ambiguousIdentifier (whiteSpace? argList)? endOfStatement 
-	block? 
-	END_PROPERTY
-;
-
-propertyLetStmt : 
-	(visibility whiteSpace)? (STATIC whiteSpace)? PROPERTY_LET whiteSpace ambiguousIdentifier (whiteSpace? argList)? endOfStatement 
-	block? 
-	END_PROPERTY
-;
-
-putStmt : PUT whiteSpace fileNumber whiteSpace? COMMA whiteSpace? valueStmt? whiteSpace? COMMA whiteSpace? valueStmt;
-
-raiseEventStmt : RAISEEVENT whiteSpace ambiguousIdentifier (whiteSpace? LPAREN whiteSpace? (argsCall whiteSpace?)? RPAREN)?;
-
-randomizeStmt : RANDOMIZE (whiteSpace valueStmt)?;
-
-redimStmt : REDIM whiteSpace (PRESERVE whiteSpace)? redimSubStmt (whiteSpace? COMMA whiteSpace? redimSubStmt)*;
-
-redimSubStmt : implicitCallStmt_InStmt whiteSpace? LPAREN whiteSpace? subscripts whiteSpace? RPAREN (whiteSpace asTypeClause)?;
-
-resetStmt : RESET;
-
-resumeStmt : RESUME (whiteSpace (NEXT | ambiguousIdentifier))?;
-
-returnStmt : RETURN;
-
-rmdirStmt : RMDIR whiteSpace valueStmt;
-
-rsetStmt : RSET whiteSpace implicitCallStmt_InStmt whiteSpace? EQ whiteSpace? valueStmt;
-
-savepictureStmt : SAVEPICTURE whiteSpace valueStmt whiteSpace? COMMA whiteSpace? valueStmt;
-
-saveSettingStmt : SAVESETTING whiteSpace valueStmt whiteSpace? COMMA whiteSpace? valueStmt whiteSpace? COMMA whiteSpace? valueStmt whiteSpace? COMMA whiteSpace? valueStmt;
-
-seekStmt : SEEK whiteSpace fileNumber whiteSpace? COMMA whiteSpace? valueStmt;
-
-selectCaseStmt : 
-	SELECT whiteSpace CASE whiteSpace valueStmt endOfStatement 
-	sC_Case*
-	END_SELECT
-;
-
-sC_Selection :
-    IS whiteSpace? comparisonOperator whiteSpace? valueStmt                       # caseCondIs
-    | valueStmt whiteSpace TO whiteSpace valueStmt                                # caseCondTo
-    | valueStmt                                                                   # caseCondValue
-;
-
-sC_Case : 
-	CASE whiteSpace sC_Cond endOfStatement
-	block?
-;
-
-sC_Cond :
-    ELSE                                                                           # caseCondElse
-    | sC_Selection (whiteSpace? COMMA whiteSpace? sC_Selection)*                   # caseCondSelection
-;
-
-sendkeysStmt : SENDKEYS whiteSpace valueStmt (whiteSpace? COMMA whiteSpace? valueStmt)?;
-
-setattrStmt : SETATTR whiteSpace valueStmt whiteSpace? COMMA whiteSpace? valueStmt;
-
-setStmt : SET whiteSpace implicitCallStmt_InStmt whiteSpace? EQ whiteSpace? valueStmt;
-
-stopStmt : STOP;
-
-subStmt : 
-	(visibility whiteSpace)? (STATIC whiteSpace)? SUB whiteSpace? ambiguousIdentifier (whiteSpace? argList)? endOfStatement
-	block? 
-	END_SUB
-;
-
-timeStmt : TIME whiteSpace? EQ whiteSpace? valueStmt;
-
-typeStmt : 
-	(visibility whiteSpace)? TYPE whiteSpace ambiguousIdentifier endOfStatement
-	typeStmt_Element*
-	END_TYPE
-;
-
-typeStmt_Element : ambiguousIdentifier (whiteSpace? LPAREN (whiteSpace? subscripts)? whiteSpace? RPAREN)? (whiteSpace asTypeClause)? endOfStatement;
-
-typeOfStmt : TYPEOF whiteSpace valueStmt (whiteSpace IS whiteSpace type)?;
-
-unloadStmt : UNLOAD whiteSpace valueStmt;
-
-unlockStmt : UNLOCK whiteSpace fileNumber (whiteSpace? COMMA whiteSpace? valueStmt (whiteSpace TO whiteSpace valueStmt)?)?;
-
-valueStmt : 
-	literal                                                                                         # vsLiteral
-	| implicitCallStmt_InStmt                                                                       # vsICS
-	| LPAREN whiteSpace? valueStmt whiteSpace? RPAREN                                               # vsStruct
-	| NEW whiteSpace? valueStmt                                                                     # vsNew
-	| typeOfStmt                                                                                    # vsTypeOf
-	| midStmt                                                                                       # vsMid
-	| ADDRESSOF whiteSpace? valueStmt                                                               # vsAddressOf
-	| implicitCallStmt_InStmt whiteSpace? ASSIGN whiteSpace? valueStmt                              # vsAssign
-	| valueStmt whiteSpace? POW whiteSpace? valueStmt                                               # vsPow
-	| MINUS whiteSpace? valueStmt                                                                   # vsNegation
-	| valueStmt whiteSpace? (MULT | DIV) whiteSpace? valueStmt                                      # vsMult
-	| valueStmt whiteSpace? INTDIV whiteSpace? valueStmt                                            # vsIntDiv
-	| valueStmt whiteSpace? MOD whiteSpace? valueStmt                                               # vsMod
-	| valueStmt whiteSpace? (PLUS | MINUS) whiteSpace? valueStmt                                    # vsAdd
-	| valueStmt whiteSpace? AMPERSAND whiteSpace? valueStmt                                         # vsAmp
-	| valueStmt whiteSpace? (EQ | NEQ | LT | GT | LEQ | GEQ | LIKE | IS) whiteSpace? valueStmt      # vsRelational
-	| NOT whiteSpace? valueStmt                                                                     # vsNot
-	| valueStmt whiteSpace? AND whiteSpace? valueStmt                                               # vsAnd
-	| valueStmt whiteSpace? OR whiteSpace? valueStmt                                                # vsOr
-	| valueStmt whiteSpace? XOR whiteSpace? valueStmt                                               # vsXor
-	| valueStmt whiteSpace? EQV whiteSpace? valueStmt                                               # vsEqv
-	| valueStmt whiteSpace? IMP whiteSpace? valueStmt                                               # vsImp
-;
-
-variableStmt : (DIM | STATIC | visibility) whiteSpace (WITHEVENTS whiteSpace)? variableListStmt;
-
-variableListStmt : variableSubStmt (whiteSpace? COMMA whiteSpace? variableSubStmt)*;
-
-variableSubStmt : ambiguousIdentifier (whiteSpace? LPAREN whiteSpace? (subscripts whiteSpace?)? RPAREN whiteSpace?)? typeHint? (whiteSpace asTypeClause)?;
-
-whileWendStmt : 
-	WHILE whiteSpace valueStmt endOfStatement 
-	block?
-	WEND
-;
-
-widthStmt : WIDTH whiteSpace fileNumber whiteSpace? COMMA whiteSpace? valueStmt;
-
-withStmt : 
-	WITH whiteSpace (implicitCallStmt_InStmt | (NEW whiteSpace type)) endOfStatement 
-	block? 
-	END_WITH
-;
-
-writeStmt : WRITE whiteSpace fileNumber whiteSpace? COMMA (whiteSpace? outputList)?;
-
-fileNumber : HASH? valueStmt;
-
-explicitCallStmt : 
-	eCS_ProcedureCall 
-	| eCS_MemberProcedureCall 
-;
-
-eCS_ProcedureCall : CALL whiteSpace ambiguousIdentifier typeHint? (whiteSpace? LPAREN whiteSpace? argsCall whiteSpace? RPAREN)? (whiteSpace? LPAREN subscripts RPAREN)*;
-
-eCS_MemberProcedureCall : CALL whiteSpace implicitCallStmt_InStmt? DOT ambiguousIdentifier typeHint? (whiteSpace? LPAREN whiteSpace? argsCall whiteSpace? RPAREN)? (whiteSpace? LPAREN subscripts RPAREN)*;
-
-implicitCallStmt_InBlock :
-	iCS_B_MemberProcedureCall 
-	| iCS_B_ProcedureCall
-;
-
-iCS_B_MemberProcedureCall : implicitCallStmt_InStmt? whiteSpace? DOT whiteSpace? ambiguousIdentifier typeHint? (whiteSpace argsCall)? (whiteSpace? dictionaryCallStmt)? (whiteSpace? LPAREN subscripts RPAREN)*;
-
-iCS_B_ProcedureCall : certainIdentifier (whiteSpace argsCall)? (whiteSpace? LPAREN subscripts RPAREN)*;
-
-implicitCallStmt_InStmt :
-	iCS_S_MembersCall
-	| iCS_S_VariableOrProcedureCall
-	| iCS_S_ProcedureOrArrayCall
-	| iCS_S_DictionaryCall
-;
-
-iCS_S_VariableOrProcedureCall : ambiguousIdentifier typeHint? (whiteSpace? dictionaryCallStmt)? (whiteSpace? LPAREN subscripts RPAREN)*;
-
-iCS_S_ProcedureOrArrayCall : (ambiguousIdentifier | baseType) typeHint? whiteSpace? LPAREN whiteSpace? (argsCall whiteSpace?)? RPAREN (whiteSpace? dictionaryCallStmt)? (whiteSpace? LPAREN subscripts RPAREN)*;
-
-iCS_S_MembersCall : (iCS_S_VariableOrProcedureCall | iCS_S_ProcedureOrArrayCall)? (iCS_S_MemberCall whiteSpace?)+ (whiteSpace? dictionaryCallStmt)? (whiteSpace? LPAREN subscripts RPAREN)*;
-
-iCS_S_MemberCall : (DOT | EXCLAMATIONPOINT) whiteSpace? (iCS_S_VariableOrProcedureCall | iCS_S_ProcedureOrArrayCall);
-
-iCS_S_DictionaryCall : whiteSpace? dictionaryCallStmt;
-
-argsCall : (argCall? whiteSpace? (COMMA | SEMICOLON) whiteSpace?)* argCall (whiteSpace? (COMMA | SEMICOLON) whiteSpace? argCall?)*;
-
-argCall : LPAREN? ((BYVAL | BYREF | PARAMARRAY) whiteSpace)? RPAREN? valueStmt;
-
-dictionaryCallStmt : EXCLAMATIONPOINT whiteSpace? ambiguousIdentifier typeHint?;
+declareStmt : (visibility whiteSpace)? DECLARE whiteSpace (PTRSAFE whiteSpace)? (FUNCTION | SUB) whiteSpace identifier whiteSpace LIB whiteSpace STRINGLITERAL (whiteSpace ALIAS whiteSpace STRINGLITERAL)? (whiteSpace? argList)? (whiteSpace asTypeClause)?;
 
 argList : LPAREN (whiteSpace? arg (whiteSpace? COMMA whiteSpace? arg)*)? whiteSpace? RPAREN;
 
-arg : (OPTIONAL whiteSpace)? ((BYVAL | BYREF) whiteSpace)? (PARAMARRAY whiteSpace)? ambiguousIdentifier typeHint? (whiteSpace? LPAREN whiteSpace? RPAREN)? (whiteSpace? asTypeClause)? (whiteSpace? argDefaultValue)?;
+arg : (OPTIONAL whiteSpace)? ((BYVAL | BYREF) whiteSpace)? (PARAMARRAY whiteSpace)? unrestrictedIdentifier (whiteSpace? LPAREN whiteSpace? RPAREN)? (whiteSpace? asTypeClause)? (whiteSpace? argDefaultValue)?;
 
-argDefaultValue : EQ whiteSpace? valueStmt;
+argDefaultValue : EQ whiteSpace? expression;
+
+// 5.2.2 Implicit Definition Directives
+defDirective : defType whiteSpace letterSpec (whiteSpace? COMMA whiteSpace? letterSpec)*;
+defType :
+        DEFBOOL | DEFBYTE | DEFINT | DEFLNG | DEFLNGLNG | DEFLNGPTR | DEFCUR |
+        DEFSNG | DEFDBL | DEFDATE | 
+        DEFSTR | DEFOBJ | DEFVAR
+;
+// universalLetterRange must appear before letterRange because they both match the same amount in the case of A-Z but we prefer the universalLetterRange.
+letterSpec : singleLetter | universalLetterRange | letterRange;
+singleLetter : unrestrictedIdentifier;
+// We make a separate universalLetterRange rule because it is treated specially in VBA. This makes it easy for users of the parser
+// to identify this case. Quoting MS VBAL:
+// "A <universal-letter-range> defines a single implicit declared type for every <IDENTIFIER> within 
+// a module, even those with a first character that would otherwise fall outside this range if it was 
+// interpreted as a <letter-range> from A-Z.""
+universalLetterRange : upperCaseA whiteSpace? MINUS whiteSpace? upperCaseZ;
+upperCaseA : {_input.Lt(1).Text.Equals("A")}? unrestrictedIdentifier;
+upperCaseZ : {_input.Lt(1).Text.Equals("Z")}? unrestrictedIdentifier;
+letterRange : firstLetter whiteSpace? MINUS whiteSpace? lastLetter;
+firstLetter : unrestrictedIdentifier;
+lastLetter : unrestrictedIdentifier;
+
+doLoopStmt :
+    DO endOfStatement 
+    block
+    LOOP
+    |
+    DO whiteSpace (WHILE | UNTIL) whiteSpace expression endOfStatement
+    block
+    LOOP
+    | 
+    DO endOfStatement
+    block
+    LOOP whiteSpace (WHILE | UNTIL) whiteSpace expression
+;
+
+enumerationStmt: 
+    (visibility whiteSpace)? ENUM whiteSpace identifier endOfStatement 
+    enumerationStmt_Constant* 
+    END_ENUM
+;
+
+enumerationStmt_Constant : identifier (whiteSpace? EQ whiteSpace? expression)? endOfStatement;
+
+// We add "END" as a statement so that it does not get resolved to some nonsensical property.
+endStmt : END;
+
+eraseStmt : ERASE whiteSpace expression (whiteSpace? COMMA whiteSpace? expression)*;
+
+errorStmt : ERROR whiteSpace expression;
+
+eventStmt : (visibility whiteSpace)? EVENT whiteSpace identifier whiteSpace? argList;
+
+exitStmt : EXIT_DO | EXIT_FOR | EXIT_FUNCTION | EXIT_PROPERTY | EXIT_SUB;
+
+forEachStmt : 
+    FOR whiteSpace EACH whiteSpace expression whiteSpace IN whiteSpace expression endOfStatement
+    block
+    NEXT (whiteSpace expression)?
+;
+
+// expression EQ expression refactored to expression to allow SLL
+forNextStmt : 
+    FOR whiteSpace expression whiteSpace TO whiteSpace expression (whiteSpace STEP whiteSpace expression)? endOfStatement 
+    block
+    NEXT (whiteSpace expression)?
+; 
+
+functionStmt :
+    (visibility whiteSpace)? (STATIC whiteSpace)? FUNCTION whiteSpace? functionName (whiteSpace? argList)? (whiteSpace? asTypeClause)? endOfStatement
+    block
+    END_FUNCTION
+;
+functionName : identifier;
+
+goSubStmt : GOSUB whiteSpace expression;
+
+goToStmt : GOTO whiteSpace expression;
+
+// 5.4.2.8 If Statement
+ifStmt :
+     IF whiteSpace booleanExpression whiteSpace THEN endOfStatement
+     block
+     elseIfBlock*
+     elseBlock?
+     END_IF
+;
+elseIfBlock :
+     ELSEIF whiteSpace booleanExpression whiteSpace THEN endOfStatement block
+     | ELSEIF whiteSpace booleanExpression whiteSpace THEN whiteSpace? block
+;
+elseBlock :
+     ELSE endOfStatement block
+;
+
+// 5.4.2.9 Single-line If Statement
+singleLineIfStmt : ifWithNonEmptyThen | ifWithEmptyThen;
+ifWithNonEmptyThen : IF whiteSpace? booleanExpression whiteSpace? THEN whiteSpace? listOrLabel (whiteSpace singleLineElseClause)?;
+ifWithEmptyThen : IF whiteSpace? booleanExpression whiteSpace? THEN endOfStatement whiteSpace? singleLineElseClause;
+singleLineElseClause : ELSE whiteSpace? listOrLabel?;
+// lineNumberLabel should actually be "statement-label" according to MS VBAL but they only allow lineNumberLabels:
+// A <statement-label> that occurs as the first element of a <list-or-label> element has the effect 
+// as if the <statement-label> was replaced with a <goto-statement> containing the same 
+// <statement-label>. This <goto-statement> takes the place of <line-number-label> in 
+// <statement-list>.  
+listOrLabel :
+    lineNumberLabel (whiteSpace? COLON whiteSpace? sameLineStatement?)*
+    | (COLON whiteSpace?)? sameLineStatement (whiteSpace? COLON whiteSpace? sameLineStatement?)*
+;
+sameLineStatement : blockStmt;
+booleanExpression : expression;
+
+implementsStmt : IMPLEMENTS whiteSpace expression;
+
+letStmt : (LET whiteSpace)? lExpression whiteSpace? EQ whiteSpace? expression;
+
+lsetStmt : LSET whiteSpace expression whiteSpace? EQ whiteSpace? expression;
+
+onErrorStmt : (ON_ERROR | ON_LOCAL_ERROR) whiteSpace (GOTO whiteSpace expression | RESUME whiteSpace NEXT);
+
+onGoToStmt : ON whiteSpace expression whiteSpace GOTO whiteSpace expression (whiteSpace? COMMA whiteSpace? expression)*;
+
+onGoSubStmt : ON whiteSpace expression whiteSpace GOSUB whiteSpace expression (whiteSpace? COMMA whiteSpace? expression)*;
+
+propertyGetStmt : 
+    (visibility whiteSpace)? (STATIC whiteSpace)? PROPERTY_GET whiteSpace functionName (whiteSpace? argList)? (whiteSpace asTypeClause)? endOfStatement 
+    block 
+    END_PROPERTY
+;
+
+propertySetStmt : 
+    (visibility whiteSpace)? (STATIC whiteSpace)? PROPERTY_SET whiteSpace subroutineName (whiteSpace? argList)? endOfStatement 
+    block 
+    END_PROPERTY
+;
+
+propertyLetStmt : 
+    (visibility whiteSpace)? (STATIC whiteSpace)? PROPERTY_LET whiteSpace subroutineName (whiteSpace? argList)? endOfStatement 
+    block 
+    END_PROPERTY
+;
+
+// 5.4.2.20 RaiseEvent Statement
+raiseEventStmt : RAISEEVENT whiteSpace identifier (whiteSpace? LPAREN whiteSpace? eventArgumentList? whiteSpace? RPAREN)?;
+eventArgumentList : eventArgument (whiteSpace? COMMA whiteSpace? eventArgument)*;
+eventArgument : expression;
+
+// 5.4.3.3 ReDim Statement
+// To make the grammar non-ambiguous we treat redim statements as index expressions.
+// For this to work the argumentList rule had to be changed to support "lower bound arguments", e.g. "1 To 10".
+redimStmt : REDIM whiteSpace (PRESERVE whiteSpace)? redimDeclarationList;
+redimDeclarationList : redimVariableDeclaration (whiteSpace? COMMA whiteSpace? redimVariableDeclaration)*;
+redimVariableDeclaration : expression (whiteSpace asTypeClause)?;
+
+// 5.4.3.5 Mid/MidB/Mid$/MidB$ Statement
+// This needs to be explicitly defined to distinguish between Mid as a function and Mid as a keyword.
+midStatement : modeSpecifier 
+	LPAREN whiteSpace? 
+	lExpression whiteSpace? COMMA whiteSpace? lExpression whiteSpace? (COMMA whiteSpace? lExpression whiteSpace?)? 
+	RPAREN 
+	whiteSpace? ASSIGN whiteSpace? 
+	expression;
+modeSpecifier :	(MID | MIDB) DOLLAR? ;
+
+integerExpression : expression;
+
+callStmt :
+    CALL whiteSpace expression
+    | expression (whiteSpace argumentList)?
+;
+
+resumeStmt : RESUME (whiteSpace (NEXT | expression))?;
+
+returnStmt : RETURN;
+
+rsetStmt : RSET whiteSpace expression whiteSpace? EQ whiteSpace? expression;
+
+// 5.4.2.11 Stop Statement
+stopStmt : STOP;
+
+nameStmt : NAME whiteSpace expression whiteSpace AS whiteSpace expression;
+
+// 5.4.2.10 Select Case Statement
+selectCaseStmt :
+    SELECT whiteSpace? CASE whiteSpace? selectExpression endOfStatement
+    caseClause*
+    caseElseClause?
+    END_SELECT
+;
+selectExpression : expression;
+caseClause :
+    CASE whiteSpace rangeClause (whiteSpace? COMMA whiteSpace? rangeClause)* endOfStatement block
+;
+caseElseClause : CASE whiteSpace? ELSE endOfStatement block;
+rangeClause :
+    (IS whiteSpace?)? comparisonOperator whiteSpace? expression
+	| selectStartValue whiteSpace TO whiteSpace selectEndValue 
+    | expression
+;
+selectStartValue : expression;
+selectEndValue : expression;
+
+setStmt : SET whiteSpace lExpression whiteSpace? EQ whiteSpace? expression;
+
+subStmt : 
+    (visibility whiteSpace)? (STATIC whiteSpace)? SUB whiteSpace? subroutineName (whiteSpace? argList)? endOfStatement
+    block 
+    END_SUB
+;
+subroutineName : identifier;
+
+// 5.2.3.3 User Defined Type Declarations
+publicTypeDeclaration : ((GLOBAL | PUBLIC) whiteSpace)? udtDeclaration;
+privateTypeDeclaration : PRIVATE whiteSpace udtDeclaration;
+udtDeclaration : TYPE whiteSpace untypedIdentifier endOfStatement udtMemberList endOfStatement END_TYPE;  
+udtMemberList : udtMember (endOfStatement udtMember)*; 
+udtMember : reservedNameMemberDeclaration | untypedNameMemberDeclaration;
+untypedNameMemberDeclaration : untypedIdentifier whiteSpace? optionalArrayClause;
+reservedNameMemberDeclaration : unrestrictedIdentifier whiteSpace asTypeClause;
+optionalArrayClause : (arrayDim whiteSpace)? asTypeClause;
+
+// 5.2.3.1.3 Array Dimensions and Bounds
+arrayDim : LPAREN whiteSpace? boundsList? whiteSpace? RPAREN;
+boundsList : dimSpec (whiteSpace? COMMA whiteSpace? dimSpec)*;
+dimSpec : (lowerBound whiteSpace?)? upperBound;
+lowerBound : constantExpression whiteSpace? TO;
+upperBound : constantExpression;
+
+constantExpression : expression;
+
+variableStmt : (DIM | STATIC | visibility) whiteSpace (WITHEVENTS whiteSpace)? variableListStmt;
+variableListStmt : variableSubStmt (whiteSpace? COMMA whiteSpace? variableSubStmt)*;
+variableSubStmt : identifier (whiteSpace? LPAREN whiteSpace? (subscripts whiteSpace?)? RPAREN whiteSpace?)? (whiteSpace asTypeClause)?;
+
+whileWendStmt : 
+    WHILE whiteSpace expression endOfStatement 
+    block
+    WEND
+;
+
+withStmt :
+    WITH whiteSpace expression endOfStatement 
+    block 
+    END_WITH
+;
+
+// Special forms with special syntax, only available in a report.
+lineSpecialForm : expression whiteSpace (STEP whiteSpace?)? tuple MINUS (STEP whiteSpace?)? tuple whiteSpace? (COMMA whiteSpace? expression)? whiteSpace? (COMMA whiteSpace? lineSpecialFormOption)?;
+circleSpecialForm : (expression whiteSpace? DOT whiteSpace?)? CIRCLE whiteSpace (STEP whiteSpace?)? tuple (whiteSpace? COMMA whiteSpace? expression)+;
+scaleSpecialForm : (expression whiteSpace? DOT whiteSpace?)? SCALE whiteSpace tuple whiteSpace? MINUS whiteSpace? tuple;
+tuple : LPAREN whiteSpace? expression whiteSpace? COMMA whiteSpace? expression whiteSpace? RPAREN;
+lineSpecialFormOption: (B_CHAR | BF);
 
 subscripts : subscript (whiteSpace? COMMA whiteSpace? subscript)*;
 
-subscript : (valueStmt whiteSpace TO whiteSpace)? valueStmt;
+subscript : (expression whiteSpace TO whiteSpace)? expression;
 
-ambiguousIdentifier : 
-	(IDENTIFIER | ambiguousKeyword)+
-;
+unrestrictedIdentifier : identifier | statementKeyword | markerKeyword;
+identifier : typedIdentifier | untypedIdentifier;
+untypedIdentifier : identifierValue;
+typedIdentifier : untypedIdentifier typeHint;
+identifierValue : IDENTIFIER | keyword | foreignName | BF;
+foreignName : L_SQUARE_BRACKET foreignIdentifier* R_SQUARE_BRACKET;
+foreignIdentifier : ~(L_SQUARE_BRACKET | R_SQUARE_BRACKET) | foreignName;
 
 asTypeClause : AS whiteSpace? (NEW whiteSpace)? type (whiteSpace? fieldLength)?;
 
-baseType : BOOLEAN | BYTE | COLLECTION | DATE | DOUBLE | INTEGER | LONG | SINGLE | STRING | VARIANT;
-
-certainIdentifier : 
-	IDENTIFIER (ambiguousKeyword | IDENTIFIER)*
-	| ambiguousKeyword (ambiguousKeyword | IDENTIFIER)+
-;
+baseType : BOOLEAN | BYTE | CURRENCY | DATE | DOUBLE | INTEGER | LONG | LONGLONG | LONGPTR | SINGLE | STRING | VARIANT | ANY;
 
 comparisonOperator : LT | LEQ | GT | GEQ | EQ | NEQ | IS | LIKE;
 
-complexType : ambiguousIdentifier ((DOT | EXCLAMATIONPOINT) ambiguousIdentifier)*;
+complexType :
+    // Literal Expression has to come before lExpression, otherwise it'll be classified as simple name expression instead.
+    literalExpression                                                                               # ctLiteralExpr
+    | lExpression                                                                                   # ctLExpr
+    | builtInType                                                                                   # ctBuiltInTypeExpr
+    | LPAREN whiteSpace? complexType whiteSpace? RPAREN                                             # ctParenthesizedExpr
+    | TYPEOF whiteSpace complexType                                                                 # ctTypeofexpr        // To make the grammar SLL, the type-of-is-expression is actually the child of an IS relational op.
+    | NEW whiteSpace complexType                                                                    # ctNewExpr
+    | HASH expression                                                                               # ctMarkedFileNumberExpr // Added to support special forms such as Input(file1, #file1)
+;
 
-fieldLength : MULT whiteSpace? (numberLiteral | ambiguousIdentifier);
+fieldLength : MULT whiteSpace? (numberLiteral | identifierValue);
 
-letterrange : certainIdentifier (whiteSpace? MINUS whiteSpace? certainIdentifier)?;
-
-lineLabel : (ambiguousIdentifier | numberLiteral) COLON;
-
-literal : numberLiteral | DATELITERAL | STRINGLITERAL | TRUE | FALSE | NOTHING | NULL | EMPTY;
+statementLabelDefinition : identifierStatementLabel | lineNumberLabel;
+identifierStatementLabel : unrestrictedIdentifier whiteSpace? COLON;
+lineNumberLabel : numberLiteral whiteSpace? COLON?;
 
 numberLiteral : HEXLITERAL | OCTLITERAL | FLOATLITERAL | INTEGERLITERAL;
 
@@ -541,53 +570,306 @@ typeHint : PERCENT | AMPERSAND | POW | EXCLAMATIONPOINT | HASH | AT | DOLLAR;
 
 visibility : PRIVATE | PUBLIC | FRIEND | GLOBAL;
 
-ambiguousKeyword : 
-	ACCESS | ADDRESSOF | ALIAS | AND | ATTRIBUTE | APPACTIVATE | APPEND | AS |
-	BEEP | BEGIN | BINARY | BOOLEAN | BYVAL | BYREF | BYTE | 
-	CALL | CASE | CLASS | CLOSE | CHDIR | CHDRIVE | COLLECTION | CONST | 
-	DATABASE | DATE | DECLARE | DEFBOOL | DEFBYTE | DEFCUR | DEFDBL | DEFDATE | DEFINT | DEFLNG | DEFLNGLNG | DEFLNGPTR | DEFOBJ | DEFSNG | DEFSTR | DEFVAR | DELETESETTING | DIM | DO | DOUBLE | 
-	EACH | ELSE | ELSEIF | END | ENUM | EQV | ERASE | ERROR | EVENT | 
-	FALSE | FILECOPY | FRIEND | FOR | FUNCTION | 
-	GET | GLOBAL | GOSUB | GOTO | 
-	IF | IMP | IMPLEMENTS | IN | INPUT | IS | INTEGER |
-	KILL | 
-	LOAD | LOCK | LONG | LOOP | LEN | LET | LIB | LIKE | LSET |
-	ME | MID | MKDIR | MOD | 
-	NAME | NEXT | NEW | NOT | NOTHING | NULL | 
-	ON | OPEN | OPTIONAL | OR | OUTPUT | 
-	PARAMARRAY | PRESERVE | PRINT | PRIVATE | PUBLIC | PUT |
-	RANDOM | RANDOMIZE | RAISEEVENT | READ | REDIM | REM | RESET | RESUME | RETURN | RMDIR | RSET |
-	SAVEPICTURE | SAVESETTING | SEEK | SELECT | SENDKEYS | SET | SETATTR | SHARED | SINGLE | SPC | STATIC | STEP | STOP | STRING | SUB | 
-	TAB | TEXT | THEN | TIME | TO | TRUE | TYPE | TYPEOF | 
-	UNLOAD | UNLOCK | UNTIL | 
-	VARIANT | VERSION | 
-	WEND | WHILE | WIDTH | WITH | WITHEVENTS | WRITE |
-	XOR
+// 5.6 Expressions
+expression :
+    // Literal Expression has to come before lExpression, otherwise it'll be classified as simple name expression instead.	
+	whiteSpace? LPAREN whiteSpace? expression whiteSpace? RPAREN                                    # parenthesizedExpr
+	|literalExpression                                                                              # literalExpr
+	| lExpression                                                                                   # lExpr
+	| builtInType                                                                                   # builtInTypeExpr
+	| TYPEOF whiteSpace expression                                                                  # typeofexpr        // To make the grammar SLL, the type-of-is-expression is actually the child of an IS relational op.
+	| NEW whiteSpace expression                                                                     # newExpr
+	| expression whiteSpace? POW whiteSpace? expression                                             # powOp
+	| MINUS whiteSpace? expression                                                                  # unaryMinusOp
+	| expression whiteSpace? (MULT | DIV) whiteSpace? expression                                    # multOp
+	| expression whiteSpace? INTDIV whiteSpace? expression                                          # intDivOp
+	| expression whiteSpace? MOD whiteSpace? expression                                             # modOp
+	| expression whiteSpace? (PLUS | MINUS) whiteSpace? expression                                  # addOp
+	| expression whiteSpace? AMPERSAND whiteSpace? expression                                       # concatOp
+	| expression whiteSpace? (EQ | NEQ | LT | GT | LEQ | GEQ | LIKE | IS) whiteSpace? expression    # relationalOp
+	| NOT whiteSpace? expression                                                                    # logicalNotOp
+	| expression whiteSpace? AND whiteSpace? expression                                             # logicalAndOp
+	| expression whiteSpace? OR whiteSpace? expression                                              # logicalOrOp
+	| expression whiteSpace? XOR whiteSpace? expression                                             # logicalXorOp
+	| expression whiteSpace? EQV whiteSpace? expression                                             # logicalEqvOp
+	| expression whiteSpace? IMP whiteSpace? expression                                             # logicalImpOp
+	| HASH expression                                                                               # markedFileNumberExpr // Added to support special forms such as Input(file1, #file1)
+;
+
+// 5.6.5 Literal Expressions
+literalExpression :
+    numberLiteral
+    | DATELITERAL
+    | STRINGLITERAL
+    | literalIdentifier typeHint?
+;
+
+literalIdentifier : booleanLiteralIdentifier | objectLiteralIdentifier | variantLiteralIdentifier;
+booleanLiteralIdentifier : TRUE | FALSE;
+objectLiteralIdentifier : NOTHING;
+variantLiteralIdentifier : EMPTY | NULL;
+
+lExpression :
+    lExpression LPAREN whiteSpace? argumentList? whiteSpace? RPAREN                                                 # indexExpr
+    | lExpression mandatoryLineContinuation? DOT mandatoryLineContinuation? unrestrictedIdentifier                  # memberAccessExpr
+    | lExpression mandatoryLineContinuation? EXCLAMATIONPOINT mandatoryLineContinuation? unrestrictedIdentifier     # dictionaryAccessExpr
+    | ME                                                                                                            # instanceExpr
+    | identifier                                                                                                    # simpleNameExpr
+    | DOT mandatoryLineContinuation? unrestrictedIdentifier                                                         # withMemberAccessExpr
+    | EXCLAMATIONPOINT mandatoryLineContinuation? unrestrictedIdentifier                                            # withDictionaryAccessExpr
+;
+
+// 3.3.5.3 Special Identifier Forms
+builtInType : 
+    baseType
+    | L_SQUARE_BRACKET whiteSpace? baseType whiteSpace? R_SQUARE_BRACKET
+    | OBJECT
+    | L_SQUARE_BRACKET whiteSpace? OBJECT whiteSpace? R_SQUARE_BRACKET
+;
+
+// 5.6.13.1 Argument Lists
+argumentList : positionalOrNamedArgumentList;
+positionalOrNamedArgumentList :
+    (positionalArgumentOrMissing whiteSpace?)* requiredPositionalArgument 
+    | (positionalArgumentOrMissing whiteSpace?)* namedArgumentList  
+;
+positionalArgumentOrMissing :
+    positionalArgument whiteSpace? COMMA                                                            # specifiedPositionalArgument
+    | whiteSpace? COMMA                                                                             # missingPositionalArgument
+;
+positionalArgument : argumentExpression;
+requiredPositionalArgument : argumentExpression;  
+namedArgumentList : namedArgument (whiteSpace? COMMA whiteSpace? namedArgument)*;
+namedArgument : unrestrictedIdentifier whiteSpace? ASSIGN whiteSpace? argumentExpression;
+argumentExpression :
+    (BYVAL whiteSpace)? expression
+    | addressOfExpression
+    // Special case for redim statements. The resolver doesn't have to deal with this because it is "picked apart" in the redim statement.
+    | lowerBoundArgumentExpression whiteSpace TO whiteSpace upperBoundArgumentExpression
+;
+
+lowerBoundArgumentExpression : expression;
+upperBoundArgumentExpression : expression;
+
+// 5.6.16.8   AddressOf Expressions 
+addressOfExpression : ADDRESSOF whiteSpace expression;
+
+keyword : 
+       ABS
+     | ADDRESSOF
+     | ALIAS
+     | AND
+     | ANY
+     | ARRAY
+     | ATTRIBUTE
+	 | B_CHAR
+     | BEGIN
+     | BOOLEAN
+     | BYREF
+     | BYTE
+     | BYVAL
+     | CBOOL
+     | CBYTE
+     | CCUR
+     | CDATE
+     | CDBL
+     | CDEC
+     | CINT
+     | CLASS
+     | CLNG
+     | CLNGLNG
+     | CLNGPTR
+     | CSNG
+     | CSTR
+     | CURRENCY
+     | CVAR
+     | CVERR
+     | DATABASE
+     | DATE
+     | DEBUG
+     | DOEVENTS
+     | DOUBLE
+     | END
+     | EQV
+     | FALSE
+     | FIX
+     | IMP
+     | IN
+     | INPUTB
+     | INT
+     | INTEGER
+     | IS
+     | LBOUND
+     | LEN
+     | LEN
+     | LENB
+     | LIB
+     | LIKE
+     | LOAD
+     | LONG
+     | LONGLONG
+     | LONGPTR
+     | ME
+     | MID
+     | MIDB
+//     | MIDBTYPESUFFIX
+//     | MIDTYPESUFFIX
+     | MOD
+     | NEW
+     | NOT
+     | NOTHING
+     | NULL
+     | OBJECT
+     | OPTIONAL
+     | OR
+     | PARAMARRAY
+     | PRESERVE
+     | PSET
+     | PTRSAFE
+     | REM
+     | SGN
+     | SINGLE
+     | SPC
+     | STRING
+     | TAB
+     | TEXT
+     | THEN
+     | TO
+     | TRUE
+     | TYPEOF
+     | UBOUND
+     | UNTIL
+     | VARIANT
+     | VERSION
+     | WITHEVENTS
+     | XOR
+     | STEP
+     | ON_ERROR
+     | RESUME_NEXT
+     | ERROR
+     | APPEND
+     | BINARY
+     | OUTPUT
+     | RANDOM
+     | ACCESS
+     | READ
+     | WRITE
+     | READ_WRITE
+     | SHARED
+     | LOCK_READ
+     | LOCK_WRITE
+     | LOCK_READ_WRITE
+     | LINE_INPUT    
+     | RESET
+     | WIDTH
+     | PRINT
+     | GET
+     | PUT
+     | CLOSE
+     | INPUT
+     | LOCK
+     | OPEN
+     | SEEK
+     | UNLOCK
+     | WRITE
+	 | NAME
+;
+
+markerKeyword : AS;
+
+statementKeyword :
+    CALL
+    | CASE
+    | CONST
+    | DECLARE
+    | DEFBOOL
+    | DEFBYTE
+    | DEFCUR
+    | DEFDATE
+    | DEFDBL
+    | DEFINT
+    | DEFLNG
+    | DEFLNGLNG
+    | DEFLNGPTR
+    | DEFOBJ
+    | DEFSNG
+    | DEFSTR
+    | DEFVAR
+    | DIM
+    | DO
+    | ELSE
+    | ELSEIF
+    | ENUM
+    | ERASE
+    | EVENT
+    | EXIT
+    | EXIT_DO 
+    | EXIT_FOR 
+    | EXIT_FUNCTION 
+    | EXIT_PROPERTY 
+    | EXIT_SUB
+    | END_SELECT
+    | END_WITH
+    | FOR
+    | FRIEND
+    | FUNCTION
+    | GLOBAL
+    | GOSUB
+    | GOTO
+    | IF
+    | IMPLEMENTS
+    | LET
+    | LOOP
+    | LSET
+    | NEXT
+    | ON
+    | OPTION
+    | PRIVATE
+    | PUBLIC
+    | RAISEEVENT
+    | REDIM
+    | RESUME
+    | RETURN
+    | RSET
+    | SELECT
+    | SET
+    | STATIC
+    | STOP
+    | SUB
+    | TYPE
+    | WEND
+    | WHILE
+    | WITH
 ;
 
 endOfLine :
-    whiteSpace? (NEWLINE+ | comment | remComment) whiteSpace?
-    | whiteSpace? annotationList
+    whiteSpace? NEWLINE whiteSpace?
+    | whiteSpace? commentOrAnnotation
 ;
 
-endOfStatement : (endOfLine | whiteSpace? COLON whiteSpace?)*;
+endOfStatement :
+    (endOfLine | (whiteSpace? COLON whiteSpace?))*
+;
 
-remComment : REMCOMMENT;
-
-comment : COMMENT;
-
-annotationList : SINGLEQUOTE annotation+;
-
-annotation : AT annotationName annotationArgList?;
-
-annotationName : IDENTIFIER;
-
+// Annotations must come before comments because of precedence. ANTLR4 matches as much as possible then chooses the one that comes first.
+commentOrAnnotation :
+    annotationList 
+    | remComment
+    | comment
+;
+remComment : REM whiteSpace? commentBody;
+comment : SINGLEQUOTE commentBody;
+commentBody : (LINE_CONTINUATION | ~NEWLINE)*;
+annotationList : SINGLEQUOTE (AT annotation whiteSpace?)+ (whiteSpace? COLON commentBody)?;
+annotation : annotationName annotationArgList?;
+annotationName : unrestrictedIdentifier;
 annotationArgList : 
-	 whiteSpace annotationArg whiteSpace?
-	 | whiteSpace annotationArg (whiteSpace? COMMA whiteSpace? annotationArg)+  whiteSpace?
-	 | whiteSpace? LPAREN whiteSpace? annotationArg whiteSpace? RPAREN whiteSpace?
-	 | whiteSpace? LPAREN annotationArg (whiteSpace? COMMA whiteSpace? annotationArg)+ whiteSpace? RPAREN whiteSpace?;
-	
-annotationArg : IDENTIFIER | literal;
+     whiteSpace annotationArg
+     | whiteSpace annotationArg (whiteSpace? COMMA whiteSpace? annotationArg)+
+     | whiteSpace? LPAREN whiteSpace? RPAREN
+     | whiteSpace? LPAREN whiteSpace? annotationArg whiteSpace? RPAREN
+     | whiteSpace? LPAREN annotationArg (whiteSpace? COMMA whiteSpace? annotationArg)+ whiteSpace? RPAREN;
+annotationArg : expression;
 
+mandatoryLineContinuation : LINE_CONTINUATION WS*;
 whiteSpace : (WS | LINE_CONTINUATION)+;

@@ -7,28 +7,31 @@ using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.UI;
 using Rubberduck.VBEditor;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.Refactorings.IntroduceField
 {
     public class IntroduceFieldRefactoring : IRefactoring
     {
         private readonly IList<Declaration> _declarations;
-        private readonly IActiveCodePaneEditor _editor;
+        private readonly IVBE _vbe;
+        private readonly RubberduckParserState _state;
         private readonly IMessageBox _messageBox;
 
-        public IntroduceFieldRefactoring(RubberduckParserState parserState, IActiveCodePaneEditor editor, IMessageBox messageBox)
+        public IntroduceFieldRefactoring(IVBE vbe, RubberduckParserState state, IMessageBox messageBox)
         {
             _declarations =
-                parserState.AllDeclarations.Where(i => !i.IsBuiltIn && i.DeclarationType == DeclarationType.Variable)
+                state.AllDeclarations.Where(i => !i.IsBuiltIn && i.DeclarationType == DeclarationType.Variable)
                     .ToList();
-            _editor = editor;
+            _vbe = vbe;
+            _state = state;
             _messageBox = messageBox;
         }
 
         public void Refactor()
         {
-            var selection = _editor.GetSelection();
-            
+            var selection = _vbe.ActiveCodePane.GetQualifiedSelection();
+
             if (!selection.HasValue)
             {
                 _messageBox.Show(RubberduckUI.PromoteVariable_InvalidSelection, RubberduckUI.IntroduceField_Caption,
@@ -69,34 +72,53 @@ namespace Rubberduck.Refactorings.IntroduceField
 
         private void PromoteVariable(Declaration target)
         {
-            if (new[] { DeclarationType.Class, DeclarationType.Module }.Contains(target.ParentDeclaration.DeclarationType))
+            if (new[] { DeclarationType.ClassModule, DeclarationType.ProceduralModule }.Contains(target.ParentDeclaration.DeclarationType))
             {
                 _messageBox.Show(RubberduckUI.PromoteVariable_InvalidSelection, RubberduckUI.IntroduceParameter_Caption,
                     MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                 return;
             }
 
+            QualifiedSelection? oldSelection = null;
+            if (_vbe.ActiveCodePane != null)
+            {
+                oldSelection = _vbe.ActiveCodePane.CodeModule.GetQualifiedSelection();
+            }
+
             RemoveVariable(target);
             AddField(target);
+
+            if (oldSelection.HasValue)
+            {
+                var module = oldSelection.Value.QualifiedName.Component.CodeModule;
+                var pane = module.CodePane;
+                {
+                    pane.Selection = oldSelection.Value.Selection;
+                }
+            }
+
+            _state.OnParseRequested(this);
         }
 
         private void AddField(Declaration target)
         {
             var module = target.QualifiedName.QualifiedModuleName.Component.CodeModule;
-            module.InsertLines(module.CountOfDeclarationLines + 1, GetFieldDefinition(target));
+            {
+                module.InsertLines(module.CountOfDeclarationLines + 1, GetFieldDefinition(target));
+            }
         }
 
         private void RemoveVariable(Declaration target)
         {
             Selection selection;
-            var declarationText = target.Context.GetText();
+            var declarationText = target.Context.GetText().Replace(" _" + Environment.NewLine, string.Empty);
             var multipleDeclarations = target.HasMultipleDeclarationsInStatement();
 
             var variableStmtContext = target.GetVariableStmtContext();
 
             if (!multipleDeclarations)
             {
-                declarationText = variableStmtContext.GetText();
+                declarationText = variableStmtContext.GetText().Replace(" _" + Environment.NewLine, string.Empty);
                 selection = target.GetVariableStmtContextSelection();
             }
             else
@@ -105,41 +127,44 @@ namespace Rubberduck.Refactorings.IntroduceField
                     target.Context.Stop.Line, target.Context.Stop.Column);
             }
 
-            var oldLines = _editor.GetLines(selection);
-
-            var newLines = oldLines.Replace(" _" + Environment.NewLine, string.Empty)
-                .Remove(selection.StartColumn, declarationText.Length);
-
-            if (multipleDeclarations)
+            var pane = _vbe.ActiveCodePane;
+            var module = pane.CodeModule;
             {
-                selection = target.GetVariableStmtContextSelection();
-                newLines = RemoveExtraComma(_editor.GetLines(selection).Replace(oldLines, newLines),
-                    target.CountOfDeclarationsInStatement(), target.IndexOfVariableDeclarationInStatement());
-            }
+                var oldLines = module.GetLines(selection);
+                var newLines = oldLines.Replace(" _" + Environment.NewLine, string.Empty)
+                                       .Remove(selection.StartColumn, declarationText.Length);
 
-            var newLinesWithoutExcessSpaces = newLines.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-            for (var i = 0; i < newLinesWithoutExcessSpaces.Length; i++)
-            {
-                newLinesWithoutExcessSpaces[i] = newLinesWithoutExcessSpaces[i].RemoveExtraSpacesLeavingIndentation();
-            }
-
-            for (var i = newLinesWithoutExcessSpaces.Length - 1; i >= 0; i--)
-            {
-                if (newLinesWithoutExcessSpaces[i].Trim() == string.Empty)
+                if (multipleDeclarations)
                 {
-                    continue;
+                    selection = target.GetVariableStmtContextSelection();
+                    newLines = RemoveExtraComma(_vbe.ActiveCodePane.CodeModule.GetLines(selection).Replace(oldLines, newLines),
+                        target.CountOfDeclarationsInStatement(), target.IndexOfVariableDeclarationInStatement());
                 }
 
-                if (newLinesWithoutExcessSpaces[i].EndsWith(" _"))
+                var newLinesWithoutExcessSpaces = newLines.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+                for (var i = 0; i < newLinesWithoutExcessSpaces.Length; i++)
                 {
-                    newLinesWithoutExcessSpaces[i] =
-                        newLinesWithoutExcessSpaces[i].Remove(newLinesWithoutExcessSpaces[i].Length - 2);
+                    newLinesWithoutExcessSpaces[i] = newLinesWithoutExcessSpaces[i].RemoveExtraSpacesLeavingIndentation();
                 }
-                break;
-            }
 
-            _editor.DeleteLines(selection);
-            _editor.InsertLines(selection.StartLine, string.Join(Environment.NewLine, newLinesWithoutExcessSpaces));
+                for (var i = newLinesWithoutExcessSpaces.Length - 1; i >= 0; i--)
+                {
+                    if (newLinesWithoutExcessSpaces[i].Trim() == string.Empty)
+                    {
+                        continue;
+                    }
+
+                    if (newLinesWithoutExcessSpaces[i].EndsWith(" _"))
+                    {
+                        newLinesWithoutExcessSpaces[i] =
+                            newLinesWithoutExcessSpaces[i].Remove(newLinesWithoutExcessSpaces[i].Length - 2);
+                    }
+                    break;
+                }
+
+                module.DeleteLines(selection);
+                module.InsertLines(selection.StartLine, string.Join(Environment.NewLine, newLinesWithoutExcessSpaces));
+            }
         }
 
         private string RemoveExtraComma(string str, int numParams, int indexRemoved)

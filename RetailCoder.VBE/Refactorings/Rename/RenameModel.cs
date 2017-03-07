@@ -1,19 +1,19 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
-using Microsoft.Vbe.Interop;
 using Rubberduck.Common;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.UI;
 using Rubberduck.VBEditor;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.Refactorings.Rename
 {
     public class RenameModel
     {
-        private readonly VBE _vbe;
-        public VBE VBE { get { return _vbe; } }
+        private readonly IVBE _vbe;
+        public IVBE VBE { get { return _vbe; } }
         
         private readonly IList<Declaration> _declarations;
         public IEnumerable<Declaration> Declarations { get { return _declarations; } }
@@ -28,18 +28,18 @@ namespace Rubberduck.Refactorings.Rename
         private readonly QualifiedSelection _selection;
         public QualifiedSelection Selection { get { return _selection; } }
 
-        private readonly RubberduckParserState _parseResult;
-        public RubberduckParserState ParseResult { get { return _parseResult; } }
+        private readonly RubberduckParserState _state;
+        public RubberduckParserState State { get { return _state; } }
 
         public string NewName { get; set; }
 
         private readonly IMessageBox _messageBox;
 
-        public RenameModel(VBE vbe, RubberduckParserState parseResult, QualifiedSelection selection, IMessageBox messageBox)
+        public RenameModel(IVBE vbe, RubberduckParserState state, QualifiedSelection selection, IMessageBox messageBox)
         {
             _vbe = vbe;
-            _parseResult = parseResult;
-            _declarations = parseResult.AllDeclarations.ToList();
+            _state = state;
+            _declarations = state.AllDeclarations.ToList();
             _selection = selection;
             _messageBox = messageBox;
 
@@ -50,8 +50,7 @@ namespace Rubberduck.Refactorings.Rename
         {
             target = _declarations
                 .Where(item => !item.IsBuiltIn && item.DeclarationType != DeclarationType.ModuleOption)
-                .FirstOrDefault(item => item.IsSelected(selection)
-                                      || item.References.Any(r => r.IsSelected(selection)));
+                .FirstOrDefault(item => item.IsSelected(selection) || item.References.Any(r => r.IsSelected(selection)));
 
             PromptIfTargetImplementsInterface(ref target);
         }

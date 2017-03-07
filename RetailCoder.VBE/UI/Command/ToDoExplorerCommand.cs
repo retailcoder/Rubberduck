@@ -1,5 +1,5 @@
 ﻿using System.Runtime.InteropServices;
-using Rubberduck.UI.ToDoItems;
+using NLog;
 
 namespace Rubberduck.UI.Command
 {
@@ -9,14 +9,15 @@ namespace Rubberduck.UI.Command
     [ComVisible(false)]
     public class ToDoExplorerCommand : CommandBase
     {
-        private readonly IPresenter _presenter;
+        private readonly IDockablePresenter _presenter;
 
-        public ToDoExplorerCommand(IPresenter presenter)
+        public ToDoExplorerCommand(IDockablePresenter presenter)
+            : base(LogManager.GetCurrentClassLogger())
         {
             _presenter = presenter;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
             _presenter.Show();
         }

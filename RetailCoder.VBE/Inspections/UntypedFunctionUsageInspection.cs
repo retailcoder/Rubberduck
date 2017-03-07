@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.Inspections.Results;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.VBA;
 
@@ -43,11 +46,14 @@ namespace Rubberduck.Inspections
         public override IEnumerable<InspectionResultBase> GetInspectionResults()
         {
             var declarations = BuiltInDeclarations
-                    // note: these *should* be functions, but somehow they're not defined as such
-                .Where(item => _tokens.Any(token => (item.IdentifierName == token || item.IdentifierName == "_B_var_" + token)) && item.References.Any());
+                .Where(item =>
+                        _tokens.Any(token => item.IdentifierName == token || item.IdentifierName == "_B_var_" + token) &&
+                        item.Scope.StartsWith("VBE7.DLL;"));
 
             return declarations.SelectMany(declaration => declaration.References
-                .Select(item => new UntypedFunctionUsageInspectionResult(this, string.Format(Description, declaration.IdentifierName), item.QualifiedModuleName, item.Context)));
+                .Where(item => _tokens.Contains(item.IdentifierName) &&
+                               !IsIgnoringInspectionResultFor(item, AnnotationName))
+                .Select(item => new UntypedFunctionUsageInspectionResult(this, item)));
         }
     }
 }

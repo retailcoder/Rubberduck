@@ -1,71 +1,85 @@
 ﻿using System;
-using System.IO;
 using System.Linq;
 using System.Timers;
-using Microsoft.Vbe.Interop;
 using Rubberduck.Settings;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.AutoSave
 {
-    public class AutoSave : IDisposable
+    public sealed class AutoSave : IDisposable
     {
-        private readonly VBE _vbe;
+        private readonly IVBE _vbe;
         private readonly IGeneralConfigService _configService;
-        private readonly Timer _timer = new Timer();
-        private Configuration _config;
+        private Timer _timer = new Timer();
 
         private const int VbeSaveCommandId = 3;
 
-        public AutoSave(VBE vbe, IGeneralConfigService configService)
+        public AutoSave(IVBE vbe, IGeneralConfigService configService)
         {
             _vbe = vbe;
             _configService = configService;
 
             _configService.SettingsChanged += ConfigServiceSettingsChanged;
-
-            // todo: move this out of ctor
-            //_timer.Enabled = _config.UserSettings.GeneralSettings.AutoSaveEnabled 
-            //    && _config.UserSettings.GeneralSettings.AutoSavePeriod != 0;
-
-            //if (_config.UserSettings.GeneralSettings.AutoSavePeriod != 0)
-            //{
-            //    _timer.Interval = _config.UserSettings.GeneralSettings.AutoSavePeriod * 1000;
-            //    _timer.Elapsed += _timer_Elapsed;
-            //}
+            _timer.Elapsed += _timer_Elapsed;
+            _timer.Enabled = false;
         }
 
-        private void ConfigServiceSettingsChanged(object sender, EventArgs e)
+        public void ConfigServiceSettingsChanged(object sender, EventArgs e)
         {
-            _config = _configService.LoadConfiguration();
+            var config = _configService.LoadConfiguration();
 
-            _timer.Enabled = _config.UserSettings.GeneralSettings.AutoSaveEnabled;
-            _timer.Interval = _config.UserSettings.GeneralSettings.AutoSavePeriod * 1000;
+            _timer.Enabled = config.UserSettings.GeneralSettings.AutoSaveEnabled
+                && config.UserSettings.GeneralSettings.AutoSavePeriod != 0;
+
+            _timer.Interval = config.UserSettings.GeneralSettings.AutoSavePeriod * 1000;
         }
 
         private void _timer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            if (_vbe.VBProjects.OfType<VBProject>().Any(p => !p.Saved))
+            SaveAllUnsavedProjects();
+        }
+
+            private void SaveAllUnsavedProjects()
             {
-                try
+                var saveCommand = _vbe.CommandBars.FindControl(VbeSaveCommandId);
+                var activeProject = _vbe.ActiveVBProject;
+                var unsaved = _vbe
+                    .VBProjects
+                    .Where(project => !project.IsSaved && !string.IsNullOrEmpty(project.FileName));
+
+                foreach (var project in unsaved)
                 {
-                    var projects = _vbe.VBProjects.OfType<VBProject>().Select(p => p.FileName).ToList();
-                }
-                catch (IOException)
-                {
-                    // note: VBProject.FileName getter throws IOException if unsaved
-                    return;
+                    _vbe.ActiveVBProject = project;
+                    saveCommand.Execute();
                 }
 
-                _vbe.CommandBars.FindControl(Id: VbeSaveCommandId).Execute();
+                _vbe.ActiveVBProject = activeProject;
             }
-        }
+
 
         public void Dispose()
         {
-            _configService.LanguageChanged -= ConfigServiceSettingsChanged;
-            _timer.Elapsed -= _timer_Elapsed;
+            Dispose(true);
+        }
 
-            _timer.Dispose();
+        private void Dispose(bool disposing)
+        {
+            if (!disposing)
+            {
+                return;
+            }
+
+            if (_configService != null)
+            {
+                _configService.SettingsChanged -= ConfigServiceSettingsChanged;
+            }
+
+            if (_timer != null)
+            {
+                _timer.Elapsed -= _timer_Elapsed;
+                _timer.Dispose();
+                _timer = null;
+            }
         }
     }
 }

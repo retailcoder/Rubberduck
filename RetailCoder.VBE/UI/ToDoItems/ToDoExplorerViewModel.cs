@@ -1,39 +1,95 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Linq;
-using System.Windows.Input;
-using System.Windows.Threading;
-using Rubberduck.Parsing.Nodes;
+using NLog;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Settings;
 using Rubberduck.ToDoItems;
 using Rubberduck.UI.Command;
 using Rubberduck.UI.Controls;
 using Rubberduck.UI.Settings;
+using Rubberduck.Common;
+using Rubberduck.Parsing.Symbols;
 
 namespace Rubberduck.UI.ToDoItems
 {
-    public class ToDoExplorerViewModel : ViewModelBase, INavigateSelection
+    public sealed class ToDoExplorerViewModel : ViewModelBase, INavigateSelection, IDisposable
     {
-        private readonly Dispatcher _dispatcher;
         private readonly RubberduckParserState _state;
         private readonly IGeneralConfigService _configService;
+        private readonly IOperatingSystem _operatingSystem;
 
-        public ToDoExplorerViewModel(RubberduckParserState state, IGeneralConfigService configService)
+        public ToDoExplorerViewModel(RubberduckParserState state, IGeneralConfigService configService, IOperatingSystem operatingSystem)
         {
-            _dispatcher = Dispatcher.CurrentDispatcher;
             _state = state;
             _configService = configService;
+            _operatingSystem = operatingSystem;
             _state.StateChanged += _state_StateChanged;
+
+            _setMarkerGroupingCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), param =>
+            {
+                GroupByMarker = (bool)param;
+                GroupByLocation = !(bool)param;
+            });
+
+            _setLocationGroupingCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), param =>
+            {
+                GroupByLocation = (bool)param;
+                GroupByMarker = !(bool)param;
+            });
         }
 
-        private readonly ObservableCollection<ToDoItem> _items = new ObservableCollection<ToDoItem>();
-        public ObservableCollection<ToDoItem> Items { get { return _items; } } 
+        private ObservableCollection<ToDoItem> _items = new ObservableCollection<ToDoItem>();
+        public ObservableCollection<ToDoItem> Items
+        {
+            get { return _items; }
+            set
+            {
+                if (_items != value)
+                {
+                    _items = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
-        private ICommand _refreshCommand;
-        public ICommand RefreshCommand
+        private bool _groupByMarker = true;
+        public bool GroupByMarker
+        {
+            get { return _groupByMarker; }
+            set
+            {
+                if (_groupByMarker != value)
+                {
+                    _groupByMarker = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private bool _groupByLocation;
+        public bool GroupByLocation
+        {
+            get { return _groupByLocation; }
+            set
+            {
+                if (_groupByLocation != value)
+                {
+                    _groupByLocation = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private readonly CommandBase _setMarkerGroupingCommand;
+        public CommandBase SetMarkerGroupingCommand { get { return _setMarkerGroupingCommand; } }
+
+        private readonly CommandBase _setLocationGroupingCommand;
+        public CommandBase SetLocationGroupingCommand { get { return _setLocationGroupingCommand; } }
+
+        private CommandBase _refreshCommand;
+        public CommandBase RefreshCommand
         {
             get
             {
@@ -41,30 +97,22 @@ namespace Rubberduck.UI.ToDoItems
                 {
                     return _refreshCommand;
                 }
-                return _refreshCommand = new DelegateCommand(_ =>
+                return _refreshCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ =>
                 {
                     _state.OnParseRequested(this);
-                });
+                },
+                _ => _state.IsDirty());
             }
         }
 
-        private async void _state_StateChanged(object sender, EventArgs e)
+        private void _state_StateChanged(object sender, EventArgs e)
         {
-            Debug.WriteLine("ToDoExplorerViewModel handles StateChanged...");
-            if (_state.Status != ParserState.Ready)
+            if (_state.Status != ParserState.ResolvedDeclarations)
             {
                 return;
             }
 
-            Debug.WriteLine("Refreshing TODO items...");
-            _dispatcher.Invoke(() =>
-            {
-                Items.Clear();
-                foreach (var item in GetItems())
-                {
-                    Items.Add(item);
-                }
-            });
+            Items = new ObservableCollection<ToDoItem>(GetItems());
         }
 
         private ToDoItem _selectedItem;
@@ -78,8 +126,8 @@ namespace Rubberduck.UI.ToDoItems
             }
         }
 
-        private ICommand _removeCommand;
-        public ICommand RemoveCommand
+        private CommandBase _removeCommand;
+        public CommandBase RemoveCommand
         {
             get
             {
@@ -87,26 +135,28 @@ namespace Rubberduck.UI.ToDoItems
                 {
                     return _removeCommand;
                 }
-                return _removeCommand = new DelegateCommand(_ =>
+                return _removeCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ =>
                 {
                     if (_selectedItem == null)
                     {
                         return;
                     }
+
                     var module = _selectedItem.Selection.QualifiedName.Component.CodeModule;
+                    {
+                        var oldContent = module.GetLines(_selectedItem.Selection.Selection.StartLine, 1);
+                        var newContent = oldContent.Remove(_selectedItem.Selection.Selection.StartColumn - 1);
 
-                    var oldContent = module.Lines[_selectedItem.Selection.Selection.StartLine, 1];
-                    var newContent = oldContent.Remove(_selectedItem.Selection.Selection.StartColumn - 1);
+                        module.ReplaceLine(_selectedItem.Selection.Selection.StartLine, newContent);
 
-                    module.ReplaceLine(_selectedItem.Selection.Selection.StartLine, newContent);
-
-                    RefreshCommand.Execute(null);
+                        RefreshCommand.Execute(null);
+                    }
                 });
             }
         }
 
-        private ICommand _openTodoSettings;
-        public ICommand OpenTodoSettings
+        private CommandBase _openTodoSettings;
+        public CommandBase OpenTodoSettings
         {
             get
             {
@@ -114,9 +164,9 @@ namespace Rubberduck.UI.ToDoItems
                 {
                     return _openTodoSettings;
                 }
-                return _openTodoSettings = new DelegateCommand(_ =>
+                return _openTodoSettings = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ =>
                 {
-                    using (var window = new SettingsForm(_configService, SettingsViews.TodoSettings))
+                    using (var window = new SettingsForm(_configService, _operatingSystem, SettingsViews.TodoSettings))
                     {
                         window.ShowDialog();
                     }
@@ -148,6 +198,14 @@ namespace Rubberduck.UI.ToDoItems
         private IEnumerable<ToDoItem> GetItems()
         {
             return _state.AllComments.SelectMany(GetToDoMarkers);
+        }
+
+        public void Dispose()
+        {
+            if (_state != null)
+            {
+                _state.StateChanged -= _state_StateChanged;
+            }
         }
     }
 }

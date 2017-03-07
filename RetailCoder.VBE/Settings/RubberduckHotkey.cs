@@ -2,6 +2,7 @@ namespace Rubberduck.Settings
 {
     public enum RubberduckHotkey
     {
+        None,
         ParseAll,
         IndentProcedure,
         IndentModule,
@@ -12,5 +13,7 @@ namespace Rubberduck.Settings
         RefactorMoveCloserToUsage,
         RefactorRename,
         RefactorExtractMethod,
+        RefactorEncapsulateField,
+        SourceControl
     }
 }

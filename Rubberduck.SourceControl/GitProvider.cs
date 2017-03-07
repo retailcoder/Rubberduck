@@ -5,12 +5,11 @@ using System.Runtime.InteropServices;
 using System.Security;
 using LibGit2Sharp;
 using LibGit2Sharp.Handlers;
-using Microsoft.Vbe.Interop;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.SourceControl
 {
-    public class GitProvider : SourceControlProviderBase // note: why not : IDisposable?
+    public class GitProvider : SourceControlProviderBase, IDisposable
     {
         private readonly LibGit2Sharp.Repository _repo;
         private readonly LibGit2Sharp.Credentials _credentials;
@@ -18,15 +17,15 @@ namespace Rubberduck.SourceControl
         private List<ICommit> _unsyncedLocalCommits;
         private List<ICommit> _unsyncedRemoteCommits;
 
-        public GitProvider(VBProject project)
+        public GitProvider(IVBProject project)
             : base(project)
         {
             _unsyncedLocalCommits = new List<ICommit>();
             _unsyncedRemoteCommits = new List<ICommit>();
         }
 
-        public GitProvider(VBProject project, IRepository repository, ICodePaneWrapperFactory wrapperFactory)
-            : base(project, repository, wrapperFactory) 
+        public GitProvider(IVBProject project, IRepository repository)
+            : base(project, repository) 
         {
             _unsyncedLocalCommits = new List<ICommit>();
             _unsyncedRemoteCommits = new List<ICommit>();
@@ -41,8 +40,8 @@ namespace Rubberduck.SourceControl
             }
         }
 
-        public GitProvider(VBProject project, IRepository repository, string userName, string passWord, ICodePaneWrapperFactory wrapperFactory)
-            : this(project, repository, wrapperFactory)
+        public GitProvider(IVBProject project, IRepository repository, string userName, string passWord)
+            : this(project, repository)
         {
             _credentials = new UsernamePasswordCredentials()
             {
@@ -53,12 +52,8 @@ namespace Rubberduck.SourceControl
             _credentialsHandler = (url, user, cred) => _credentials;
         }
 
-        public GitProvider(VBProject project, IRepository repository, ICredentials<string> credentials, ICodePaneWrapperFactory wrapperFactory)
-            :this(project, repository, credentials.Username, credentials.Password, wrapperFactory)
-        { }
-
-        public GitProvider(VBProject project, IRepository repository, ICredentials<SecureString> credentials, ICodePaneWrapperFactory wrapperFactory)
-            : this(project, repository, wrapperFactory)
+        public GitProvider(IVBProject project, IRepository repository, ICredentials<SecureString> credentials)
+            : this(project, repository)
         {
             _credentials = new SecureUsernamePasswordCredentials()
             {
@@ -69,7 +64,7 @@ namespace Rubberduck.SourceControl
             _credentialsHandler = (url, user, cred) => _credentials;
         }
 
-        ~GitProvider()
+        public void Dispose()
         {
             if (_repo != null)
             {
@@ -104,12 +99,28 @@ namespace Rubberduck.SourceControl
             get { return _unsyncedRemoteCommits; }
         }
 
-        public override IRepository Clone(string remotePathOrUrl, string workingDirectory)
+        public override IRepository Clone(string remotePathOrUrl, string workingDirectory, SecureCredentials credentials = null)
         {
             try
             {
                 var name = GetProjectNameFromDirectory(remotePathOrUrl);
-                LibGit2Sharp.Repository.Clone(remotePathOrUrl, workingDirectory);
+
+                if (credentials == null)
+                {
+                    LibGit2Sharp.Repository.Clone(remotePathOrUrl, workingDirectory);
+                }
+                else
+                {
+                    var credentialsHandler = new CredentialsHandler((url, usernameFromUrl, types) => new SecureUsernamePasswordCredentials
+                    {
+                        Username = credentials.Username,
+                        Password = credentials.Password
+                    });
+
+                    var options = new CloneOptions {CredentialsProvider = credentialsHandler};
+                    LibGit2Sharp.Repository.Clone(remotePathOrUrl, workingDirectory, options);
+                }
+
                 return new Repository(name, workingDirectory, remotePathOrUrl);
             }
             catch (LibGit2SharpException ex)
@@ -126,12 +137,36 @@ namespace Rubberduck.SourceControl
 
                 LibGit2Sharp.Repository.Init(directory, bare);
 
-                return new Repository(Project.Name, workingDir, directory);
+                return new Repository(Project.HelpFile, workingDir, directory);
             }
             catch (LibGit2SharpException ex)
             {
                 throw new SourceControlException(SourceControlText.GitNotInit, ex);
             }
+        }
+
+        public override void AddOrigin(string path, string trackingBranchName)
+        {
+            try
+            {
+                if (_repo.Network.Remotes.Any(r => r.Name == "origin"))
+                {
+                    _repo.Network.Remotes.Remove("origin"); // todo prompt that remote is already taken
+                }
+
+                _repo.Network.Remotes.Add("origin", path);
+                _repo.Branches.Update(_repo.Branches[CurrentBranch.Name], c => c.Remote = "origin",
+                        c => c.UpstreamBranch = "refs/heads/" + trackingBranchName);
+            }
+            catch (LibGit2SharpException ex)
+            {
+                throw new SourceControlException("Failed to add remote location.", ex);
+            }
+        }
+
+        public override bool HasCredentials()
+        {
+            return _credentials != null;
         }
 
         /// <summary>
@@ -147,7 +182,7 @@ namespace Rubberduck.SourceControl
             //add a master branch to newly created repo
             using (var repo = new LibGit2Sharp.Repository(repository.LocalLocation))
             {
-                var status = repo.RetrieveStatus(new StatusOptions());
+                var status = repo.RetrieveStatus(new StatusOptions {DetectRenamesInWorkDir = true});
                 foreach (var stat in status.Untracked)
                 {
                     repo.Stage(stat.FilePath);
@@ -158,7 +193,7 @@ namespace Rubberduck.SourceControl
                     //The default behavior of LibGit2Sharp.Repo.Commit is to throw an exception if no signature is found,
                     // but BuildSignature() does not throw if a signature is not found, it returns "unknown" instead.
                     // so we pass a signature that won't throw along to the commit.
-                    repo.Commit("Intial Commit", GetSignature(repo));
+                    repo.Commit("Initial Commit", GetSignature(repo));
                 }
                 catch(LibGit2SharpException ex)
                 {
@@ -437,14 +472,17 @@ namespace Rubberduck.SourceControl
         }
 
         /// <summary>
-        /// Removes file from staging area, but leaves the file in the working directory.
+        /// Removes file from staging area.
         /// </summary>
         /// <param name="filePath"></param>
-        public override void RemoveFile(string filePath)
+        /// <param name="removeFromWorkingDirectory"></param>
+        public override void RemoveFile(string filePath, bool removeFromWorkingDirectory)
         {
             try
             {
-                _repo.Remove(filePath, false);
+                NotifyExternalFileChanges = false;
+                _repo.Remove(filePath, removeFromWorkingDirectory);
+                NotifyExternalFileChanges = true;
             }
             catch (LibGit2SharpException ex)
             {
@@ -457,14 +495,31 @@ namespace Rubberduck.SourceControl
             try
             {
                 base.Status();
-                return _repo.RetrieveStatus().Select(item => new FileStatusEntry(item));
+                return _repo.RetrieveStatus(new StatusOptions {IncludeUnaltered = true, DetectRenamesInWorkDir = true})
+                    .Select(item => new FileStatusEntry(item));
+            }
+            catch (LibGit2SharpException ex)
+            {
+                throw new SourceControlException(SourceControlText.GitRepoStatusFailed, ex);
+            }
+            catch (SEHException ex)
+            {
+                throw new SourceControlException(SourceControlText.GitRepoStatusFailed + " (SEH Code " + ex.ErrorCode + ")", ex);
+            }
+        }
+
+        public override IEnumerable<IFileStatusEntry> LastKnownStatus()
+        {
+            try
+            {
+                return _repo.RetrieveStatus(new StatusOptions { IncludeUnaltered = true, DetectRenamesInWorkDir = true})
+                        .Select(item => new FileStatusEntry(item));
             }
             catch (LibGit2SharpException ex)
             {
                 throw new SourceControlException(SourceControlText.GitRepoStatusFailed, ex);
             }
         }
-
         public override void Undo(string filePath)
         {
             try
@@ -472,6 +527,7 @@ namespace Rubberduck.SourceControl
                 var tip = _repo.Branches.First(b => !b.IsRemote && b.IsCurrentRepositoryHead).Tip;
                 var options = new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force };
                 _repo.CheckoutPaths(tip.Sha, new List<string> { filePath }, options);
+
                 base.Undo(filePath);
             }
             catch (LibGit2SharpException ex)
@@ -508,6 +564,18 @@ namespace Rubberduck.SourceControl
             catch(LibGit2SharpException ex)
             {
                 throw new SourceControlException(SourceControlText.GitBranchDeleteFailed, ex);
+            }
+        }
+
+        public override bool RepoHasRemoteOrigin()
+        {
+            try
+            {
+                return _repo.Network.Remotes.Any(a => a.Name == "origin");
+            }
+            catch (LibGit2SharpException ex)
+            {
+                throw new SourceControlException(SourceControlText.GitPublishFailed, ex);
             }
         }
 

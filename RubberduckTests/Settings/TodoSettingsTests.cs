@@ -20,7 +20,7 @@ namespace RubberduckTests.Settings
                 }
             };
 
-            var userSettings = new UserSettings(null, todoSettings, null, null, null);
+            var userSettings = new UserSettings(null, null, todoSettings, null, null, null, null);
             return new Configuration(userSettings);
         }
 
@@ -34,10 +34,11 @@ namespace RubberduckTests.Settings
                 }
             };
 
-            var userSettings = new UserSettings(null, todoSettings, null, null, null);
+            var userSettings = new UserSettings(null, null, todoSettings, null, null, null, null);
             return new Configuration(userSettings);
         }
 
+        [TestCategory("Settings")]
         [TestMethod]
         public void SaveConfigWorks()
         {
@@ -50,6 +51,7 @@ namespace RubberduckTests.Settings
             Assert.IsTrue(config.UserSettings.ToDoListSettings.ToDoMarkers.SequenceEqual(viewModel.TodoSettings));
         }
 
+        [TestCategory("Settings")]
         [TestMethod]
         public void SetDefaultsWorks()
         {
@@ -61,6 +63,7 @@ namespace RubberduckTests.Settings
             Assert.IsTrue(defaultConfig.UserSettings.ToDoListSettings.ToDoMarkers.SequenceEqual(viewModel.TodoSettings));
         }
 
+        [TestCategory("Settings")]
         [TestMethod]
         public void TodoMarkersAreSetInCtor()
         {
@@ -70,6 +73,7 @@ namespace RubberduckTests.Settings
             Assert.IsTrue(defaultConfig.UserSettings.ToDoListSettings.ToDoMarkers.SequenceEqual(viewModel.TodoSettings));
         }
 
+        [TestCategory("Settings")]
         [TestMethod]
         public void AddTodoMarker()
         {
@@ -83,6 +87,7 @@ namespace RubberduckTests.Settings
             Assert.IsTrue(todoMarkersList.SequenceEqual(viewModel.TodoSettings));
         }
 
+        [TestCategory("Settings")]
         [TestMethod]
         public void DeleteTodoMarker()
         {
@@ -96,6 +101,7 @@ namespace RubberduckTests.Settings
             Assert.IsTrue(todoMarkersList.SequenceEqual(viewModel.TodoSettings));
         }
 
+        [TestCategory("Settings")]
         [TestMethod]
         public void AddTodoMarker_ReusesAction()
         {
@@ -105,6 +111,7 @@ namespace RubberduckTests.Settings
             Assert.AreSame(initialAddTodoCommand, viewModel.AddTodoCommand);
         }
 
+        [TestCategory("Settings")]
         [TestMethod]
         public void DeleteTodoMarker_ReusesAction()
         {
@@ -112,6 +119,37 @@ namespace RubberduckTests.Settings
 
             var initialAddTodoCommand = viewModel.DeleteTodoCommand;
             Assert.AreSame(initialAddTodoCommand, viewModel.DeleteTodoCommand);
+        }
+
+        //Somewhat related to https://github.com/rubberduck-vba/Rubberduck/issues/1623
+        [TestCategory("Settings")]
+        [TestMethod]
+        public void DuplicateToDoMarkersAreIgnored()
+        {
+            var actual = new ToDoListSettings
+            {
+                ToDoMarkers = new[]
+                {
+                    new ToDoMarker("NOTE "),
+                    new ToDoMarker("TODO "),
+                    new ToDoMarker("BUG "),
+                    new ToDoMarker("PLACEHOLDER "),
+                    new ToDoMarker("PLACEHOLDER ")
+                }
+            };
+
+            var expected = new ToDoListSettings
+            {
+                ToDoMarkers = new[]
+                {
+                    new ToDoMarker("NOTE "),
+                    new ToDoMarker("TODO "),
+                    new ToDoMarker("BUG "),
+                    new ToDoMarker("PLACEHOLDER ")
+                }
+            };
+
+            Assert.IsTrue(actual.ToDoMarkers.SequenceEqual(expected.ToDoMarkers));
         }
     }
 }

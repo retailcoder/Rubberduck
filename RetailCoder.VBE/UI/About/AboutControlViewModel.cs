@@ -1,24 +1,31 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Reflection;
-using System.Windows.Input;
+using NLog;
 using Rubberduck.UI.Command;
+using Rubberduck.VersionCheck;
 
 namespace Rubberduck.UI.About
 {
     public class AboutControlViewModel
     {
+        private readonly IVersionCheck _version;
+
+        public AboutControlViewModel(IVersionCheck version)
+        {
+            _version = version;
+        }
+
         public string Version
         {
             get
             {
-                var name = Assembly.GetExecutingAssembly().GetName();
-                return string.Format(RubberduckUI.Rubberduck_AboutBuild, name.Version, name.ProcessorArchitecture);
+                return string.Format(RubberduckUI.Rubberduck_AboutBuild, _version.CurrentVersion);
             }
         }
 
-        private ICommand _uriCommand;
-        public ICommand UriCommand
+        private CommandBase _uriCommand;
+        public CommandBase UriCommand
         {
             get
             {
@@ -26,7 +33,7 @@ namespace Rubberduck.UI.About
                 {
                     return _uriCommand;
                 }
-                return _uriCommand = new DelegateCommand(uri =>
+                return _uriCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), uri =>
                 {
                     Process.Start(new ProcessStartInfo(((Uri)uri).AbsoluteUri));
                 });

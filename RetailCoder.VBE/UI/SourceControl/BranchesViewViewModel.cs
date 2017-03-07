@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Input;
+using System.Text.RegularExpressions;
+using NLog;
 using Rubberduck.SourceControl;
 using Rubberduck.UI.Command;
 // ReSharper disable ExplicitCallerInfoArgument
@@ -10,20 +11,25 @@ namespace Rubberduck.UI.SourceControl
 {
     public class BranchesViewViewModel : ViewModelBase, IControlViewModel
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         public BranchesViewViewModel()
         {
-            _newBranchCommand = new DelegateCommand(_ => CreateBranch(), _ => Provider != null);
-            _mergeBranchCommand = new DelegateCommand(_ => MergeBranch(), _ => Provider != null);
+            _newBranchCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => CreateBranch(), _ => Provider != null);
+            _mergeBranchCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => MergeBranch(), _ => Provider != null);
 
-            _createBranchOkButtonCommand = new DelegateCommand(_ => CreateBranchOk(), _ => !IsNotValidBranchName);
-            _createBranchCancelButtonCommand = new DelegateCommand(_ => CreateBranchCancel());
+            _createBranchOkButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => CreateBranchOk(), _ => !IsNotValidBranchName);
+            _createBranchCancelButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => CreateBranchCancel());
 
-            _mergeBranchesOkButtonCommand = new DelegateCommand(_ => MergeBranchOk(), _ => SourceBranch != DestinationBranch);
-            _mergeBranchesCancelButtonCommand = new DelegateCommand(_ => MergeBranchCancel());
+            _mergeBranchesOkButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => MergeBranchOk(), _ => SourceBranch != DestinationBranch);
+            _mergeBranchesCancelButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => MergeBranchCancel());
 
-            _deleteBranchToolbarButtonCommand = new DelegateCommand(branch => DeleteBranch((string)branch), branch => (string) branch != CurrentBranch);
-            _publishBranchToolbarButtonCommand = new DelegateCommand(branch => PublishBranch((string) branch));
-            _unpublishBranchToolbarButtonCommand = new DelegateCommand(branch => UnpublishBranch((string)branch));
+            _deleteBranchToolbarButtonCommand =
+                new DelegateCommand(LogManager.GetCurrentClassLogger(), isBranchPublished => DeleteBranch(bool.Parse((string) isBranchPublished)),
+                    isBranchPublished => CanDeleteBranch(bool.Parse((string)isBranchPublished)));
+
+            _publishBranchToolbarButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => PublishBranch(), _ => !string.IsNullOrEmpty(CurrentUnpublishedBranch));
+            _unpublishBranchToolbarButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => UnpublishBranch(), _ => !string.IsNullOrEmpty(CurrentPublishedBranch));
         }
 
         private ISourceControlProvider _provider;
@@ -32,6 +38,8 @@ namespace Rubberduck.UI.SourceControl
             get { return _provider; }
             set
             {
+                Logger.Trace("Provider changed");
+
                 _provider = value;
                 RefreshView();
             }
@@ -39,6 +47,8 @@ namespace Rubberduck.UI.SourceControl
 
         public void RefreshView()
         {
+            Logger.Trace("Refreshing view");
+
             OnPropertyChanged("LocalBranches");
             OnPropertyChanged("PublishedBranches");
             OnPropertyChanged("UnpublishedBranches");
@@ -50,12 +60,30 @@ namespace Rubberduck.UI.SourceControl
             DestinationBranch = CurrentBranch;
         }
 
+        public void ResetView()
+        {
+            Logger.Trace("Resetting view");
+
+            _provider = null;
+            _currentBranch = string.Empty;
+            SourceBranch = string.Empty;
+            DestinationBranch = CurrentBranch;
+
+            OnPropertyChanged("LocalBranches");
+            OnPropertyChanged("PublishedBranches");
+            OnPropertyChanged("UnpublishedBranches");
+            OnPropertyChanged("Branches");
+            OnPropertyChanged("CurrentBranch");
+        }
+
+        public SourceControlTab Tab { get { return SourceControlTab.Branches; } }
+
         public IEnumerable<string> Branches
         {
             get
             {
                 return Provider == null
-                  ? new string[] { }
+                  ? Enumerable.Empty<string>()
                   : Provider.Branches.Select(b => b.Name);
             }
         }
@@ -65,7 +93,7 @@ namespace Rubberduck.UI.SourceControl
             get
             {
                 return Provider == null
-                    ? new string[] { }
+                    ? Enumerable.Empty<string>()
                     : Provider.Branches.Where(b => !b.IsRemote).Select(b => b.Name);
             }
         }
@@ -75,7 +103,7 @@ namespace Rubberduck.UI.SourceControl
             get
             {
                 return Provider == null
-                    ? new string[] { }
+                    ? Enumerable.Empty<string>()
                     : Provider.Branches.Where(b => !b.IsRemote && !string.IsNullOrEmpty(b.TrackingName)).Select(b => b.Name);
             }
         }
@@ -85,7 +113,7 @@ namespace Rubberduck.UI.SourceControl
             get
             {
                 return Provider == null
-                    ? new string[] { }
+                    ? Enumerable.Empty<string>()
                     : Provider.Branches.Where(b => !b.IsRemote && string.IsNullOrEmpty(b.TrackingName)).Select(b => b.Name);
             }
         }
@@ -103,15 +131,49 @@ namespace Rubberduck.UI.SourceControl
 
                     CreateBranchSource = value;
 
+                    if (Provider == null) { return; }
+
                     try
                     {
+                        Provider.NotifyExternalFileChanges = false;
+                        Provider.HandleVbeSinkEvents = false;
                         Provider.Checkout(_currentBranch);
                     }
                     catch (SourceControlException ex)
                     {
-                        RaiseErrorEvent(ex.Message, ex.InnerException.Message);
+                        RaiseErrorEvent(ex.Message, ex.InnerException, NotificationType.Error);
                     }
+                    catch
+                    {
+                        RaiseErrorEvent(RubberduckUI.SourceControl_UnknownErrorTitle,
+                            RubberduckUI.SourceControl_UnknownErrorMessage, NotificationType.Error);
+                        throw;
+                    }
+                    Provider.NotifyExternalFileChanges = true;
+                    Provider.HandleVbeSinkEvents = true;
                 }
+            }
+        }
+
+        private string _currentPublishedBranch;
+        public string CurrentPublishedBranch
+        {
+            get { return _currentPublishedBranch; }
+            set
+            {
+                _currentPublishedBranch = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _currentUnpublishedBranch;
+        public string CurrentUnpublishedBranch
+        {
+            get { return _currentUnpublishedBranch; }
+            set
+            {
+                _currentUnpublishedBranch = value;
+                OnPropertyChanged();
             }
         }
 
@@ -158,41 +220,12 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
+        // Courtesy of http://stackoverflow.com/a/12093994/4088852 - Assumes --allow-onelevel is set TODO: Verify provider honor that. 
+        private static readonly Regex ValidBranchNameRegex = new Regex(@"^(?!@$|build-|/|.*([/.]\.|//|@\{|\\))[^\u0000-\u0037\u0177 ~^:?*[]+/?[^\u0000-\u0037\u0177 ~^:?*[]+(?<!\.lock|[/.])$");
+
         public bool IsNotValidBranchName
         {
-            get
-            {
-                // Rules taken from https://www.kernel.org/pub/software/scm/git/docs/git-check-ref-format.html
-                var isValidName = !string.IsNullOrEmpty(NewBranchName) &&
-                                  !LocalBranches.Contains(NewBranchName) &&
-                                  !NewBranchName.Any(char.IsWhiteSpace) &&
-                                  !NewBranchName.Contains("..") &&
-                                  !NewBranchName.Contains("~") &&
-                                  !NewBranchName.Contains("^") &&
-                                  !NewBranchName.Contains(":") &&
-                                  !NewBranchName.Contains("?") &&
-                                  !NewBranchName.Contains("*") &&
-                                  !NewBranchName.Contains("[") &&
-                                  !NewBranchName.Contains("//") &&
-                                  NewBranchName.FirstOrDefault() != '/' &&
-                                  NewBranchName.LastOrDefault() != '/' &&
-                                  NewBranchName.LastOrDefault() != '.' &&
-                                  NewBranchName != "@" &&
-                                  !NewBranchName.Contains("@{") &&
-                                  !NewBranchName.Contains("\\");
-
-                if (!isValidName)
-                {
-                    return true;
-                }
-                foreach (var section in NewBranchName.Split('/'))
-                {
-                    isValidName = section.FirstOrDefault() != '.' &&
-                                  !section.EndsWith(".lock");
-                }
-
-                return !isValidName;
-            }
+            get { return string.IsNullOrEmpty(NewBranchName) || !ValidBranchNameRegex.IsMatch(NewBranchName); }
         }
 
         private bool _displayMergeBranchesGrid;
@@ -254,13 +287,20 @@ namespace Rubberduck.UI.SourceControl
 
         private void CreateBranchOk()
         {
+            Logger.Trace("Creating branch {0}", NewBranchName);
             try
             {
                 Provider.CreateBranch(CreateBranchSource, NewBranchName);
             }
             catch (SourceControlException ex)
             {
-                RaiseErrorEvent(ex.Message, ex.InnerException.Message);
+                RaiseErrorEvent(ex.Message, ex.InnerException, NotificationType.Error);
+            }
+            catch
+            {
+                RaiseErrorEvent(RubberduckUI.SourceControl_UnknownErrorTitle,
+                    RubberduckUI.SourceControl_UnknownErrorMessage, NotificationType.Error);
+                throw;
             }
 
             DisplayCreateBranchGrid = false;
@@ -277,17 +317,36 @@ namespace Rubberduck.UI.SourceControl
 
         private void MergeBranchOk()
         {
+            Logger.Trace("Merging branch {0} into branch {1}", SourceBranch, DestinationBranch);
+
+            Provider.NotifyExternalFileChanges = false;
+            Provider.HandleVbeSinkEvents = false;
+
             try
             {
                 Provider.Merge(SourceBranch, DestinationBranch);
             }
             catch (SourceControlException ex)
             {
-                RaiseErrorEvent(ex.Message, ex.InnerException.Message);
+                RaiseErrorEvent(ex.Message, ex.InnerException, NotificationType.Error);
+                Provider.NotifyExternalFileChanges = true;
+                Provider.HandleVbeSinkEvents = true;
+                return;
+            }
+            catch
+            {
+                RaiseErrorEvent(RubberduckUI.SourceControl_UnknownErrorTitle,
+                    RubberduckUI.SourceControl_UnknownErrorMessage, NotificationType.Error);
+                Provider.NotifyExternalFileChanges = true;
+                Provider.HandleVbeSinkEvents = true;
+                throw;
             }
 
             DisplayMergeBranchesGrid = false;
-            RaiseErrorEvent(RubberduckUI.SourceControl_MergeStatus, string.Format(RubberduckUI.SourceControl_SuccessfulMerge, SourceBranch, DestinationBranch));
+            RaiseErrorEvent(RubberduckUI.SourceControl_MergeStatus, string.Format(RubberduckUI.SourceControl_SuccessfulMerge, SourceBranch, DestinationBranch), NotificationType.Info);
+
+            Provider.NotifyExternalFileChanges = true;
+            Provider.HandleVbeSinkEvents = true;
         }
 
         private void MergeBranchCancel()
@@ -295,50 +354,79 @@ namespace Rubberduck.UI.SourceControl
             DisplayMergeBranchesGrid = false;
         }
 
-        private void DeleteBranch(string branch)
+        private void DeleteBranch(bool isBranchPublished)
         {
+            Logger.Trace("Deleting {0}published branch {1}", isBranchPublished ? "" : "un",
+                isBranchPublished ? CurrentPublishedBranch : CurrentUnpublishedBranch);
             try
             {
-                Provider.DeleteBranch(branch);
+                Provider.DeleteBranch(isBranchPublished ? CurrentPublishedBranch : CurrentUnpublishedBranch);
             }
             catch (SourceControlException ex)
             {
-                RaiseErrorEvent(ex.Message, ex.InnerException.Message);
+                RaiseErrorEvent(ex.Message, ex.InnerException, NotificationType.Error);
+            }
+            catch
+            {
+                RaiseErrorEvent(RubberduckUI.SourceControl_UnknownErrorTitle,
+                    RubberduckUI.SourceControl_UnknownErrorMessage, NotificationType.Error);
+                throw;
+            }
+
+            RefreshView();
+        }
+        
+        private bool CanDeleteBranch(bool isBranchPublished)
+        {
+            return isBranchPublished
+                ? !string.IsNullOrEmpty(CurrentPublishedBranch) && CurrentPublishedBranch != CurrentBranch
+                : !string.IsNullOrEmpty(CurrentUnpublishedBranch) && CurrentUnpublishedBranch != CurrentBranch;
+        }
+
+        private void PublishBranch()
+        {
+            Logger.Trace("Publishing branch {0}", CurrentUnpublishedBranch);
+            try
+            {
+                Provider.Publish(CurrentUnpublishedBranch);
+            }
+            catch (SourceControlException ex)
+            {
+                RaiseErrorEvent(ex.Message, ex.InnerException, NotificationType.Error);
+            }
+            catch
+            {
+                RaiseErrorEvent(RubberduckUI.SourceControl_UnknownErrorTitle,
+                    RubberduckUI.SourceControl_UnknownErrorMessage, NotificationType.Error);
+                throw;
             }
 
             RefreshView();
         }
 
-        private void PublishBranch(string branch)
+        private void UnpublishBranch()
         {
+            Logger.Trace("Unpublishing branch {0}", CurrentPublishedBranch);
             try
             {
-                Provider.Publish(branch);
+                Provider.Unpublish(Provider.Branches.First(b => b.Name == CurrentPublishedBranch).TrackingName);
             }
             catch (SourceControlException ex)
             {
-                RaiseErrorEvent(ex.Message, ex.InnerException.Message);
+                RaiseErrorEvent(ex.Message, ex.InnerException, NotificationType.Error);
+            }
+            catch
+            {
+                RaiseErrorEvent(RubberduckUI.SourceControl_UnknownErrorTitle,
+                    RubberduckUI.SourceControl_UnknownErrorMessage, NotificationType.Error);
+                throw;
             }
 
             RefreshView();
         }
 
-        private void UnpublishBranch(string branch)
-        {
-            try
-            {
-                Provider.Unpublish(Provider.Branches.First(b => b.Name == branch).TrackingName);
-            }
-            catch (SourceControlException ex)
-            {
-                RaiseErrorEvent(ex.Message, ex.InnerException.Message);
-            }
-
-            RefreshView();
-        }
-
-        private readonly ICommand _newBranchCommand;
-        public ICommand NewBranchCommand
+        private readonly CommandBase _newBranchCommand;
+        public CommandBase NewBranchCommand
         {
             get
             {
@@ -346,8 +434,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _mergeBranchCommand;
-        public ICommand MergeBranchCommand
+        private readonly CommandBase _mergeBranchCommand;
+        public CommandBase MergeBranchCommand
         {
             get
             {
@@ -355,8 +443,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _createBranchOkButtonCommand;
-        public ICommand CreateBranchOkButtonCommand
+        private readonly CommandBase _createBranchOkButtonCommand;
+        public CommandBase CreateBranchOkButtonCommand
         {
             get
             {
@@ -364,8 +452,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _createBranchCancelButtonCommand;
-        public ICommand CreateBranchCancelButtonCommand
+        private readonly CommandBase _createBranchCancelButtonCommand;
+        public CommandBase CreateBranchCancelButtonCommand
         {
             get
             {
@@ -373,8 +461,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _mergeBranchesOkButtonCommand;
-        public ICommand MergeBranchesOkButtonCommand
+        private readonly CommandBase _mergeBranchesOkButtonCommand;
+        public CommandBase MergeBranchesOkButtonCommand
         {
             get
             {
@@ -382,8 +470,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _mergeBranchesCancelButtonCommand;
-        public ICommand MergeBranchesCancelButtonCommand
+        private readonly CommandBase _mergeBranchesCancelButtonCommand;
+        public CommandBase MergeBranchesCancelButtonCommand
         {
             get
             {
@@ -391,8 +479,8 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _deleteBranchToolbarButtonCommand;
-        public ICommand DeleteBranchToolbarButtonCommand
+        private readonly CommandBase _deleteBranchToolbarButtonCommand;
+        public CommandBase DeleteBranchToolbarButtonCommand
         {
             get
             {
@@ -400,25 +488,34 @@ namespace Rubberduck.UI.SourceControl
             }
         }
 
-        private readonly ICommand _publishBranchToolbarButtonCommand;
-        public ICommand PublishBranchToolbarButtonCommand
+        private readonly CommandBase _publishBranchToolbarButtonCommand;
+        public CommandBase PublishBranchToolbarButtonCommand
         {
             get { return _publishBranchToolbarButtonCommand; }
         }
 
-        private readonly ICommand _unpublishBranchToolbarButtonCommand;
-        public ICommand UnpublishBranchToolbarButtonCommand
+        private readonly CommandBase _unpublishBranchToolbarButtonCommand;
+        public CommandBase UnpublishBranchToolbarButtonCommand
         {
             get { return _unpublishBranchToolbarButtonCommand; }
         }
 
         public event EventHandler<ErrorEventArgs> ErrorThrown;
-        private void RaiseErrorEvent(string message, string innerMessage)
+        private void RaiseErrorEvent(string message, Exception innerException, NotificationType notificationType)
         {
             var handler = ErrorThrown;
             if (handler != null)
             {
-                handler(this, new ErrorEventArgs(message, innerMessage));
+                handler(this, new ErrorEventArgs(message, innerException, notificationType));
+            }
+        }
+
+        private void RaiseErrorEvent(string title, string message, NotificationType notificationType)
+        {
+            var handler = ErrorThrown;
+            if (handler != null)
+            {
+                handler(this, new ErrorEventArgs(title, message, notificationType));
             }
         }
     }

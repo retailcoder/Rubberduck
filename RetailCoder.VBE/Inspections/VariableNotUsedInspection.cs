@@ -1,15 +1,22 @@
 using System.Collections.Generic;
 using System.Linq;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.Inspections.Results;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
+using Rubberduck.UI;
 
 namespace Rubberduck.Inspections
 {
     public sealed class VariableNotUsedInspection : InspectionBase
     {
-        public VariableNotUsedInspection(RubberduckParserState state)
+        private readonly IMessageBox _messageBox;
+
+        public VariableNotUsedInspection(RubberduckParserState state, IMessageBox messageBox)
             : base(state)
         {
+            _messageBox = messageBox;
         }
 
         public override string Meta { get { return InspectionsUI.VariableNotUsedInspectionMeta; } }
@@ -24,7 +31,7 @@ namespace Rubberduck.Inspections
                 && declaration.References.All(reference => reference.IsAssignment));
 
             return declarations.Select(issue => 
-                new IdentifierNotUsedInspectionResult(this, issue, ((dynamic)issue.Context).ambiguousIdentifier(), issue.QualifiedName.QualifiedModuleName));
+                new IdentifierNotUsedInspectionResult(this, issue, ((dynamic)issue.Context).identifier(), issue.QualifiedName.QualifiedModuleName));
         }
     }
 }

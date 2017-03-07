@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Windows.Input;
+using NLog;
 using Rubberduck.SourceControl;
 using Rubberduck.UI.Command;
 // ReSharper disable ExplicitCallerInfoArgument
@@ -10,13 +12,15 @@ namespace Rubberduck.UI.SourceControl
 {
     public class ChangesViewViewModel : ViewModelBase, IControlViewModel
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         public ChangesViewViewModel()
         {
-            _commitCommand = new DelegateCommand(_ => Commit(), _ => !string.IsNullOrEmpty(CommitMessage) && IncludedChanges != null && IncludedChanges.Any());
+            _commitCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => Commit(), _ => !string.IsNullOrEmpty(CommitMessage) && IncludedChanges != null && IncludedChanges.Any());
 
-            _includeChangesToolbarButtonCommand = new DelegateCommand(fileStatusEntry => IncludeChanges((IFileStatusEntry)fileStatusEntry));
-            _excludeChangesToolbarButtonCommand = new DelegateCommand(fileStatusEntry => ExcludeChanges((IFileStatusEntry)fileStatusEntry));
-            _undoChangesToolbarButtonCommand = new DelegateCommand(fileStatusEntry => UndoChanges((IFileStatusEntry) fileStatusEntry));
+            _includeChangesToolbarButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), fileStatusEntry => IncludeChanges((IFileStatusEntry)fileStatusEntry));
+            _excludeChangesToolbarButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), fileStatusEntry => ExcludeChanges((IFileStatusEntry)fileStatusEntry));
+            _undoChangesToolbarButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), fileStatusEntry => UndoChanges((IFileStatusEntry) fileStatusEntry));
         }
 
         private string _commitMessage;
@@ -48,6 +52,8 @@ namespace Rubberduck.UI.SourceControl
 
         public void RefreshView()
         {
+            Logger.Trace("Refreshing view");
+
             OnPropertyChanged("CurrentBranch");
 
             IncludedChanges = Provider == null
@@ -68,6 +74,21 @@ namespace Rubberduck.UI.SourceControl
                 : new ObservableCollection<IFileStatusEntry>(
                     Provider.Status().Where(stat => stat.FileStatus.HasFlag(FileStatus.Untracked)));
         }
+
+        public void ResetView()
+        {
+            Logger.Trace("Resetting view");
+
+            _provider.BranchChanged -= Provider_BranchChanged;
+            _provider = null;
+
+            OnPropertyChanged("CurrentBranch");
+
+            IncludedChanges = new ObservableCollection<IFileStatusEntry>();
+            UntrackedFiles = new ObservableCollection<IFileStatusEntry>();
+        }
+
+        public SourceControlTab Tab { get { return SourceControlTab.Changes; } }
 
         private void Provider_BranchChanged(object sender, EventArgs e)
         {
@@ -125,24 +146,31 @@ namespace Rubberduck.UI.SourceControl
 
         private void UndoChanges(IFileStatusEntry fileStatusEntry)
         {
+            Logger.Trace("Undoing changes to file {0}", fileStatusEntry.FilePath);
+
             try
             {
-                var localLocation = Provider.CurrentRepository.LocalLocation.EndsWith("\\")
-                    ? Provider.CurrentRepository.LocalLocation
-                    : Provider.CurrentRepository.LocalLocation + "\\";
-
-                Provider.Undo(localLocation + fileStatusEntry.FilePath);
-
+                var file = Path.GetFileName(fileStatusEntry.FilePath);
+                Debug.Assert(!string.IsNullOrEmpty(file));
+                Provider.Undo(Path.Combine(Provider.CurrentRepository.LocalLocation, file));
                 RefreshView();
             }
             catch (SourceControlException ex)
             {
-                RaiseErrorEvent(ex.Message, ex.InnerException.Message);
+                RaiseErrorEvent(ex.Message, ex.InnerException, NotificationType.Error);
+            }
+            catch
+            {
+                RaiseErrorEvent(RubberduckUI.SourceControl_UnknownErrorTitle,
+                    RubberduckUI.SourceControl_UnknownErrorMessage, NotificationType.Error);
+                throw;
             }
         }
 
         private void Commit()
         {
+            Logger.Trace("Committing");
+
             var changes = IncludedChanges.Select(c => c.FilePath).ToList();
             if (!changes.Any())
             {
@@ -156,20 +184,41 @@ namespace Rubberduck.UI.SourceControl
 
                 if (CommitAction == CommitAction.CommitAndSync)
                 {
+                    Logger.Trace("Commit and sync (pull + push)");
                     Provider.Pull();
                     Provider.Push();
                 }
 
                 if (CommitAction == CommitAction.CommitAndPush)
                 {
+                    Logger.Trace("Commit and push");
                     Provider.Push();
                 }
 
                 RefreshView();
+
+                switch (CommitAction)
+                {
+                    case CommitAction.Commit:
+                        RaiseErrorEvent(RubberduckUI.SourceControl_CommitStatus, RubberduckUI.SourceControl_CommitStatus_CommitSuccess, NotificationType.Info);
+                        return;
+                    case CommitAction.CommitAndPush:
+                        RaiseErrorEvent(RubberduckUI.SourceControl_CommitStatus, RubberduckUI.SourceControl_CommitStatus_CommitAndPushSuccess, NotificationType.Info);
+                        return;
+                    case CommitAction.CommitAndSync:
+                        RaiseErrorEvent(RubberduckUI.SourceControl_CommitStatus, RubberduckUI.SourceControl_CommitStatus_CommitAndSyncSuccess, NotificationType.Info);
+                        return;
+                }
             }
             catch (SourceControlException ex)
             {
-                RaiseErrorEvent(ex.Message, ex.InnerException.Message);
+                RaiseErrorEvent(ex.Message, ex.InnerException, NotificationType.Error);
+            }
+            catch
+            {
+                RaiseErrorEvent(RubberduckUI.SourceControl_UnknownErrorTitle,
+                    RubberduckUI.SourceControl_UnknownErrorMessage, NotificationType.Error);
+                throw;
             }
 
             CommitMessage = string.Empty;
@@ -179,10 +228,12 @@ namespace Rubberduck.UI.SourceControl
         {
             if (UntrackedFiles.FirstOrDefault(f => f.FilePath == fileStatusEntry.FilePath) != null)
             {
+                Logger.Trace("Tracking file {0}", fileStatusEntry.FilePath);
                 Provider.AddFile(fileStatusEntry.FilePath);
             }
             else
             {
+                Logger.Trace("Removing file {0} from excluded changes", fileStatusEntry.FilePath);
                 ExcludedChanges.Remove(ExcludedChanges.FirstOrDefault(f => f.FilePath == fileStatusEntry.FilePath));
             }
 
@@ -191,42 +242,52 @@ namespace Rubberduck.UI.SourceControl
 
         private void ExcludeChanges(IFileStatusEntry fileStatusEntry)
         {
+            Logger.Trace("Adding file {0} to excluded changes", fileStatusEntry.FilePath);
             ExcludedChanges.Add(fileStatusEntry);
 
             RefreshView();
         }
         
-        private readonly ICommand _commitCommand;
-        public ICommand CommitCommand
+        private readonly CommandBase _commitCommand;
+        public CommandBase CommitCommand
         {
             get { return _commitCommand; }
         }
 
-        private readonly ICommand _undoChangesToolbarButtonCommand;
-        public ICommand UndoChangesToolbarButtonCommand
+        private readonly CommandBase _undoChangesToolbarButtonCommand;
+        public CommandBase UndoChangesToolbarButtonCommand
         {
             get { return _undoChangesToolbarButtonCommand; }
         }
 
-        private readonly ICommand _excludeChangesToolbarButtonCommand;
-        public ICommand ExcludeChangesToolbarButtonCommand
+        private readonly CommandBase _excludeChangesToolbarButtonCommand;
+        public CommandBase ExcludeChangesToolbarButtonCommand
         {
             get { return _excludeChangesToolbarButtonCommand; }
         }
 
-        private readonly ICommand _includeChangesToolbarButtonCommand;
-        public ICommand IncludeChangesToolbarButtonCommand
+        private readonly CommandBase _includeChangesToolbarButtonCommand;
+        public CommandBase IncludeChangesToolbarButtonCommand
         {
             get { return _includeChangesToolbarButtonCommand; }
         }
 
         public event EventHandler<ErrorEventArgs> ErrorThrown;
-        private void RaiseErrorEvent(string message, string innerMessage)
+        private void RaiseErrorEvent(string message, Exception innerException, NotificationType notificationType)
         {
             var handler = ErrorThrown;
             if (handler != null)
             {
-                handler(this, new ErrorEventArgs(message, innerMessage));
+                handler(this, new ErrorEventArgs(message, innerException, notificationType));
+            }
+        }
+
+        private void RaiseErrorEvent(string title, string message, NotificationType notificationType)
+        {
+            var handler = ErrorThrown;
+            if (handler != null)
+            {
+                handler(this, new ErrorEventArgs(title, message, notificationType));
             }
         }
     }

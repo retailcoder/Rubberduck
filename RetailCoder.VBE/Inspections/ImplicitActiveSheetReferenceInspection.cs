@@ -1,23 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using Antlr4.Runtime;
-using Microsoft.Vbe.Interop;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.Inspections.Results;
 using Rubberduck.Parsing.VBA;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.Extensions;
-using Rubberduck.VBEditor.VBEHost;
 
 namespace Rubberduck.Inspections
 {
     public sealed class ImplicitActiveSheetReferenceInspection : InspectionBase
     {
-        private readonly Func<IHostApplication> _hostApp;
-
-        public ImplicitActiveSheetReferenceInspection(VBE vbe, RubberduckParserState state)
+        public ImplicitActiveSheetReferenceInspection(RubberduckParserState state)
             : base(state)
         {
-            _hostApp = vbe.HostApplication;
         }
 
         public override string Meta { get { return InspectionsUI.ImplicitActiveSheetReferenceInspectionMeta; } }
@@ -31,44 +25,25 @@ namespace Rubberduck.Inspections
 
         public override IEnumerable<InspectionResultBase> GetInspectionResults()
         {
-            if (_hostApp().ApplicationName != "Excel")
+            var excel = State.DeclarationFinder.Projects.SingleOrDefault(item => item.IsBuiltIn && item.IdentifierName == "Excel");
+            if (excel == null) { return Enumerable.Empty<InspectionResultBase>(); }
+
+            var globalModules = new[]
             {
-                return new InspectionResultBase[] {};
-                // if host isn't Excel, the ExcelObjectModel declarations shouldn't be loaded anyway.
-            }
-
-            var matches = BuiltInDeclarations.Where(item =>
-                (item.ParentScope == "Excel.Global" || item.ParentScope == "Excel.Application")
-                && Targets.Contains(item.IdentifierName)).ToList();
-
-            var issues = matches.Where(item => item.References.Any())
-                .SelectMany(declaration => declaration.References);
-
-            return issues.Select(issue => 
-                new ImplicitActiveSheetReferenceInspectionResult(this, string.Format(Description, issue.Declaration.IdentifierName), issue.Context, issue.QualifiedModuleName));
-        }
-    }
-
-    public class ImplicitActiveSheetReferenceInspectionResult : InspectionResultBase
-    {
-        private readonly string _result;
-        private readonly IEnumerable<CodeInspectionQuickFix> _quickFixes;
-
-        public ImplicitActiveSheetReferenceInspectionResult(IInspection inspection, string result, ParserRuleContext context, QualifiedModuleName qualifiedName)
-            : base(inspection, qualifiedName, context)
-        {
-            _result = result;
-            _quickFixes = new CodeInspectionQuickFix[]
-            {
-                new IgnoreOnceQuickFix(context, QualifiedSelection, Inspection.AnnotationName), 
+                State.DeclarationFinder.FindClassModule("Global", excel, true),
+                State.DeclarationFinder.FindClassModule("_Global", excel, true)
             };
-        }
 
-        public override IEnumerable<CodeInspectionQuickFix> QuickFixes { get { return _quickFixes; } }
+            var members = Targets
+                .SelectMany(target => globalModules.SelectMany(global =>
+                    State.DeclarationFinder.FindMemberMatches(global, target))
+                .Where(member => member.AsTypeName == "Range" && member.References.Any()));
 
-        public override string Description
-        {
-            get { return _result; }
+            return members
+                .SelectMany(declaration => declaration.References)
+                .Where(issue => !issue.IsIgnoringInspectionResultFor(AnnotationName))
+                .Select(issue => new ImplicitActiveSheetReferenceInspectionResult(this, issue))
+                .ToList();
         }
     }
 }

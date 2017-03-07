@@ -1,7 +1,7 @@
-using System;
+using System.Collections.Generic;
 using Antlr4.Runtime;
+using Antlr4.Runtime.Tree;
 using Rubberduck.Parsing.Grammar;
-using Rubberduck.Parsing.Symbols;
 using Rubberduck.VBEditor;
 
 namespace Rubberduck.Parsing
@@ -17,86 +17,49 @@ namespace Rubberduck.Parsing
             // 1 is the default value that will select all lines. Replace zeroes with ones.
             // See also: https://msdn.microsoft.com/en-us/library/aa443952(v=vs.60).aspx
 
-            var startLine = context.Start.Line == 0 ? 1 : context.Start.Line;
-            var startCol = context.Start.Column + 1;
-            var endLine = context.Stop.Line == 0 ? 1 : context.Stop.Line;
-            var endCol = startCol + context.Stop.Text.Length;
-
-            return new Selection(
-                startLine,
-                startCol,
-                endLine,
-                endCol
-                );
+            return new Selection(context.Start.Line == 0 ? 1 : context.Start.Line,
+                                 context.Start.Column + 1,
+                                 context.Stop.Line == 0 ? 1 : context.Stop.Line,
+                                 context.Stop.Column + context.Stop.Text.Length + 1);
         }
 
-        public static Accessibility GetAccessibility(this VBAParser.VisibilityContext context)
-        {
-            if (context == null)
-                return Accessibility.Implicit;
+        //This set of overloads returns the selection for the entire procedure statement body, i.e. Public Function Foo(bar As String) As String
+        public static Selection GetProcedureSelection(this VBAParser.FunctionStmtContext context) { return GetProcedureContextSelection(context); }
+        public static Selection GetProcedureSelection(this VBAParser.SubStmtContext context) { return GetProcedureContextSelection(context); }
+        public static Selection GetProcedureSelection(this VBAParser.PropertyGetStmtContext context) { return GetProcedureContextSelection(context); }
+        public static Selection GetProcedureSelection(this VBAParser.PropertyLetStmtContext context) { return GetProcedureContextSelection(context); }
+        public static Selection GetProcedureSelection(this VBAParser.PropertySetStmtContext context) { return GetProcedureContextSelection(context); }
 
-            return (Accessibility) Enum.Parse(typeof (Accessibility), context.GetText());
+        private static Selection GetProcedureContextSelection(ParserRuleContext context)
+        {
+            var endContext = context.GetRuleContext<VBAParser.EndOfStatementContext>(0);
+            return new Selection(context.Start.Line == 0 ? 1 : context.Start.Line,
+                                 context.Start.Column + 1,
+                                 endContext.Start.Line == 0 ? 1 : endContext.Start.Line,
+                                 endContext.Start.Column + 1);
         }
 
-        public static string Signature(this VBAParser.FunctionStmtContext context)
+        public static IEnumerable<TContext> FindChildren<TContext>(this ParserRuleContext context) where TContext : ParserRuleContext
         {
-            var visibility = context.visibility();
-            var visibilityText = visibility == null ? string.Empty : visibility.GetText();
-
-            var identifierText = context.ambiguousIdentifier().GetText();
-            var argsText = context.argList().GetText();
-            
-            var asType = context.asTypeClause();
-            var asTypeText = asType == null ? string.Empty : asType.GetText();
-
-            return (visibilityText + ' ' + Tokens.Function + ' ' + identifierText + argsText + ' ' + asTypeText).Trim();
+            var walker = new ParseTreeWalker();
+            var listener = new ChildNodeListener<TContext>();
+            walker.Walk(listener, context);
+            return listener.Matches;
         }
 
-        public static string Signature(this VBAParser.SubStmtContext context)
+        private class ChildNodeListener<TContext> : VBAParserBaseListener where TContext : ParserRuleContext
         {
-            var visibility = context.visibility();
-            var visibilityText = visibility == null ? string.Empty : visibility.GetText();
+            private readonly HashSet<TContext> _matches = new HashSet<TContext>();
+            public IEnumerable<TContext> Matches { get { return _matches; } }
 
-            var identifierText = context.ambiguousIdentifier().GetText();
-            var argsText = context.argList().GetText();
-
-            return (visibilityText + ' ' + Tokens.Sub + ' ' + identifierText + argsText).Trim();
-        }
-
-        public static string Signature(this VBAParser.PropertyGetStmtContext context)
-        {
-            var visibility = context.visibility();
-            var visibilityText = visibility == null ? string.Empty : visibility.GetText();
-
-            var identifierText = context.ambiguousIdentifier().GetText();
-            var argsText = context.argList().GetText();
-
-            var asType = context.asTypeClause();
-            var asTypeText = asType == null ? string.Empty : asType.GetText();
-
-            return (visibilityText + ' ' + Tokens.Property + ' ' + Tokens.Get + ' ' + identifierText + argsText + ' ' + asTypeText).Trim();
-        }
-
-        public static string Signature(this VBAParser.PropertyLetStmtContext context)
-        {
-            var visibility = context.visibility();
-            var visibilityText = visibility == null ? string.Empty : visibility.GetText();
-
-            var identifierText = context.ambiguousIdentifier().GetText();
-            var argsText = context.argList().GetText();
-
-            return (visibilityText + ' ' + Tokens.Property + ' ' + Tokens.Let + ' ' + identifierText + argsText).Trim();
-        }
-
-        public static string Signature(this VBAParser.PropertySetStmtContext context)
-        {
-            var visibility = context.visibility();
-            var visibilityText = visibility == null ? string.Empty : visibility.GetText();
-
-            var identifierText = context.ambiguousIdentifier().GetText();
-            var argsText = context.argList().GetText();
-
-            return (visibilityText + ' ' + Tokens.Property + ' ' + Tokens.Set + ' ' + identifierText + argsText).Trim();
+            public override void EnterEveryRule(ParserRuleContext context)
+            {
+                var match = context as TContext;
+                if (match != null)
+                {
+                    _matches.Add(match);
+                }
+            }
         }
     }
 }

@@ -1,53 +1,62 @@
-﻿using System.Diagnostics;
-using Microsoft.Vbe.Interop;
-using Rubberduck.Common;
+﻿using Rubberduck.Common;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.IntroduceField;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
     public class RefactorIntroduceFieldCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
-        private readonly ICodePaneWrapperFactory _wrapperWrapperFactory;
+        private readonly IMessageBox _messageBox;
 
-        public RefactorIntroduceFieldCommand (VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor, ICodePaneWrapperFactory wrapperWrapperFactory)
-            : base(vbe, editor)
+        public RefactorIntroduceFieldCommand (IVBE vbe, RubberduckParserState state, IMessageBox messageBox)
+            :base(vbe)
         {
             _state = state;
-            _wrapperWrapperFactory = wrapperWrapperFactory;
+            _messageBox = messageBox;
         }
 
-        public override bool CanExecute(object parameter)
+        protected override bool CanExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null || _state.Status != ParserState.Ready)
+            var pane = Vbe.ActiveCodePane;
             {
-                return false;
+                if (_state.Status != ParserState.Ready || pane.IsWrappingNullReference)
+                {
+                    return false;
+                }
+
+                var selection = pane.GetQualifiedSelection();
+                if (!selection.HasValue)
+                {
+                    return false;
+                }
+
+                var target = _state.AllUserDeclarations.FindVariable(selection.Value);
+
+                return target != null && target.ParentScopeDeclaration.DeclarationType.HasFlag(DeclarationType.Member);
             }
-
-            var selection = Vbe.ActiveCodePane.GetSelection();
-            var target = _state.AllUserDeclarations.FindVariable(selection);
-
-            var canExecute = target != null && target.ParentScopeDeclaration.DeclarationType.HasFlag(DeclarationType.Member);
-
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
-            return canExecute;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null)
+            var pane = Vbe.ActiveCodePane;
             {
-                return;
-            }
-            var codePane = _wrapperWrapperFactory.Create(Vbe.ActiveCodePane);
-            var selection = new QualifiedSelection(new QualifiedModuleName(codePane.CodeModule.Parent), codePane.Selection);
+                if (pane.IsWrappingNullReference)
+                {
+                    return;
+                }
 
-            var refactoring = new IntroduceFieldRefactoring(_state, Editor, new MessageBox());
-            refactoring.Refactor(selection);
+                var selection = pane.GetQualifiedSelection();
+                if (!selection.HasValue)
+                {
+                    return;
+                }
+
+                var refactoring = new IntroduceFieldRefactoring(Vbe, _state, _messageBox);
+                refactoring.Refactor(selection.Value);
+            }
         }
     }
 }

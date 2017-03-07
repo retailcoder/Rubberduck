@@ -1,48 +1,50 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Vbe.Interop;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.Inspections.Results;
 using Rubberduck.Parsing.VBA;
-using Rubberduck.VBEditor.Extensions;
-using Rubberduck.VBEditor.VBEHost;
 
 namespace Rubberduck.Inspections
 {
     public sealed class ImplicitActiveWorkbookReferenceInspection : InspectionBase
     {
-        private readonly Lazy<IHostApplication> _hostApp;
-
-        public ImplicitActiveWorkbookReferenceInspection(VBE vbe, RubberduckParserState state)
+        public ImplicitActiveWorkbookReferenceInspection(RubberduckParserState state)
             : base(state)
         {
-            _hostApp = new Lazy<IHostApplication>(vbe.HostApplication);
         }
 
         public override string Meta { get { return InspectionsUI.ImplicitActiveWorkbookReferenceInspectionMeta; } }
         public override string Description { get { return InspectionsUI.ImplicitActiveWorkbookReferenceInspectionName; } }
         public override CodeInspectionType InspectionType { get { return CodeInspectionType.MaintainabilityAndReadabilityIssues; } }
 
-        private static readonly string[] Targets = 
+        private static readonly string[] Targets =
         {
-            "Worksheets", "Sheets", "Names", 
+            "Worksheets", "Sheets", "Names", "_Default"
         };
 
         public override IEnumerable<InspectionResultBase> GetInspectionResults()
         {
-            if (!_hostApp.IsValueCreated || _hostApp.Value == null || _hostApp.Value.ApplicationName != "Excel")
+            var excel = State.DeclarationFinder.Projects.SingleOrDefault(item => item.IsBuiltIn && item.IdentifierName == "Excel");
+            if (excel == null) { return Enumerable.Empty<InspectionResultBase>(); }
+
+            var modules = new[]
             {
-                return new InspectionResultBase[] {};
-                // if host isn't Excel, the ExcelObjectModel declarations shouldn't be loaded anyway.
-            }
+                State.DeclarationFinder.FindClassModule("_Global", excel, true),
+                State.DeclarationFinder.FindClassModule("_Application", excel, true),
+                State.DeclarationFinder.FindClassModule("Global", excel, true),
+                State.DeclarationFinder.FindClassModule("Application", excel, true),
+                State.DeclarationFinder.FindClassModule("Sheets", excel, true),
+            };
 
-            var issues = Declarations.Where(item => item.IsBuiltIn 
-                                            && item.ParentScope == "Excel.Global"
-                                            && Targets.Contains(item.IdentifierName)
-                                            && item.References.Any())
-                .SelectMany(declaration => declaration.References);
-
-            return issues.Select(issue => 
-                new ImplicitActiveSheetReferenceInspectionResult(this, string.Format(Description, issue.Declaration.IdentifierName), issue.Context, issue.QualifiedModuleName));
+            var members = Targets
+                .SelectMany(target => modules.SelectMany(module =>
+                    State.DeclarationFinder.FindMemberMatches(module, target)))
+                .Where(item => item.References.Any())
+                .SelectMany(item => item.References.Where(reference => !IsIgnoringInspectionResultFor(reference, AnnotationName)))
+                .ToList();
+                
+            return members.Select(issue => new ImplicitActiveWorkbookReferenceInspectionResult(this, issue));
         }
     }
 }

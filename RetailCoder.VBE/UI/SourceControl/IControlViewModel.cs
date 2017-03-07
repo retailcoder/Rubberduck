@@ -3,23 +3,44 @@ using Rubberduck.SourceControl;
 
 namespace Rubberduck.UI.SourceControl
 {
+    using System.Linq;
+
     public class ErrorEventArgs
     {
-        public readonly string Message;
+        public readonly string Title;
         public readonly string InnerMessage;
+        public readonly NotificationType NotificationType;
 
-        public ErrorEventArgs(string message,string innerMessage)
+        public ErrorEventArgs(string title, Exception innerException, NotificationType notificationType)
         {
-            Message = message;
-            InnerMessage = innerMessage;
+            Title = title;
+            InnerMessage = GetInnerExceptionMessage(innerException);
+            NotificationType = notificationType;
+        }
+
+        public ErrorEventArgs(string title, string message, NotificationType notificationType)
+        {
+            Title = title;
+            InnerMessage = message;
+            NotificationType = notificationType;
+        }
+
+        private string GetInnerExceptionMessage(Exception ex)
+        {
+            return ex is AggregateException
+                ? string.Join(Environment.NewLine, ((AggregateException) ex).InnerExceptions.Select(s => s.Message))
+                : ex.Message;
         }
     }
 
     public interface IControlViewModel
     {
+        SourceControlTab Tab { get; }
+
         ISourceControlProvider Provider { get; set; }
         event EventHandler<ErrorEventArgs> ErrorThrown;
 
         void RefreshView();
+        void ResetView();
     }
 }

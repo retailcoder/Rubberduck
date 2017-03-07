@@ -1,13 +1,11 @@
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Vbe.Interop;
 using System.Runtime.InteropServices;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.ExtractInterface;
 using Rubberduck.UI.Refactorings;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
@@ -17,43 +15,43 @@ namespace Rubberduck.UI.Command.Refactorings
         private readonly RubberduckParserState _state;
         private readonly IMessageBox _messageBox;
 
-        public RefactorExtractInterfaceCommand(VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor, IMessageBox messageBox)
-            : base(vbe, editor)
+        public RefactorExtractInterfaceCommand(IVBE vbe, RubberduckParserState state, IMessageBox messageBox)
+            :base(vbe)
         {
             _state = state;
             _messageBox = messageBox;
         }
 
-        private static readonly vbext_ComponentType[] ModuleTypes =
+        private static readonly IReadOnlyList<DeclarationType> ModuleTypes = new[] 
         {
-            vbext_ComponentType.vbext_ct_ClassModule, 
-            vbext_ComponentType.vbext_ct_Document, 
-            vbext_ComponentType.vbext_ct_MSForm, 
+            DeclarationType.ClassModule,
+            DeclarationType.UserForm, 
+            DeclarationType.ProceduralModule, 
         };
 
-        public override bool CanExecute(object parameter)
+        protected override bool CanExecuteImpl(object parameter)
         {
-            var activePane = Vbe.ActiveCodePane;
-            if (activePane == null)
+            var selection = Vbe.ActiveCodePane.GetQualifiedSelection();
+            if (!selection.HasValue)
             {
                 return false;
             }
 
-            var selection = activePane.GetSelection();
-            var target = _state.AllUserDeclarations.SingleOrDefault(item =>
-                item.QualifiedName.QualifiedModuleName.Equals(selection.QualifiedName)
-                && item.IdentifierName == selection.QualifiedName.ComponentName
-                && (item.DeclarationType == DeclarationType.Class || item.DeclarationType == DeclarationType.Document || item.DeclarationType == DeclarationType.UserForm));
-            var hasMembers = _state.AllUserDeclarations.Any(item => item.DeclarationType.HasFlag(DeclarationType.Member) && item.ParentDeclaration != null && item.ParentDeclaration.Equals(target));
+            var interfaceClass = _state.AllUserDeclarations.SingleOrDefault(item =>
+                item.QualifiedName.QualifiedModuleName.Equals(selection.Value.QualifiedName)
+                && ModuleTypes.Contains(item.DeclarationType));
+
+            // interface class must have members to be implementable
+            var hasMembers = _state.AllUserDeclarations.Any(item => 
+                item.DeclarationType.HasFlag(DeclarationType.Member) 
+                && item.ParentDeclaration != null 
+                && item.ParentDeclaration.Equals(interfaceClass));
 
             // true if active code pane is for a class/document/form module
-            var canExecute = ModuleTypes.Contains(Vbe.ActiveCodePane.CodeModule.Parent.Type) && target != null && hasMembers;
-
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
-            return canExecute;
+            return interfaceClass != null && hasMembers;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
             if (Vbe.ActiveCodePane == null)
             {
@@ -62,8 +60,8 @@ namespace Rubberduck.UI.Command.Refactorings
 
             using (var view = new ExtractInterfaceDialog())
             {
-                var factory = new ExtractInterfacePresenterFactory(_state, Editor, view);
-                var refactoring = new ExtractInterfaceRefactoring(_state, _messageBox, factory, Editor);
+                var factory = new ExtractInterfacePresenterFactory(Vbe, _state, view);
+                var refactoring = new ExtractInterfaceRefactoring(Vbe, _state, _messageBox, factory);
                 refactoring.Refactor();
             }
         }

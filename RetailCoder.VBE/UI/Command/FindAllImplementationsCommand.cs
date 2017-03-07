@@ -1,17 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using Microsoft.Vbe.Interop;
+using NLog;
 using Rubberduck.Common;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
+using Rubberduck.UI.Command.MenuItems;
 using Rubberduck.UI.Controls;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command
 {
@@ -19,16 +18,19 @@ namespace Rubberduck.UI.Command
     /// A command that finds all implementations of a specified method, or of the active interface module.
     /// </summary>
     [ComVisible(false)]
-    public class FindAllImplementationsCommand : CommandBase
+    public class FindAllImplementationsCommand : CommandBase, IDisposable
     {
         private readonly INavigateCommand _navigateCommand;
         private readonly IMessageBox _messageBox;
         private readonly RubberduckParserState _state;
         private readonly ISearchResultsWindowViewModel _viewModel;
         private readonly SearchResultPresenterInstanceManager _presenterService;
-        private readonly VBE _vbe;
+        private readonly IVBE _vbe;
 
-        public FindAllImplementationsCommand(INavigateCommand navigateCommand, IMessageBox messageBox, RubberduckParserState state, VBE vbe, ISearchResultsWindowViewModel viewModel, SearchResultPresenterInstanceManager presenterService)
+        public FindAllImplementationsCommand(INavigateCommand navigateCommand, IMessageBox messageBox,
+            RubberduckParserState state, IVBE vbe, ISearchResultsWindowViewModel viewModel,
+            SearchResultPresenterInstanceManager presenterService)
+             : base(LogManager.GetCurrentClassLogger())
         {
             _navigateCommand = navigateCommand;
             _messageBox = messageBox;
@@ -36,24 +38,70 @@ namespace Rubberduck.UI.Command
             _vbe = vbe;
             _viewModel = viewModel;
             _presenterService = presenterService;
+
+            _state.StateChanged += _state_StateChanged;
         }
 
-        public override bool CanExecute(object parameter)
+        private Declaration FindNewDeclaration(Declaration declaration)
         {
-            if (_vbe.ActiveCodePane == null && _state.Status != ParserState.Ready)
+            return _state.AllUserDeclarations.SingleOrDefault(item =>
+                        item.ProjectId == declaration.ProjectId &&
+                        item.ComponentName == declaration.ComponentName &&
+                        item.ParentScope == declaration.ParentScope &&
+                        item.IdentifierName == declaration.IdentifierName &&
+                        item.DeclarationType == declaration.DeclarationType);
+        }
+
+        private void _state_StateChanged(object sender, ParserStateEventArgs e)
+        {
+            if (e.State != ParserState.Ready) { return; }
+
+            if (_viewModel == null) { return; }
+
+            UiDispatcher.InvokeAsync(UpdateTab);
+        }
+
+        private void UpdateTab()
+        {
+            var findImplementationsTabs = _viewModel.Tabs.Where(
+                t => t.Header.StartsWith(RubberduckUI.AllImplementations_Caption.Replace("'{0}'", ""))).ToList();
+
+            foreach (var tab in findImplementationsTabs)
+            {
+                var newTarget = FindNewDeclaration(tab.Target);
+                if (newTarget == null)
+                {
+                    tab.CloseCommand.Execute(null);
+                    return;
+                }
+
+                var vm = CreateViewModel(newTarget);
+                if (vm.SearchResults.Any())
+                {
+                    tab.SearchResults = vm.SearchResults;
+                    tab.Target = vm.Target;
+                }
+                else
+                {
+                    tab.CloseCommand.Execute(null);
+                }
+            }
+        }
+
+        protected override bool CanExecuteImpl(object parameter)
+        {
+            if (_vbe.ActiveCodePane == null || _state.Status != ParserState.Ready)
             {
                 return false;
             }
 
-            // todo: make this work for Code/Project Explorer context menus too (may require a new command implementation)
             var target = FindTarget(parameter);
             var canExecute = target != null;
 
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
             return canExecute;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
             if (_state.Status != ParserState.Ready)
             {
@@ -99,7 +147,7 @@ namespace Rubberduck.UI.Command
                 new SearchResultItem(
                     declaration.ParentScopeDeclaration,
                     new NavigateCodeEventArgs(declaration.QualifiedName.QualifiedModuleName, declaration.Selection),
-                    declaration.QualifiedName.QualifiedModuleName.Component.CodeModule.Lines[declaration.Selection.StartLine, 1].Trim()));
+                    declaration.QualifiedName.QualifiedModuleName.Component.CodeModule.GetLines(declaration.Selection.StartLine, 1).Trim()));
 
             var viewModel = new SearchResultsViewModel(_navigateCommand,
                 string.Format(RubberduckUI.SearchResults_AllImplementationsTabFormat, target.IdentifierName), target, results);
@@ -122,7 +170,7 @@ namespace Rubberduck.UI.Command
         {
             var items = _state.AllDeclarations;
             string name;
-            var implementations = (target.DeclarationType == DeclarationType.Class
+            var implementations = (target.DeclarationType == DeclarationType.ClassModule
                 ? FindAllImplementationsOfClass(target, items, out name)
                 : FindAllImplementationsOfMember(target, items, out name)) ?? new List<Declaration>();
 
@@ -131,10 +179,10 @@ namespace Rubberduck.UI.Command
 
         private IEnumerable<Declaration> FindAllImplementationsOfClass(Declaration target, IEnumerable<Declaration> declarations, out string name)
         {
-            if (target.DeclarationType != DeclarationType.Class)
+            if (target.DeclarationType != DeclarationType.ClassModule)
             {
                 name = string.Empty;
-                return null;
+                return Enumerable.Empty<Declaration>();
             }
 
             var identifiers = declarations as IList<Declaration> ?? declarations.ToList();
@@ -153,7 +201,7 @@ namespace Rubberduck.UI.Command
             if (!target.DeclarationType.HasFlag(DeclarationType.Member))
             {
                 name = string.Empty;
-                return null;
+                return Enumerable.Empty<Declaration>();
             }
 
             var items = declarations as IList<Declaration> ?? declarations.ToList();
@@ -170,9 +218,22 @@ namespace Rubberduck.UI.Command
             }
 
             var member = items.FindInterfaceMember(target);
+            if (member == null)
+            {
+                name = string.Empty;
+                return Enumerable.Empty<Declaration>();
+            }
             name = member.ComponentName + "." + member.IdentifierName;
             return items.FindInterfaceImplementationMembers(member.IdentifierName)
                    .Where(item => item.IdentifierName == member.ComponentName + "_" + member.IdentifierName);
+        }
+
+        public void Dispose()
+        {
+            if (_state != null)
+            {
+                _state.StateChanged -= _state_StateChanged;
+            }
         }
     }
 }

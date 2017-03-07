@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using NLog;
 using Rubberduck.Settings;
 
 namespace Rubberduck.UI.Command
@@ -9,18 +10,24 @@ namespace Rubberduck.UI.Command
     [ComVisible(false)]
     public class InspectionResultsCommand : CommandBase
     {
-        private readonly IPresenter _presenter;
+        private readonly IDockablePresenter _presenter;
 
-        public InspectionResultsCommand(IPresenter presenter)
+        public InspectionResultsCommand(IDockablePresenter presenter)
+            : base(LogManager.GetCurrentClassLogger())
         {
             _presenter = presenter;
+        }
+
+        public override RubberduckHotkey Hotkey
+        {
+            get { return RubberduckHotkey.InspectionResults; }
         }
 
         /// <summary>
         /// Runs code inspections 
         /// </summary>
         /// <param name="parameter"></param>
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
             _presenter.Show();
         }

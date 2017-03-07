@@ -1,25 +1,30 @@
 ﻿using System.Linq;
 using Rubberduck.Parsing.VBA;
-using Rubberduck.VBEditor;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.Refactorings.ExtractInterface
 {
     public class ExtractInterfacePresenterFactory : IRefactoringPresenterFactory<ExtractInterfacePresenter>
     {
-        private readonly IActiveCodePaneEditor _editor;
-        private readonly IExtractInterfaceView _view;
+        private readonly IVBE _vbe;
+        private readonly IExtractInterfaceDialog _view;
         private readonly RubberduckParserState _state;
 
-        public ExtractInterfacePresenterFactory(RubberduckParserState state, IActiveCodePaneEditor editor, IExtractInterfaceView view)
+        public ExtractInterfacePresenterFactory(IVBE vbe, RubberduckParserState state, IExtractInterfaceDialog view)
         {
-            _editor = editor;
+            _vbe = vbe;
             _view = view;
             _state = state;
         }
 
         public ExtractInterfacePresenter Create()
         {
-            var selection = _editor.GetSelection();
+            var pane = _vbe.ActiveCodePane;
+            if (pane == null || pane.IsWrappingNullReference)
+            {
+                return null;
+            }
+            var selection = pane.GetQualifiedSelection();
             if (selection == null)
             {
                 return null;
@@ -33,6 +38,7 @@ namespace Rubberduck.Refactorings.ExtractInterface
             }
 
             return new ExtractInterfacePresenter(_view, model);
+
         }
     }
 }

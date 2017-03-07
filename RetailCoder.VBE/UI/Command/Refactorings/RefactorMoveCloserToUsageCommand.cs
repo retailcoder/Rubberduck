@@ -1,28 +1,31 @@
-﻿using System.Diagnostics;
-using System.Linq;
-using Microsoft.Vbe.Interop;
-using Rubberduck.Common;
+﻿using System.Linq;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.MoveCloserToUsage;
+using Rubberduck.Settings;
 using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
     public class RefactorMoveCloserToUsageCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
-        private readonly ICodePaneWrapperFactory _wrapperWrapperFactory;
+        private readonly IMessageBox _msgbox;
 
-        public RefactorMoveCloserToUsageCommand(VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor, ICodePaneWrapperFactory wrapperWrapperFactory)
-            : base(vbe, editor)
+        public RefactorMoveCloserToUsageCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgbox)
+            :base(vbe)
         {
             _state = state;
-            _wrapperWrapperFactory = wrapperWrapperFactory;
+            _msgbox = msgbox;
         }
 
-        public override bool CanExecute(object parameter)
+        public override RubberduckHotkey Hotkey
+        {
+            get { return RubberduckHotkey.RefactorMoveCloserToUsage; }
+        }
+
+        protected override bool CanExecuteImpl(object parameter)
         {
             if (Vbe.ActiveCodePane == null || _state.Status != ParserState.Ready)
             {
@@ -30,25 +33,26 @@ namespace Rubberduck.UI.Command.Refactorings
             }
 
             var target = _state.FindSelectedDeclaration(Vbe.ActiveCodePane);
-            var canExecute = target != null 
+            return target != null 
                 && (target.DeclarationType == DeclarationType.Variable || target.DeclarationType == DeclarationType.Constant)
                 && target.References.Any();
-
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
-            return canExecute;
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
-            if (Vbe.ActiveCodePane == null)
+            var pane = Vbe.ActiveCodePane;
+            var module = pane.CodeModule;
             {
-                return;
-            }
-            var codePane = _wrapperWrapperFactory.Create(Vbe.ActiveCodePane);
-            var selection = new QualifiedSelection(new QualifiedModuleName(codePane.CodeModule.Parent), codePane.Selection);
+                if (pane.IsWrappingNullReference)
+                {
+                    return;
+                }
 
-            var refactoring = new MoveCloserToUsageRefactoring(_state, Editor, new MessageBox());
-            refactoring.Refactor(selection);
+                var selection = new QualifiedSelection(new QualifiedModuleName(module.Parent), pane.Selection);
+
+                var refactoring = new MoveCloserToUsageRefactoring(Vbe, _state, _msgbox);
+                refactoring.Refactor(selection);
+            }
         }
     }
 }

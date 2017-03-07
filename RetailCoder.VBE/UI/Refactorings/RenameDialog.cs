@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
 using Rubberduck.Parsing.Grammar;
@@ -7,7 +8,7 @@ using Rubberduck.Refactorings.Rename;
 
 namespace Rubberduck.UI.Refactorings
 {
-    public partial class RenameDialog : Form, IRenameView
+    public partial class RenameDialog : Form, IRenameDialog
     {
         public RenameDialog()
         {
@@ -53,7 +54,7 @@ namespace Rubberduck.UI.Refactorings
 
                 NewName = _target.IdentifierName;
                 var declarationType =
-                    RubberduckUI.ResourceManager.GetString("DeclarationType_" + _target.DeclarationType, RubberduckUI.Culture);
+                    RubberduckUI.ResourceManager.GetString("DeclarationType_" + _target.DeclarationType, CultureInfo.CurrentUICulture);
                 InstructionsLabel.Text = string.Format(RubberduckUI.RenameDialog_InstructionsLabelText, declarationType,
                     _target.IdentifierName);
             }

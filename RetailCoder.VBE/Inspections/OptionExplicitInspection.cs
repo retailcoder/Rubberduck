@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.Inspections.Results;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
@@ -19,8 +22,8 @@ namespace Rubberduck.Inspections
 
         private static readonly DeclarationType[] ModuleTypes =
         {
-            DeclarationType.Module,
-            DeclarationType.Class
+            DeclarationType.ProceduralModule,
+            DeclarationType.ClassModule
         };
 
         public override IEnumerable<InspectionResultBase> GetInspectionResults()
@@ -36,7 +39,7 @@ namespace Rubberduck.Inspections
                 .Where(declaration => ModuleTypes.Contains(declaration.DeclarationType));
 
             var issues = modules.Where(module => !options.Select(option => option.Scope).Contains(module.Scope))
-                .Select(issue => new OptionExplicitInspectionResult(this, issue.QualifiedName.QualifiedModuleName));
+                .Select(issue => new OptionExplicitInspectionResult(this, issue));
 
             return issues;
         }

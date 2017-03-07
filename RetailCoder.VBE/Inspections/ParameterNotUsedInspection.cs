@@ -1,30 +1,22 @@
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Vbe.Interop;
-using Rubberduck.Common;
-using Rubberduck.Parsing.Grammar;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.Inspections.Results;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
-using Rubberduck.Refactorings.RemoveParameters;
 using Rubberduck.UI;
-using Rubberduck.UI.Refactorings;
-using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
 
 namespace Rubberduck.Inspections
 {
     public sealed class ParameterNotUsedInspection : InspectionBase
     {
-        private readonly VBE _vbe;
         private readonly IMessageBox _messageBox;
-        private readonly ICodePaneWrapperFactory _wrapperFactory;
 
-        public ParameterNotUsedInspection(VBE vbe, RubberduckParserState state, IMessageBox messageBox)
+        public ParameterNotUsedInspection(RubberduckParserState state, IMessageBox messageBox)
             : base(state)
         {
-            _vbe = vbe;
             _messageBox = messageBox;
-            _wrapperFactory = new CodePaneWrapperFactory();
         }
 
         public override string Meta { get { return InspectionsUI.ParameterNotUsedInspectionName; }}
@@ -33,43 +25,27 @@ namespace Rubberduck.Inspections
 
         public override IEnumerable<InspectionResultBase> GetInspectionResults()
         {
-            var declarations = UserDeclarations.ToList();
+            var interfaceMembers = State.DeclarationFinder.FindAllInterfaceMembers();
+            var interfaceImplementationMembers = State.DeclarationFinder.FindAllInterfaceImplementingMembers();
 
-            var interfaceMemberScopes = declarations.FindInterfaceMembers().Select(m => m.Scope).ToList();
-            var interfaceImplementationMemberScopes = declarations.FindInterfaceImplementationMembers().Select(m => m.Scope).ToList();
+            var handlers = State.DeclarationFinder.FindEventHandlers();
 
-            var builtInHandlers = declarations.FindBuiltInEventHandlers();
+            var parameters = State.DeclarationFinder
+                .UserDeclarations(DeclarationType.Parameter)
+                .OfType<ParameterDeclaration>()
+                .Where(parameter => !parameter.References.Any() && !IsIgnoringInspectionResultFor(parameter, AnnotationName)
+                                    && parameter.ParentDeclaration.DeclarationType != DeclarationType.Event
+                                    && parameter.ParentDeclaration.DeclarationType != DeclarationType.LibraryFunction
+                                    && parameter.ParentDeclaration.DeclarationType != DeclarationType.LibraryProcedure
+                                    && !interfaceMembers.Contains(parameter.ParentDeclaration)
+                                    && !handlers.Contains(parameter.ParentDeclaration))
+                .ToList();
 
-            var parameters = declarations.Where(parameter => parameter.DeclarationType == DeclarationType.Parameter
-                && !(parameter.Context.Parent.Parent is VBAParser.EventStmtContext)
-                && !(parameter.Context.Parent.Parent is VBAParser.DeclareStmtContext));
-
-            var unused = parameters.Where(parameter => !parameter.References.Any()).ToList();
-            var editor = new ActiveCodePaneEditor(_vbe, _wrapperFactory);
-            var quickFixRefactoring =
-                new RemoveParametersRefactoring(
-                    new RemoveParametersPresenterFactory(editor, 
-                        new RemoveParametersDialog(), State, _messageBox), editor);
-
-            var issues = from issue in unused.Where(parameter =>
-                !IsInterfaceMemberParameter(parameter, interfaceMemberScopes)
-                && !builtInHandlers.Contains(parameter.ParentDeclaration))
-                let isInterfaceImplementationMember = IsInterfaceMemberImplementationParameter(issue, interfaceImplementationMemberScopes)
-                select new ParameterNotUsedInspectionResult(this, issue,
-                        ((dynamic) issue.Context).ambiguousIdentifier(), issue.QualifiedName,
-                        isInterfaceImplementationMember, quickFixRefactoring, State);
+            var issues = from issue in parameters
+                let isInterfaceImplementationMember = interfaceImplementationMembers.Contains(issue.ParentDeclaration)
+                select new ParameterNotUsedInspectionResult(this, issue, isInterfaceImplementationMember, issue.Project.VBE, State, _messageBox);
 
             return issues.ToList();
-        }
-
-        private bool IsInterfaceMemberParameter(Declaration parameter, IEnumerable<string> interfaceMemberScopes)
-        {
-            return interfaceMemberScopes.Contains(parameter.ParentScope);
-        }
-
-        private bool IsInterfaceMemberImplementationParameter(Declaration parameter, IEnumerable<string> interfaceMemberImplementationScopes)
-        {
-            return interfaceMemberImplementationScopes.Contains(parameter.ParentScope);
         }
     }
 }

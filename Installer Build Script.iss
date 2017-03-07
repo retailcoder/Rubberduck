@@ -3,7 +3,7 @@
 #define AddinDLL "Rubberduck.dll"
 #define AppVersion GetFileVersion(SourcePath + "RetailCoder.VBE\bin\release\Rubberduck.dll")
 #define AppPublisher "Rubberduck"
-#define AppURL "http://rubberduck-vba.com"
+#define AppURL "http://rubberduckvba.com"
 #define License SourcePath + "\License.rtf"
 #define OutputDirectory SourcePath + "\Installers"
 #define AddinProgId "Rubberduck.Extension"
@@ -52,6 +52,9 @@ Filename: "{dotnet4064}\RegAsm.exe"; Parameters: "/codebase {#AddinDLL}"; Workin
 Filename: "{dotnet4032}\RegAsm.exe"; Parameters: "/u {#AddinDLL}"; WorkingDir: "{app}"; StatusMsg: "Unregistering Controls..."; Flags: runascurrentuser runminimized; Check: Is32BitOfficeInstalled
 Filename: "{dotnet4064}\RegAsm.exe"; Parameters: "/u {#AddinDLL}"; WorkingDir: "{app}"; StatusMsg: "Unregistering Controls..."; Flags: runascurrentuser runminimized; Check: Is64BitOfficeInstalled
 
+[UninstallDelete]
+Type: filesandordirs; Name: "{localappdata}\{#AppName}"
+
 [CustomMessages]
 ; TODO add additional languages here.
 English.NETFramework40NotInstalled=Microsoft .NET Framework 4.0 installation was not detected.
@@ -95,7 +98,7 @@ end;
 function GetOfficeBitness(): Integer;
 var
   appBitness: Integer;
-  officeExeNames: array[0..4] of String;
+  officeExeNames: array[0..6] of String;
   i: Integer;
 begin
   officeExeNames[0] := 'excel.exe';
@@ -103,6 +106,8 @@ begin
   officeExeNames[2] := 'winword.exe';
   officeExeNames[3] := 'outlook.exe';
   officeExeNames[4] := 'powerpnt.exe';
+  officeExeNames[5] := 'mspub.exe';
+  officeExeNames[6] := 'winproj.exe';
 
   for i := 0 to 4 do begin
     appBitness := GetOfficeAppBitness(officeExeNames[i]);

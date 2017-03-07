@@ -1,18 +1,18 @@
 using System;
-using Microsoft.Vbe.Interop;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Controls
 {
     /// <summary>
     /// A "disposable singleton" factory that creates/returns the same instance to all clients.
     /// </summary>
-    public class SearchResultPresenterInstanceManager : IDisposable
+    public sealed class SearchResultPresenterInstanceManager : IDisposable
     {
-        private readonly VBE _vbe;
-        private readonly AddIn _addin;
+        private readonly IVBE _vbe;
+        private readonly IAddIn _addin;
         private SearchResultWindow _view;
 
-        public SearchResultPresenterInstanceManager(VBE vbe, AddIn addin)
+        public SearchResultPresenterInstanceManager(IVBE vbe, IAddIn addin)
         {
             _vbe = vbe;
             _addin = addin;
@@ -39,18 +39,29 @@ namespace Rubberduck.UI.Controls
         {
             _presenter.Hide();
         }
-        
+
         public void Dispose()
         {
+            Dispose(true);
+        }
+
+        private bool _disposed;
+        private void Dispose(bool disposing)
+        {
+            if (!disposing || _disposed) { return; }
+
             if (_view.ViewModel != null)
             {
-            _view.ViewModel.LastTabClosed -= viewModel_LastTabClosed;
+                _view.ViewModel.LastTabClosed -= viewModel_LastTabClosed;
             }
 
             if (_presenter != null)
             {
-            _presenter.Dispose();
+                _presenter.Dispose();
+                _presenter = null;
+            }
+
+            _disposed = true;
         }
     }
-}
 }

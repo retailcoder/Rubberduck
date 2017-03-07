@@ -1,14 +1,15 @@
-﻿using Microsoft.Vbe.Interop;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Rubberduck.Parsing.VBA;
-using Rubberduck.VBEditor.VBEHost;
 using RubberduckTests.Mocks;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using RubberduckTests.Inspections;
+using System.Threading;
+using Rubberduck.VBEditor.Application;
+using Rubberduck.VBEditor.Events;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace RubberduckTests.Preprocessing
 {
@@ -50,13 +51,13 @@ namespace RubberduckTests.Preprocessing
         private string Parse(string code)
         {
             var builder = new MockVbeBuilder();
-            VBComponent component;
+            IVBComponent component;
             var vbe = builder.BuildFromSingleStandardModule(code, out component);
             var mockHost = new Mock<IHostApplication>();
             mockHost.SetupAllProperties();
-            var state = new RubberduckParserState();
+            var state = new RubberduckParserState(vbe.Object);
             var parser = MockParser.Create(vbe.Object, state);
-            parser.Parse();
+            parser.Parse(new CancellationTokenSource());
             if (parser.State.Status == ParserState.Error)
             {
                 Assert.Inconclusive("Parser Error");

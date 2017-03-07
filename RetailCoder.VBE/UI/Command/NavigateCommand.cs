@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using System.Windows.Input;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using NLog;
 
 namespace Rubberduck.UI.Command
 {
@@ -12,7 +12,9 @@ namespace Rubberduck.UI.Command
     [ComVisible(false)]
     public class NavigateCommand : CommandBase, INavigateCommand
     {
-        public override void Execute(object parameter)
+        public NavigateCommand() : base(LogManager.GetCurrentClassLogger()) { }
+
+        protected override void ExecuteImpl(object parameter)
         {
             var param = parameter as NavigateCodeEventArgs;
             if (param == null || param.QualifiedName.Component == null)
@@ -20,13 +22,9 @@ namespace Rubberduck.UI.Command
                 return;
             }
 
-            var pane = param.QualifiedName.Component.CodeModule.CodePane;
-            var selection = param.Selection;
-
             try
             {
-                pane.SetSelection(selection.StartLine, selection.StartColumn, selection.EndLine, selection.EndColumn);
-                pane.ForceFocus();
+                param.QualifiedName.Component.CodeModule.CodePane.Selection = param.Selection;
             }
             catch (COMException)
             {

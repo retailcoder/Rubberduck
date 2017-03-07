@@ -1,22 +1,26 @@
 ﻿using System;
-using Microsoft.Vbe.Interop;
 using Rubberduck.Common;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.VBEditor;
+using Rubberduck.SmartIndenter;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using Selection = Rubberduck.VBEditor.Selection;
 
 namespace Rubberduck.Refactorings.EncapsulateField
 {
     public class EncapsulateFieldRefactoring : IRefactoring
     {
+        private readonly IVBE _vbe;
+        private readonly IIndenter _indenter;
         private readonly IRefactoringPresenterFactory<IEncapsulateFieldPresenter> _factory;
-        private readonly IActiveCodePaneEditor _editor;
         private EncapsulateFieldModel _model;
 
-        public EncapsulateFieldRefactoring(IRefactoringPresenterFactory<IEncapsulateFieldPresenter> factory, IActiveCodePaneEditor editor)
+        public EncapsulateFieldRefactoring(IVBE vbe, IIndenter indenter, IRefactoringPresenterFactory<IEncapsulateFieldPresenter> factory)
         {
+            _vbe = vbe;
+            _indenter = indenter;
             _factory = factory;
-            _editor = editor;
         }
 
         public void Refactor()
@@ -28,19 +32,43 @@ namespace Rubberduck.Refactorings.EncapsulateField
             }
 
             _model = presenter.Show();
-
             if (_model == null) { return; }
 
+            QualifiedSelection? oldSelection = null;
+            if (_vbe.ActiveCodePane != null)
+            {
+                oldSelection = _vbe.ActiveCodePane.CodeModule.GetQualifiedSelection();
+            }
+
             AddProperty();
+
+            if (oldSelection.HasValue)
+            {
+                var module = oldSelection.Value.QualifiedName.Component.CodeModule;
+                var pane = module.CodePane;
+                {
+                    pane.Selection = oldSelection.Value.Selection;
+                }
+            }
+
+            _model.State.OnParseRequested(this);
         }
 
         public void Refactor(QualifiedSelection target)
         {
+            var pane = _vbe.ActiveCodePane;
+            {
+                pane.Selection = target.Selection;
+            }
             Refactor();
         }
 
         public void Refactor(Declaration target)
         {
+            var pane = _vbe.ActiveCodePane;
+            {
+                pane.Selection = target.QualifiedSelection.Selection;
+            }
             Refactor();
         }
 
@@ -51,7 +79,7 @@ namespace Rubberduck.Refactorings.EncapsulateField
             var module = _model.TargetDeclaration.QualifiedName.QualifiedModuleName.Component.CodeModule;
             SetFieldToPrivate(module);
 
-            module.InsertLines(module.CountOfDeclarationLines + 1, GetPropertyText());
+            module.InsertLines(module.CountOfDeclarationLines + 1, Environment.NewLine + GetPropertyText());
         }
 
         private void UpdateReferences()
@@ -59,16 +87,17 @@ namespace Rubberduck.Refactorings.EncapsulateField
             foreach (var reference in _model.TargetDeclaration.References)
             {
                 var module = reference.QualifiedModuleName.Component.CodeModule;
+                {
+                    var oldLine = module.GetLines(reference.Selection.StartLine, 1);
+                    oldLine = oldLine.Remove(reference.Selection.StartColumn - 1, reference.Selection.EndColumn - reference.Selection.StartColumn);
+                    var newLine = oldLine.Insert(reference.Selection.StartColumn - 1, _model.PropertyName);
 
-                var oldLine = module.Lines[reference.Selection.StartLine, 1];
-                oldLine = oldLine.Remove(reference.Selection.StartColumn - 1, reference.Selection.EndColumn - reference.Selection.StartColumn);
-                var newLine = oldLine.Insert(reference.Selection.StartColumn - 1, _model.PropertyName);
-
-                module.ReplaceLine(reference.Selection.StartLine, newLine);
+                    module.ReplaceLine(reference.Selection.StartLine, newLine);
+                }
             }
         }
 
-        private void SetFieldToPrivate(CodeModule module)
+        private void SetFieldToPrivate(ICodeModule module)
         {
             if (_model.TargetDeclaration.Accessibility == Accessibility.Private)
             {
@@ -81,13 +110,16 @@ namespace Rubberduck.Refactorings.EncapsulateField
                            _model.TargetDeclaration.AsTypeName;
 
             module.InsertLines(module.CountOfDeclarationLines + 1, newField);
+            var pane = module.CodePane;
+            {
+                pane.Selection = _model.TargetDeclaration.QualifiedSelection.Selection;
+            }
 
-            _editor.SetSelection(_model.TargetDeclaration.QualifiedSelection);
             for (var index = 1; index <= module.CountOfDeclarationLines; index++)
             {
-                if (module.Lines[index, 1].Trim() == string.Empty)
+                if (module.GetLines(index, 1).Trim() == string.Empty)
                 {
-                    _editor.DeleteLines(new Selection(index, 0, index, 0));
+                    module.DeleteLines(new Selection(index, 0, index, 0));
                 }
             }
         }
@@ -95,14 +127,14 @@ namespace Rubberduck.Refactorings.EncapsulateField
         private void RemoveField(Declaration target)
         {
             Selection selection;
-            var declarationText = target.Context.GetText();
+            var declarationText = target.Context.GetText().Replace(" _" + Environment.NewLine, string.Empty);
             var multipleDeclarations = target.HasMultipleDeclarationsInStatement();
 
             var variableStmtContext = target.GetVariableStmtContext();
 
             if (!multipleDeclarations)
             {
-                declarationText = variableStmtContext.GetText();
+                declarationText = variableStmtContext.GetText().Replace(" _" + Environment.NewLine, string.Empty);
                 selection = target.GetVariableStmtContextSelection();
             }
             else
@@ -111,25 +143,29 @@ namespace Rubberduck.Refactorings.EncapsulateField
                     target.Context.Stop.Line, target.Context.Stop.Column);
             }
 
-            var oldLines = _editor.GetLines(selection);
-
-            var newLines = oldLines.Replace(" _" + Environment.NewLine, string.Empty)
-                .Remove(selection.StartColumn, declarationText.Length);
-
-            if (multipleDeclarations)
+            var pane = _vbe.ActiveCodePane;
+            var module = pane.CodeModule;
             {
-                selection = target.GetVariableStmtContextSelection();
-                newLines = RemoveExtraComma(_editor.GetLines(selection).Replace(oldLines, newLines),
-                    target.CountOfDeclarationsInStatement(), target.IndexOfVariableDeclarationInStatement());
-            }
+                var oldLines = module.GetLines(selection);
 
-            newLines = newLines.Replace(" _" + Environment.NewLine, string.Empty);
+                var newLines = oldLines.Replace(" _" + Environment.NewLine, string.Empty)
+                    .Remove(selection.StartColumn, declarationText.Length);
 
-            _editor.DeleteLines(selection);
+                if (multipleDeclarations)
+                {
+                    selection = target.GetVariableStmtContextSelection();
+                    newLines = RemoveExtraComma(module.GetLines(selection).Replace(oldLines, newLines),
+                        target.CountOfDeclarationsInStatement(), target.IndexOfVariableDeclarationInStatement());
+                }
 
-            if (newLines.Trim() != string.Empty)
-            {
-                _editor.InsertLines(selection.StartLine, newLines);
+                newLines = newLines.Replace(" _" + Environment.NewLine, string.Empty);
+
+                module.DeleteLines(selection);
+
+                if (newLines.Trim() != string.Empty)
+                {
+                    module.InsertLines(selection.StartLine, newLines);
+                }
             }
         }
 
@@ -171,28 +207,18 @@ namespace Rubberduck.Refactorings.EncapsulateField
 
         private string GetPropertyText()
         {
-            var getterText = string.Join(Environment.NewLine,
-                string.Format(Environment.NewLine + "Public Property Get {0}() As {1}", _model.PropertyName,
-                    _model.TargetDeclaration.AsTypeName),
-                string.Format("    {0} = {1}", _model.PropertyName, _model.TargetDeclaration.IdentifierName),
-                "End Property" + Environment.NewLine);
+            var generator = new PropertyGenerator
+            {
+                PropertyName = _model.PropertyName,
+                AsTypeName = _model.TargetDeclaration.AsTypeName,
+                BackingField = _model.TargetDeclaration.IdentifierName,
+                ParameterName = _model.ParameterName,
+                GenerateSetter = _model.ImplementSetSetterType,
+                GenerateLetter = _model.ImplementLetSetterType
+            };
 
-            var letterText = string.Join(Environment.NewLine,
-                string.Format(Environment.NewLine + "Public Property Let {0}(ByVal {1} As {2})",
-                    _model.PropertyName, _model.ParameterName, _model.TargetDeclaration.AsTypeName),
-                string.Format("    {0} = {1}", _model.TargetDeclaration.IdentifierName, _model.ParameterName),
-                "End Property" + Environment.NewLine);
-
-            var setterText = string.Join(Environment.NewLine,
-                string.Format(Environment.NewLine + "Public Property Set {0}(ByVal {1} As {2})",
-                    _model.PropertyName, _model.ParameterName, _model.TargetDeclaration.AsTypeName),
-                string.Format("    {0} = {1}", _model.TargetDeclaration.IdentifierName, _model.ParameterName),
-                "End Property" + Environment.NewLine);
-
-            return string.Join(string.Empty,
-                        getterText,
-                        (_model.ImplementLetSetterType ? letterText : string.Empty),
-                        (_model.ImplementSetSetterType ? setterText : string.Empty)).TrimEnd() + Environment.NewLine;
+            var propertyTextLines = generator.AllPropertyCode.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+            return string.Join(Environment.NewLine, _indenter.Indent(propertyTextLines, true));
         }
     }
 }

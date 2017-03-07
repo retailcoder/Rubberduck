@@ -1,20 +1,19 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Rubberduck.Inspections.Abstract;
+using Rubberduck.Inspections.Resources;
+using Rubberduck.Inspections.Results;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.UI;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
 
 namespace Rubberduck.Inspections
 {
     public sealed class MoveFieldCloserToUsageInspection : InspectionBase
     {
-        private readonly ICodePaneWrapperFactory _wrapperFactory;
-
         public MoveFieldCloserToUsageInspection(RubberduckParserState state)
             : base(state, CodeInspectionSeverity.Suggestion)
         {
-            _wrapperFactory = new CodePaneWrapperFactory();
         }
 
         public override string Meta { get { return InspectionsUI.MoveFieldCloserToUsageInspectionMeta; } }
@@ -27,8 +26,8 @@ namespace Rubberduck.Inspections
                 .Where(declaration =>
                 {
 
-                    if (declaration.DeclarationType != DeclarationType.Variable ||
-                        !new[] {DeclarationType.Class, DeclarationType.Module}.Contains(declaration.ParentDeclaration.DeclarationType))
+                    if (declaration.DeclarationType != DeclarationType.Variable || declaration.IsWithEvents ||
+                        !new[] {DeclarationType.ClassModule, DeclarationType.ProceduralModule}.Contains(declaration.ParentDeclaration.DeclarationType))
                     {
                         return false;
                     }
@@ -52,7 +51,7 @@ namespace Rubberduck.Inspections
                            }.Contains(parentDeclaration.DeclarationType);
                 })
                 .Select(issue =>
-                        new MoveFieldCloserToUsageInspectionResult(this, issue, State, _wrapperFactory, new MessageBox()));
+                        new MoveFieldCloserToUsageInspectionResult(this, issue, State, new MessageBox()));
         }
 
         private Declaration ParentDeclaration(IdentifierReference reference)

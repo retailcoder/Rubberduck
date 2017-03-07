@@ -1,19 +1,18 @@
-﻿using Microsoft.Vbe.Interop;
-using Rubberduck.VBEditor;
-using System;
+﻿using System;
 using System.Windows.Forms;
+using NLog;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
     public abstract class RefactorCommandBase : CommandBase
     {
-        protected readonly IActiveCodePaneEditor Editor;
-        protected readonly VBE Vbe;
+        protected readonly IVBE Vbe;
 
-        protected RefactorCommandBase(VBE vbe, IActiveCodePaneEditor editor)
+        protected RefactorCommandBase(IVBE vbe)
+            : base (LogManager.GetCurrentClassLogger())
         {
             Vbe = vbe;
-            Editor = editor;
         }
 
         protected void HandleInvalidSelection(object sender, EventArgs e)

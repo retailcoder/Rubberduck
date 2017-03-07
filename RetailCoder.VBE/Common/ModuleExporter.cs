@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Vbe.Interop;
-using Rubberduck.VBEditor.Extensions;
 using Rubberduck.Parsing.VBA;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.Common
 {
@@ -22,7 +16,7 @@ namespace Rubberduck.Common
             }
         }
 
-        public string Export(VBComponent component)
+        public string Export(IVBComponent component)
         {
             return component.ExportAsSourceFile(ExportPath);
         }

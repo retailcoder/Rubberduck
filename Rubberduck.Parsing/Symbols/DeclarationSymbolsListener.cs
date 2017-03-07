@@ -1,13 +1,15 @@
 ﻿using Antlr4.Runtime;
-using Microsoft.Vbe.Interop;
 using Rubberduck.Parsing.Annotations;
 using Rubberduck.Parsing.Grammar;
-using Rubberduck.Parsing.Nodes;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.VBEditor;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using Rubberduck.VBEditor.SafeComWrappers;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using Rubberduck.VBEditor.SafeComWrappers.Office.Core.Abstract;
 
 namespace Rubberduck.Parsing.Symbols
 {
@@ -15,73 +17,115 @@ namespace Rubberduck.Parsing.Symbols
     {
         private readonly QualifiedModuleName _qualifiedName;
         private readonly Declaration _moduleDeclaration;
-        private readonly Declaration _projectDeclaration;
 
         private string _currentScope;
         private Declaration _currentScopeDeclaration;
         private Declaration _parentDeclaration;
 
-        private readonly IEnumerable<CommentNode> _comments;
         private readonly IEnumerable<IAnnotation> _annotations;
         private readonly IDictionary<Tuple<string, DeclarationType>, Attributes> _attributes;
-        private readonly HashSet<ReferencePriorityMap> _projectReferences;
+
+        private readonly List<Declaration> _createdDeclarations = new List<Declaration>();
+        public IReadOnlyList<Declaration> CreatedDeclarations { get { return _createdDeclarations; } }
 
         public DeclarationSymbolsListener(
+            RubberduckParserState state,
             QualifiedModuleName qualifiedName,
-            Accessibility componentAccessibility,
-            vbext_ComponentType type,
-            IEnumerable<CommentNode> comments,
+            ComponentType type,
             IEnumerable<IAnnotation> annotations,
             IDictionary<Tuple<string, DeclarationType>, Attributes> attributes,
-            HashSet<ReferencePriorityMap> projectReferences)
+            Declaration projectDeclaration, string asTypeName = null)
         {
             _qualifiedName = qualifiedName;
-            _comments = comments;
             _annotations = annotations;
             _attributes = attributes;
 
-            var declarationType = type == vbext_ComponentType.vbext_ct_StdModule
-                ? DeclarationType.Module
-                : DeclarationType.Class;
-
-            var project = _qualifiedName.Component.Collection.Parent;
-            var projectQualifiedName = new QualifiedModuleName(project);
-            _projectReferences = projectReferences;
-
-            _projectDeclaration = CreateProjectDeclaration(projectQualifiedName, project);
+            var declarationType = type == ComponentType.StandardModule
+                ? DeclarationType.ProceduralModule
+                : DeclarationType.ClassModule;
 
             var key = Tuple.Create(_qualifiedName.ComponentName, declarationType);
             var moduleAttributes = attributes.ContainsKey(key)
                 ? attributes[key]
                 : new Attributes();
 
-            _moduleDeclaration = new Declaration(
-                _qualifiedName.QualifyMemberName(_qualifiedName.Component.Name),
-                _projectDeclaration,
-                _projectDeclaration,
-                _qualifiedName.Component.Name,
-                false,
-                false,
-                componentAccessibility,
-                declarationType,
-                null, Selection.Home, false,
-                FindAnnotations(), moduleAttributes);
-
-            SetCurrentScope();
-        }
-
-        private Declaration CreateProjectDeclaration(QualifiedModuleName projectQualifiedName, VBProject project)
-        {
-            var qualifiedName = projectQualifiedName.QualifyMemberName(project.Name);
-            var projectId = qualifiedName.QualifiedModuleName.ProjectId;
-            var projectDeclaration = new ProjectDeclaration(qualifiedName, project.Name);
-            var references = _projectReferences.Where(projectContainingReference => projectContainingReference.ContainsKey(projectId));
-            foreach (var reference in references)
+            if (declarationType == DeclarationType.ProceduralModule)
             {
-                int priority = reference[projectId];
-                projectDeclaration.AddProjectReference(reference.ReferencedProjectId, priority);
+                _moduleDeclaration = new ProceduralModuleDeclaration(
+                    _qualifiedName.QualifyMemberName(_qualifiedName.ComponentName),
+                    projectDeclaration,
+                    _qualifiedName.ComponentName,
+                    false,
+                    FindAnnotations(),
+                    moduleAttributes);
             }
-            return projectDeclaration;
+            else
+            {
+                bool hasDefaultInstanceVariable = type != ComponentType.ClassModule && type != ComponentType.StandardModule;
+
+                Declaration superType = null;
+                if (type == ComponentType.Document)
+                {
+                    if (!string.IsNullOrEmpty(asTypeName))
+                    {
+                        superType = state.CoClasses.FirstOrDefault(cls => cls.Value.IdentifierName == asTypeName).Value;
+                    }
+                    else
+                    {
+                        foreach (var coclass in state.CoClasses)
+                        {
+                            try
+                            {
+                                if (_qualifiedName.Component == null ||
+                                    coclass.Key.Count != _qualifiedName.Component.Properties.Count)
+                                {
+                                    continue;
+                                }
+
+                                var allNamesMatch = true;
+                                for (var i = 0; i < coclass.Key.Count; i++)
+                                {
+                                    if (coclass.Key[i] != _qualifiedName.Component.Properties[i + 1].Name)
+                                    {
+                                        allNamesMatch = false;
+                                        break;
+                                    }
+                                }
+
+                                if (allNamesMatch)
+                                {
+                                    superType = coclass.Value;
+                                    break;
+                                }
+                            }
+                            catch (COMException)
+                            {
+                            }
+                        }
+                    }
+                }
+
+                _moduleDeclaration = new ClassModuleDeclaration(
+                    _qualifiedName.QualifyMemberName(_qualifiedName.ComponentName),
+                    projectDeclaration,
+                    _qualifiedName.ComponentName,
+                    false,
+                    FindAnnotations(),
+                    moduleAttributes,
+                    hasDefaultInstanceVariable: hasDefaultInstanceVariable);
+
+                if (superType != null)
+                {
+                    ((ClassModuleDeclaration) _moduleDeclaration).AddSupertype(superType);
+                }
+            }
+            SetCurrentScope();
+            AddDeclaration(_moduleDeclaration);
+            var component = _moduleDeclaration.QualifiedName.QualifiedModuleName.Component;
+            if (component.Type == ComponentType.UserForm || component.HasDesigner)
+            {
+                DeclareControlsAsMembers(component);
+            }
         }
 
         private IEnumerable<IAnnotation> FindAnnotations()
@@ -102,37 +146,23 @@ namespace Rubberduck.Parsing.Symbols
             {
                 return null;
             }
-            var annotationAbove = _annotations.SingleOrDefault(annotation => annotation.QualifiedSelection.Selection.EndLine == line - 1);
-            if (annotationAbove == null)
-            {
-                return new List<IAnnotation>();
-            }
-            return new List<IAnnotation>()
-            {
-                annotationAbove
-            };
-        }
 
-        public void CreateModuleDeclarations()
-        {
-            OnNewDeclaration(_projectDeclaration);
-            OnNewDeclaration(_moduleDeclaration);
+            var annotations = new List<IAnnotation>();
 
-            var component = _moduleDeclaration.QualifiedName.QualifiedModuleName.Component;
-            if (component.Type == vbext_ComponentType.vbext_ct_MSForm || component.Designer != null)
+            // VBE 1-based indexing
+            for (var i = line - 1; i >= 1; i--)
             {
-                DeclareControlsAsMembers(component);
-            }
-        }
+                var annotation = _annotations.SingleOrDefault(a => a.QualifiedSelection.Selection.StartLine == i);
 
-        public event EventHandler<DeclarationEventArgs> NewDeclaration;
-        private void OnNewDeclaration(Declaration declaration)
-        {
-            var handler = NewDeclaration;
-            if (handler != null)
-            {
-                handler.Invoke(this, new DeclarationEventArgs(declaration));
+                if (annotation == null)
+                {
+                    break;
+                }
+
+                annotations.Add(annotation);
             }
+
+            return annotations;
         }
 
         /// <summary>
@@ -141,33 +171,70 @@ namespace Rubberduck.Parsing.Symbols
         /// <remarks>
         /// These declarations are meant to be used to identify control event procedures.
         /// </remarks>
-        private void DeclareControlsAsMembers(VBComponent form)
+        private void DeclareControlsAsMembers(IVBComponent form)
         {
-            var designer = form.Designer;
-            if (designer == null)
-            {
-                return;
-            }
+            if (form.Controls == null) { return; }
 
-            // using dynamic typing here, because not only MSForms could have a Controls collection (e.g. MS-Access forms are 'document' modules).
-            foreach (var control in ((dynamic)designer).Controls)
+            foreach (var control in form.Controls)
             {
-                var declaration = new Declaration(_qualifiedName.QualifyMemberName(control.Name), _parentDeclaration, _currentScopeDeclaration, "Control", true, true, Accessibility.Public, DeclarationType.Control, null, Selection.Home);
-                OnNewDeclaration(declaration);
+                var typeName = control.TypeName();
+                // The as type declaration should be TextBox, CheckBox, etc. depending on the type.
+                var declaration = new Declaration(
+                    _qualifiedName.QualifyMemberName(control.Name),
+                    _parentDeclaration,
+                    _currentScopeDeclaration,
+                    string.IsNullOrEmpty(typeName) ? "Control" : typeName,
+                    null,
+                    true,
+                    true,
+                    Accessibility.Public,
+                    DeclarationType.Control,
+                    null,
+                    Selection.Home,
+                    false,
+                    null,
+                    false);
+                AddDeclaration(declaration);
             }
         }
 
-        private Declaration CreateDeclaration(string identifierName, string asTypeName, Accessibility accessibility, DeclarationType declarationType, ParserRuleContext context, Selection selection, bool selfAssigned = false, bool withEvents = false)
+        private Declaration CreateDeclaration(
+            string identifierName,
+            string asTypeName,
+            Accessibility accessibility,
+            DeclarationType declarationType,
+            ParserRuleContext context,
+            Selection selection,
+            bool isArray,
+            VBAParser.AsTypeClauseContext asTypeContext,
+            string typeHint,
+            bool selfAssigned = false,
+            bool withEvents = false)
         {
             Declaration result;
             if (declarationType == DeclarationType.Parameter)
             {
                 var argContext = (VBAParser.ArgContext)context;
                 var isOptional = argContext.OPTIONAL() != null;
-                var isByRef = argContext.BYREF() != null;
+
+                var isByRef = argContext.BYREF() != null || argContext.BYVAL() == null;
                 var isParamArray = argContext.PARAMARRAY() != null;
-                var isArray = argContext.LPAREN() != null;
-                result = new ParameterDeclaration(new QualifiedMemberName(_qualifiedName, identifierName), _parentDeclaration, context, selection, asTypeName, isOptional, isByRef, isArray, isParamArray);
+                result = new ParameterDeclaration(
+                    new QualifiedMemberName(_qualifiedName, identifierName),
+                    _parentDeclaration,
+                    context,
+                    selection,
+                    asTypeName,
+                    asTypeContext,
+                    typeHint,
+                    isOptional,
+                    isByRef,
+                    isArray,
+                    isParamArray);
+                if (_parentDeclaration is IDeclarationWithParameter)
+                {
+                    ((IDeclarationWithParameter)_parentDeclaration).AddParameter(result);
+                }
             }
             else
             {
@@ -179,10 +246,81 @@ namespace Rubberduck.Parsing.Symbols
                 }
 
                 var annotations = FindAnnotations(selection.StartLine);
-                result = new Declaration(new QualifiedMemberName(_qualifiedName, identifierName), _parentDeclaration, _currentScopeDeclaration, asTypeName, selfAssigned, withEvents, accessibility, declarationType, context, selection, false, annotations, attributes);
+                if (declarationType == DeclarationType.Procedure)
+                {
+                    result = new SubroutineDeclaration(new QualifiedMemberName(_qualifiedName, identifierName), _parentDeclaration, _currentScopeDeclaration, asTypeName, accessibility, context, selection, false, annotations, attributes);
+                }
+                else if (declarationType == DeclarationType.Function)
+                {
+                    result = new FunctionDeclaration(
+                        new QualifiedMemberName(_qualifiedName, identifierName),
+                        _parentDeclaration,
+                        _currentScopeDeclaration,
+                        asTypeName,
+                        asTypeContext,
+                        typeHint,
+                        accessibility,
+                        context,
+                        selection,
+                        isArray,
+                        false,
+                        annotations,
+                        attributes);
+                }
+                else if (declarationType == DeclarationType.LibraryProcedure || declarationType == DeclarationType.LibraryFunction)
+                {
+                    result = new ExternalProcedureDeclaration(new QualifiedMemberName(_qualifiedName, identifierName), _parentDeclaration, _currentScopeDeclaration, declarationType, asTypeName, asTypeContext, accessibility, context, selection, false, annotations);
+                }
+                else if (declarationType == DeclarationType.PropertyGet)
+                {
+                    result = new PropertyGetDeclaration(
+                        new QualifiedMemberName(_qualifiedName, identifierName),
+                        _parentDeclaration,
+                        _currentScopeDeclaration,
+                        asTypeName,
+                        asTypeContext,
+                        typeHint,
+                        accessibility,
+                        context,
+                        selection,
+                        isArray,
+                        false,
+                        annotations,
+                        attributes);
+                }
+                else if (declarationType == DeclarationType.PropertySet)
+                {
+                    result = new PropertySetDeclaration(new QualifiedMemberName(_qualifiedName, identifierName), _parentDeclaration, _currentScopeDeclaration, asTypeName, accessibility, context, selection, false, annotations, attributes);
+                }
+                else if (declarationType == DeclarationType.PropertyLet)
+                {
+                    result = new PropertyLetDeclaration(new QualifiedMemberName(_qualifiedName, identifierName), _parentDeclaration, _currentScopeDeclaration, asTypeName, accessibility, context, selection, false, annotations, attributes);
+                }
+                else
+                {
+                    result = new Declaration(
+                        new QualifiedMemberName(_qualifiedName, identifierName),
+                        _parentDeclaration,
+                        _currentScopeDeclaration,
+                        asTypeName,
+                        typeHint,
+                        selfAssigned,
+                        withEvents,
+                        accessibility,
+                        declarationType,
+                        context,
+                        selection,
+                        isArray,
+                        asTypeContext,
+                        false,
+                        annotations,
+                        attributes);
+                }
+                if (_parentDeclaration.DeclarationType == DeclarationType.ClassModule && result is ICanBeDefaultMember && ((ICanBeDefaultMember)result).IsDefaultMember)
+                {
+                    ((ClassModuleDeclaration)_parentDeclaration).DefaultMember = result;
+                }
             }
-
-            OnNewDeclaration(result);
             return result;
         }
 
@@ -232,38 +370,93 @@ namespace Rubberduck.Parsing.Symbols
             _parentDeclaration = procedureDeclaration;
         }
 
+        public override void EnterImplementsStmt(VBAParser.ImplementsStmtContext context)
+        {
+            // The expression will be later resolved to the actual declaration. Have to split the work up because we have to gather/create all declarations first.
+            ((ClassModuleDeclaration)_moduleDeclaration).AddSupertype(context.expression().GetText());
+        }
+
         public override void EnterOptionBaseStmt(VBAParser.OptionBaseStmtContext context)
         {
-            OnNewDeclaration(CreateDeclaration(context.GetText(), string.Empty, Accessibility.Implicit, DeclarationType.ModuleOption, context, context.GetSelection()));
+            AddDeclaration(CreateDeclaration(
+                context.GetText(),
+                string.Empty,
+                Accessibility.Implicit,
+                DeclarationType.ModuleOption,
+                context,
+                context.GetSelection(),
+                false,
+                null,
+                null));
         }
 
         public override void EnterOptionCompareStmt(VBAParser.OptionCompareStmtContext context)
         {
-            OnNewDeclaration(CreateDeclaration(context.GetText(), string.Empty, Accessibility.Implicit, DeclarationType.ModuleOption, context, context.GetSelection()));
+            AddDeclaration(CreateDeclaration(
+                context.GetText(),
+                string.Empty,
+                Accessibility.Implicit,
+                DeclarationType.ModuleOption,
+                context,
+                context.GetSelection(),
+                false,
+                null,
+                null));
         }
 
         public override void EnterOptionExplicitStmt(VBAParser.OptionExplicitStmtContext context)
         {
-            OnNewDeclaration(CreateDeclaration(context.GetText(), string.Empty, Accessibility.Implicit, DeclarationType.ModuleOption, context, context.GetSelection()));
+            AddDeclaration(CreateDeclaration(
+                context.GetText(),
+                string.Empty,
+                Accessibility.Implicit,
+                DeclarationType.ModuleOption,
+                context,
+                context.GetSelection(),
+                false,
+                null,
+                null));
         }
 
         public override void ExitOptionPrivateModuleStmt(VBAParser.OptionPrivateModuleStmtContext context)
         {
-            OnNewDeclaration(CreateDeclaration(context.GetText(), string.Empty, Accessibility.Implicit, DeclarationType.ModuleOption, context, context.GetSelection()));
+            if (_moduleDeclaration.DeclarationType == DeclarationType.ProceduralModule)
+            {
+                ((ProceduralModuleDeclaration)_moduleDeclaration).IsPrivateModule = true;
+            }
+            AddDeclaration(
+                CreateDeclaration(
+                    context.GetText(),
+                    string.Empty,
+                    Accessibility.Implicit,
+                    DeclarationType.ModuleOption,
+                    context,
+                    context.GetSelection(),
+                    false,
+                    null,
+                    null));
         }
 
         public override void EnterSubStmt(VBAParser.SubStmtContext context)
         {
             var accessibility = GetProcedureAccessibility(context.visibility());
-            var identifier = context.ambiguousIdentifier();
+            var identifier = context.subroutineName();
             if (identifier == null)
             {
                 return;
             }
-
-            var name = context.ambiguousIdentifier().GetText();
-            var declaration = CreateDeclaration(name, null, accessibility, DeclarationType.Procedure, context, context.ambiguousIdentifier().GetSelection());
-            OnNewDeclaration(declaration);
+            var name = context.subroutineName().GetText();
+            var declaration = CreateDeclaration(
+                name,
+                null,
+                accessibility,
+                DeclarationType.Procedure,
+                context,
+                context.subroutineName().GetSelection(),
+                false,
+                null,
+                null);
+            AddDeclaration(declaration);
             SetCurrentScope(declaration, name);
         }
 
@@ -275,20 +468,30 @@ namespace Rubberduck.Parsing.Symbols
         public override void EnterFunctionStmt(VBAParser.FunctionStmtContext context)
         {
             var accessibility = GetProcedureAccessibility(context.visibility());
-            var identifier = context.ambiguousIdentifier();
+            var identifier = context.functionName().identifier();
             if (identifier == null)
             {
                 return;
             }
-            var name = identifier.GetText();
+            var name = Identifier.GetName(identifier);
 
             var asTypeClause = context.asTypeClause();
             var asTypeName = asTypeClause == null
                 ? Tokens.Variant
                 : asTypeClause.type().GetText();
-
-            var declaration = CreateDeclaration(name, asTypeName, accessibility, DeclarationType.Function, context, context.ambiguousIdentifier().GetSelection());
-            OnNewDeclaration(declaration);
+            var typeHint = Identifier.GetTypeHintValue(identifier);
+            var isArray = asTypeName.EndsWith("()");
+            var declaration = CreateDeclaration(
+                name,
+                asTypeName,
+                accessibility,
+                DeclarationType.Function,
+                context,
+                context.functionName().identifier().GetSelection(),
+                isArray,
+                asTypeClause,
+                typeHint);
+            AddDeclaration(declaration);
             SetCurrentScope(declaration, name);
         }
 
@@ -300,21 +503,26 @@ namespace Rubberduck.Parsing.Symbols
         public override void EnterPropertyGetStmt(VBAParser.PropertyGetStmtContext context)
         {
             var accessibility = GetProcedureAccessibility(context.visibility());
-            var identifier = context.ambiguousIdentifier();
-            if (identifier == null)
-            {
-                return;
-            }
-            var name = identifier.GetText();
-
+            var identifier = context.functionName().identifier();
+            var name = Identifier.GetName(identifier);
             var asTypeClause = context.asTypeClause();
             var asTypeName = asTypeClause == null
                 ? Tokens.Variant
                 : asTypeClause.type().GetText();
+            var typeHint = Identifier.GetTypeHintValue(identifier);
+            var isArray = asTypeClause != null && asTypeClause.type().LPAREN() != null;
+            var declaration = CreateDeclaration(
+                name,
+                asTypeName,
+                accessibility,
+                DeclarationType.PropertyGet,
+                context,
+                context.functionName().identifier().GetSelection(),
+                isArray,
+                asTypeClause,
+                typeHint);
 
-            var declaration = CreateDeclaration(name, asTypeName, accessibility, DeclarationType.PropertyGet, context, context.ambiguousIdentifier().GetSelection());
-
-            OnNewDeclaration(declaration);
+            AddDeclaration(declaration);
             SetCurrentScope(declaration, name);
         }
 
@@ -326,15 +534,23 @@ namespace Rubberduck.Parsing.Symbols
         public override void EnterPropertyLetStmt(VBAParser.PropertyLetStmtContext context)
         {
             var accessibility = GetProcedureAccessibility(context.visibility());
-            var identifier = context.ambiguousIdentifier();
+            var identifier = context.subroutineName();
             if (identifier == null)
             {
                 return;
             }
-            var name = identifier.GetText();
-
-            var declaration = CreateDeclaration(name, null, accessibility, DeclarationType.PropertyLet, context, context.ambiguousIdentifier().GetSelection());
-            OnNewDeclaration(declaration);
+            var name = Identifier.GetName(identifier.identifier());
+            var declaration = CreateDeclaration(
+                name,
+                null,
+                accessibility,
+                DeclarationType.PropertyLet,
+                context,
+                context.subroutineName().GetSelection(),
+                false,
+                null,
+                null);
+            AddDeclaration(declaration);
             SetCurrentScope(declaration, name);
         }
 
@@ -346,16 +562,25 @@ namespace Rubberduck.Parsing.Symbols
         public override void EnterPropertySetStmt(VBAParser.PropertySetStmtContext context)
         {
             var accessibility = GetProcedureAccessibility(context.visibility());
-            var identifier = context.ambiguousIdentifier();
+            var identifier = context.subroutineName();
             if (identifier == null)
             {
                 return;
             }
-            var name = identifier.GetText();
+            var name = Identifier.GetName(identifier.identifier());
 
-            var declaration = CreateDeclaration(name, null, accessibility, DeclarationType.PropertySet, context, context.ambiguousIdentifier().GetSelection());
+            var declaration = CreateDeclaration(
+                name,
+                null,
+                accessibility,
+                DeclarationType.PropertySet,
+                context,
+                context.subroutineName().GetSelection(),
+                false,
+                null,
+                null);
 
-            OnNewDeclaration(declaration);
+            AddDeclaration(declaration);
             SetCurrentScope(declaration, name);
         }
 
@@ -367,16 +592,25 @@ namespace Rubberduck.Parsing.Symbols
         public override void EnterEventStmt(VBAParser.EventStmtContext context)
         {
             var accessibility = GetMemberAccessibility(context.visibility());
-            var identifier = context.ambiguousIdentifier();
+            var identifier = context.identifier();
             if (identifier == null)
             {
                 return;
             }
-            var name = identifier.GetText();
+            var name = Identifier.GetName(identifier);
 
-            var declaration = CreateDeclaration(name, null, accessibility, DeclarationType.Event, context, context.ambiguousIdentifier().GetSelection());
+            var declaration = CreateDeclaration(
+                name,
+                null,
+                accessibility,
+                DeclarationType.Event,
+                context,
+                context.identifier().GetSelection(),
+                false,
+                null,
+                null);
 
-            OnNewDeclaration(declaration);
+            AddDeclaration(declaration);
             SetCurrentScope(declaration, name);
         }
 
@@ -388,12 +622,13 @@ namespace Rubberduck.Parsing.Symbols
         public override void EnterDeclareStmt(VBAParser.DeclareStmtContext context)
         {
             var accessibility = GetMemberAccessibility(context.visibility());
-            var nameContext = context.ambiguousIdentifier();
-            if (nameContext == null)
+            var identifier = context.identifier();
+            if (identifier == null)
             {
                 return;
             }
-            var name = nameContext.GetText();
+            var name = Identifier.GetName(identifier);
+            var typeHint = Identifier.GetTypeHintValue(identifier);
 
             var hasReturnType = context.FUNCTION() != null;
 
@@ -403,16 +638,24 @@ namespace Rubberduck.Parsing.Symbols
                                     ? Tokens.Variant
                                     : asTypeClause.type().GetText()
                                 : null;
-
-            var selection = nameContext.GetSelection();
+            var selection = identifier.GetSelection();
 
             var declarationType = hasReturnType
                 ? DeclarationType.LibraryFunction
                 : DeclarationType.LibraryProcedure;
 
-            var declaration = CreateDeclaration(name, asTypeName, accessibility, declarationType, context, selection);
+            var declaration = CreateDeclaration(
+                name,
+                asTypeName,
+                accessibility,
+                declarationType,
+                context,
+                selection,
+                false,
+                asTypeClause,
+                typeHint);
 
-            OnNewDeclaration(declaration);
+            AddDeclaration(declaration);
             SetCurrentScope(declaration, name); // treat like a procedure block, to correctly scope parameters.
         }
 
@@ -430,41 +673,77 @@ namespace Rubberduck.Parsing.Symbols
                 var asTypeName = asTypeClause == null
                     ? Tokens.Variant
                     : asTypeClause.type().GetText();
-
-                var identifier = argContext.ambiguousIdentifier();
-                if (identifier == null)
-                {
-                    return;
-                }
-                OnNewDeclaration(CreateDeclaration(identifier.GetText(), asTypeName, Accessibility.Implicit, DeclarationType.Parameter, argContext, identifier.GetSelection()));
+                var identifier = argContext.unrestrictedIdentifier();
+                string typeHint = Identifier.GetTypeHintValue(identifier);
+                bool isArray = argContext.LPAREN() != null;
+                AddDeclaration(
+                    CreateDeclaration(
+                        Identifier.GetName(identifier),
+                        asTypeName,
+                        Accessibility.Implicit,
+                        DeclarationType.Parameter,
+                        argContext,
+                        identifier.GetSelection(),
+                        isArray,
+                        asTypeClause,
+                        typeHint));
             }
         }
 
-        public override void EnterLineLabel(VBAParser.LineLabelContext context)
+        public override void EnterStatementLabelDefinition(VBAParser.StatementLabelDefinitionContext context)
         {
-            OnNewDeclaration(CreateDeclaration(context.ambiguousIdentifier().GetText(), null, Accessibility.Private, DeclarationType.LineLabel, context, context.ambiguousIdentifier().GetSelection(), true));
+            var statementText = context.identifierStatementLabel() != null
+                ? context.identifierStatementLabel().unrestrictedIdentifier().GetText()
+                : context.lineNumberLabel().numberLiteral().GetText();
+
+            var statementSelection = context.identifierStatementLabel() != null
+                ? context.identifierStatementLabel().unrestrictedIdentifier().GetSelection()
+                : context.lineNumberLabel().numberLiteral().GetSelection();
+
+            AddDeclaration(
+                CreateDeclaration(
+                    statementText,
+                    null,
+                    Accessibility.Private,
+                    DeclarationType.LineLabel,
+                    context,
+                    statementSelection,
+                    true,
+                    null,
+                    null));
         }
 
         public override void EnterVariableSubStmt(VBAParser.VariableSubStmtContext context)
         {
             var parent = (VBAParser.VariableStmtContext)context.Parent.Parent;
             var accessibility = GetMemberAccessibility(parent.visibility());
-            var identifier = context.ambiguousIdentifier();
+            var identifier = context.identifier();
             if (identifier == null)
             {
                 return;
             }
-            var name = identifier.GetText();
-
+            var name = Identifier.GetName(identifier);
+            var typeHint = Identifier.GetTypeHintValue(identifier);
             var asTypeClause = context.asTypeClause();
             var asTypeName = asTypeClause == null
                 ? Tokens.Variant
                 : asTypeClause.type().GetText();
-
             var withEvents = parent.WITHEVENTS() != null;
-            var selfAssigned = asTypeClause != null && asTypeClause.NEW() != null;
-
-            OnNewDeclaration(CreateDeclaration(name, asTypeName, accessibility, DeclarationType.Variable, context, context.ambiguousIdentifier().GetSelection(), selfAssigned, withEvents));
+            var isAutoObject = asTypeClause != null && asTypeClause.NEW() != null;
+            bool isArray = context.LPAREN() != null;
+            AddDeclaration(
+                CreateDeclaration(
+                    name,
+                    asTypeName,
+                    accessibility,
+                    DeclarationType.Variable,
+                    context,
+                    context.identifier().GetSelection(),
+                    isArray,
+                    asTypeClause,
+                    typeHint,
+                    isAutoObject,
+                    withEvents));
         }
 
         public override void EnterConstSubStmt(VBAParser.ConstSubStmtContext context)
@@ -476,63 +755,125 @@ namespace Rubberduck.Parsing.Symbols
             var asTypeName = asTypeClause == null
                 ? Tokens.Variant
                 : asTypeClause.type().GetText();
+            var identifier = context.identifier();
+            var typeHint = Identifier.GetTypeHintValue(identifier);
+            var name = Identifier.GetName(identifier);
+            var value = context.expression().GetText();
+            var constStmt = (VBAParser.ConstStmtContext) context.Parent;
 
-            var identifier = context.ambiguousIdentifier();
-            if (identifier == null)
-            {
-                return;
-            }
-            var name = identifier.GetText();
-            var value = context.valueStmt().GetText();
-            var declaration = new ValuedDeclaration(new QualifiedMemberName(_qualifiedName, name), _parentDeclaration, _currentScope, asTypeName, accessibility, DeclarationType.Constant, value, context, identifier.GetSelection());
+            var declaration = new ConstantDeclaration(
+                new QualifiedMemberName(_qualifiedName, name),
+                _parentDeclaration,
+                _currentScope,
+                asTypeName,
+                asTypeClause,
+                typeHint,
+                FindAnnotations(constStmt.Start.Line),
+                accessibility,
+                DeclarationType.Constant,
+                value,
+                context,
+                identifier.GetSelection());
 
-            OnNewDeclaration(declaration);
+            AddDeclaration(declaration);
         }
 
-        public override void EnterTypeStmt(VBAParser.TypeStmtContext context)
+        public override void EnterPublicTypeDeclaration(VBAParser.PublicTypeDeclarationContext context)
         {
-            var accessibility = GetMemberAccessibility(context.visibility());
-            var identifier = context.ambiguousIdentifier();
-            if (identifier == null)
-            {
-                return;
-            }
-            var name = identifier.GetText();
-
-            var declaration = CreateDeclaration(name, null, accessibility, DeclarationType.UserDefinedType, context, context.ambiguousIdentifier().GetSelection());
-
-            OnNewDeclaration(declaration);
-            _parentDeclaration = declaration; // treat members as child declarations, but keep them scoped to module
+            AddUdtDeclaration(context.udtDeclaration(), Accessibility.Public, context);
         }
 
-        public override void ExitTypeStmt(VBAParser.TypeStmtContext context)
+        public override void ExitPublicTypeDeclaration(VBAParser.PublicTypeDeclarationContext context)
         {
             _parentDeclaration = _moduleDeclaration;
         }
 
-        public override void EnterTypeStmt_Element(VBAParser.TypeStmt_ElementContext context)
+        public override void EnterPrivateTypeDeclaration(VBAParser.PrivateTypeDeclarationContext context)
         {
-            var asTypeClause = context.asTypeClause();
+            AddUdtDeclaration(context.udtDeclaration(), Accessibility.Private, context);
+        }
+
+        public override void ExitPrivateTypeDeclaration(VBAParser.PrivateTypeDeclarationContext context)
+        {
+            _parentDeclaration = _moduleDeclaration;
+        }
+
+        private void AddUdtDeclaration(VBAParser.UdtDeclarationContext udtDeclaration, Accessibility accessibility, ParserRuleContext context)
+        {
+            var identifier = Identifier.GetName(udtDeclaration.untypedIdentifier());
+            var identifierSelection = Identifier.GetNameSelection(udtDeclaration.untypedIdentifier());
+            var declaration = CreateDeclaration(
+                identifier,
+                null,
+                accessibility,
+                DeclarationType.UserDefinedType,
+                context,
+                identifierSelection,
+                false,
+                null,
+                null);
+            AddDeclaration(declaration);
+            _parentDeclaration = declaration; // treat members as child declarations, but keep them scoped to module
+        }
+
+        public override void EnterUdtMember(VBAParser.UdtMemberContext context)
+        {
+            VBAParser.AsTypeClauseContext asTypeClause = null;
+            bool isArray = false;
+            string typeHint = null;
+            string identifier;
+            Selection identifierSelection;
+            if (context.reservedNameMemberDeclaration() != null)
+            {
+                identifier = Identifier.GetName(context.reservedNameMemberDeclaration().unrestrictedIdentifier());
+                identifierSelection = Identifier.GetNameSelection(context.reservedNameMemberDeclaration().unrestrictedIdentifier());
+                asTypeClause = context.reservedNameMemberDeclaration().asTypeClause();
+            }
+            else
+            {
+                identifier = Identifier.GetName(context.untypedNameMemberDeclaration().untypedIdentifier());
+                identifierSelection = Identifier.GetNameSelection(context.untypedNameMemberDeclaration().untypedIdentifier());
+                asTypeClause = context.untypedNameMemberDeclaration().optionalArrayClause().asTypeClause();
+                isArray = context.untypedNameMemberDeclaration().optionalArrayClause().arrayDim() != null;
+            }
             var asTypeName = asTypeClause == null
                 ? Tokens.Variant
                 : asTypeClause.type().GetText();
-
-            OnNewDeclaration(CreateDeclaration(context.ambiguousIdentifier().GetText(), asTypeName, Accessibility.Implicit, DeclarationType.UserDefinedTypeMember, context, context.ambiguousIdentifier().GetSelection()));
+            AddDeclaration(
+                CreateDeclaration(
+                    identifier,
+                    asTypeName,
+                    Accessibility.Implicit,
+                    DeclarationType.UserDefinedTypeMember,
+                    context,
+                    identifierSelection,
+                    isArray,
+                    asTypeClause,
+                    typeHint));
         }
 
         public override void EnterEnumerationStmt(VBAParser.EnumerationStmtContext context)
         {
             var accessibility = GetMemberAccessibility(context.visibility());
-            var identifier = context.ambiguousIdentifier();
+            var identifier = context.identifier();
             if (identifier == null)
             {
                 return;
             }
-            var name = identifier.GetText();
+            var name = Identifier.GetName(identifier);
 
-            var declaration = CreateDeclaration(name, null, accessibility, DeclarationType.Enumeration, context, context.ambiguousIdentifier().GetSelection());
+            var declaration = CreateDeclaration(
+                name,
+                "Long",
+                accessibility,
+                DeclarationType.Enumeration,
+                context,
+                context.identifier().GetSelection(),
+                false,
+                null,
+                null);
 
-            OnNewDeclaration(declaration);
+            AddDeclaration(declaration);
             _parentDeclaration = declaration; // treat members as child declarations, but keep them scoped to module
         }
 
@@ -543,7 +884,21 @@ namespace Rubberduck.Parsing.Symbols
 
         public override void EnterEnumerationStmt_Constant(VBAParser.EnumerationStmt_ConstantContext context)
         {
-            OnNewDeclaration(CreateDeclaration(context.ambiguousIdentifier().GetText(), null, Accessibility.Implicit, DeclarationType.EnumerationMember, context, context.ambiguousIdentifier().GetSelection()));
+            AddDeclaration(CreateDeclaration(
+                context.identifier().GetText(),
+                "Long",
+                Accessibility.Implicit,
+                DeclarationType.EnumerationMember,
+                context,
+                context.identifier().GetSelection(),
+                false,
+                null,
+                null));
+        }
+
+        private void AddDeclaration(Declaration declaration)
+        {
+            _createdDeclarations.Add(declaration);
         }
     }
 }

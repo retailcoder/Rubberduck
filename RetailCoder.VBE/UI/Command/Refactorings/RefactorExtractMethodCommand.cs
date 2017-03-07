@@ -1,14 +1,12 @@
-using System.Diagnostics;
-using Microsoft.Vbe.Interop;
 using System.Runtime.InteropServices;
-using Antlr4.Runtime;
-using Rubberduck.Common;
-using Rubberduck.Parsing;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.ExtractMethod;
 using Rubberduck.SmartIndenter;
+using System;
 using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.VBEInterfaces.RubberduckCodePane;
+using System.Collections.Generic;
+using Rubberduck.Settings;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
 {
@@ -18,39 +16,101 @@ namespace Rubberduck.UI.Command.Refactorings
         private readonly RubberduckParserState _state;
         private readonly IIndenter _indenter;
 
-        public RefactorExtractMethodCommand(VBE vbe, RubberduckParserState state, IActiveCodePaneEditor editor, IIndenter indenter)
-            : base (vbe, editor)
+        public RefactorExtractMethodCommand(IVBE vbe, RubberduckParserState state, IIndenter indenter)
+            : base (vbe)
         {
             _state = state;
             _indenter = indenter;
         }
 
-        public override bool CanExecute(object parameter)
+        public override RubberduckHotkey Hotkey
+        {
+            get { return RubberduckHotkey.RefactorExtractMethod; }
+        }
+
+        protected override bool CanExecuteImpl(object parameter)
         {
             if (Vbe.ActiveCodePane == null || _state.Status != ParserState.Ready)
             {
                 return false;
             }
 
-            var selection = Vbe.ActiveCodePane.GetSelection();
-            var code = Vbe.ActiveCodePane.CodeModule.Lines[selection.Selection.StartLine, selection.Selection.LineCount];
+            var pane = Vbe.ActiveCodePane;
+            var module = pane.CodeModule;
+            {
+                var qualifiedSelection = pane.GetQualifiedSelection();
+                if (!qualifiedSelection.HasValue || module.IsWrappingNullReference)
+                {
+                    return false;
+                }
+                var selection = qualifiedSelection.Value.Selection;
 
-            var parentProcedure = _state.AllDeclarations.FindSelectedDeclaration(selection, DeclarationExtensions.ProcedureTypes, d => ((ParserRuleContext)d.Context.Parent).GetSelection());
-            var canExecute = parentProcedure != null
-                && selection.Selection.StartColumn != selection.Selection.EndColumn
-                && selection.Selection.LineCount > 0
-                && !string.IsNullOrWhiteSpace(code);
+                var code = module.GetLines(selection.StartLine, selection.LineCount);
 
-            Debug.WriteLine("{0}.CanExecute evaluates to {1}", GetType().Name, canExecute);
-            return canExecute;
+                var allDeclarations = _state.AllDeclarations;
+                var extractMethodValidation = new ExtractMethodSelectionValidation(allDeclarations);
+                //var parentProcedure = _state.AllDeclarations.FindSelectedDeclaration(qualifiedSelection.Value, DeclarationExtensions.ProcedureTypes, d => ((ParserRuleContext)d.Context.Parent).GetSelection());
+                var canExecute = extractMethodValidation.withinSingleProcedure(qualifiedSelection.Value);
+
+                /*
+                var canExecute = parentProcedure != null
+                    && selection.StartColumn != selection.EndColumn
+                    && selection.LineCount > 0
+                    && !string.IsNullOrWhiteSpace(code);
+                */
+
+                return canExecute;
+            }
         }
 
-        public override void Execute(object parameter)
+        protected override void ExecuteImpl(object parameter)
         {
-            var factory = new ExtractMethodPresenterFactory(Editor, _state.AllDeclarations, _indenter);
-            var refactoring = new ExtractMethodRefactoring(factory, Editor);
-            refactoring.InvalidSelection += HandleInvalidSelection;
-            refactoring.Refactor();
+            var declarations = _state.AllDeclarations;
+            var qualifiedSelection = Vbe.ActiveCodePane.GetQualifiedSelection();
+
+            var extractMethodValidation = new ExtractMethodSelectionValidation(declarations);
+            var canExecute = extractMethodValidation.withinSingleProcedure(qualifiedSelection.Value);
+            if (!canExecute)
+            {
+                return;
+            }
+
+            var pane = Vbe.ActiveCodePane;
+            var module = pane.CodeModule;
+            var component = module.Parent;
+            {
+                Func<QualifiedSelection?, string, IExtractMethodModel> createMethodModel = (qs, code) =>
+                {
+                    if (qs == null)
+                    {
+                        return null;
+                    }
+                    //TODO: Pull these even further back;
+                    //      and implement with IProvider<IExtractMethodRule>
+                    var rules = new List<IExtractMethodRule>
+                    {
+                        new ExtractMethodRuleInSelection(),
+                        new ExtractMethodRuleIsAssignedInSelection(),
+                        new ExtractMethodRuleUsedAfter(),
+                        new ExtractMethodRuleUsedBefore()
+                    };
+
+                    var paramClassify = new ExtractMethodParameterClassification(rules);
+
+                    var extractedMethod = new ExtractedMethod();
+                    var extractedMethodModel = new ExtractMethodModel(extractedMethod, paramClassify);
+                    extractedMethodModel.extract(declarations, qs.Value, code);
+                    return extractedMethodModel;
+                };
+
+                var extraction = new ExtractMethodExtraction();
+                // bug: access to disposed closure - todo: make ExtractMethodRefactoring request reparse like everyone else.
+                Action<object> parseRequest = obj => _state.OnParseRequested(obj, component); 
+
+                var refactoring = new ExtractMethodRefactoring(module, parseRequest, createMethodModel, extraction);
+                refactoring.InvalidSelection += HandleInvalidSelection;
+                refactoring.Refactor();
+            }
         }
     }
 }

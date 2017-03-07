@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Windows.Forms;
-using Rubberduck.UI.CodeInspections;
+using Rubberduck.UI.Inspections;
 
 namespace Rubberduck.UI.ToDoItems
 {
@@ -21,7 +21,6 @@ namespace Rubberduck.UI.ToDoItems
             {
                 components.Dispose();
             }
-            base.Dispose(disposing);
         }
 
         #region Component Designer generated code

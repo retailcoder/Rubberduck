@@ -1,16 +1,15 @@
-﻿using System.Windows.Input;
-using Rubberduck.UI.Command.MenuItems.ParentMenus;
+﻿using Rubberduck.UI.Command.MenuItems.ParentMenus;
 
 namespace Rubberduck.UI.Command.MenuItems
 {
     public class ShowSourceControlPanelCommandMenuItem : CommandMenuItemBase
     {
-        public ShowSourceControlPanelCommandMenuItem(ICommand command) 
+        public ShowSourceControlPanelCommandMenuItem(CommandBase command) 
             : base(command)
         {
         }
 
-        public override string Key { get { return "RubberduckMenu_SourceControl"; } }
-        public override int DisplayOrder { get { return (int)RubberduckMenuItemDisplayOrder.SourceControl; } }
+        public override string Key { get { return "ToolsMenu_SourceControl"; } }
+        public override int DisplayOrder { get { return (int)ToolsMenuItemDisplayOrder.SourceControl; } }
     }
 }

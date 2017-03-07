@@ -1,11 +1,10 @@
-using System.Windows.Input;
 using Rubberduck.UI.Command.MenuItems.ParentMenus;
 
 namespace Rubberduck.UI.Command.MenuItems
 {
     public class TestExplorerCommandMenuItem : CommandMenuItemBase
     {
-        public TestExplorerCommandMenuItem(ICommand command)
+        public TestExplorerCommandMenuItem(CommandBase command)
             : base(command)
         {
         }

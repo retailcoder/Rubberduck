@@ -1,4 +1,3 @@
-using System.Windows.Input;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.UI.Command.MenuItems.ParentMenus;
 
@@ -6,7 +5,7 @@ namespace Rubberduck.UI.Command.MenuItems
 {
     public class FindAllImplementationsCommandMenuItem : CommandMenuItemBase
     {
-        public FindAllImplementationsCommandMenuItem(ICommand command) : base(command)
+        public FindAllImplementationsCommandMenuItem(CommandBase command) : base(command)
         {
         }
 
@@ -15,7 +14,7 @@ namespace Rubberduck.UI.Command.MenuItems
 
         public override bool EvaluateCanExecute(RubberduckParserState state)
         {
-            return Command.CanExecute(null);
+            return state != null && Command.CanExecute(null);
         }
     }
 }

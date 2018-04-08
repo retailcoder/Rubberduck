@@ -1,4 +1,4 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Rubberduck.Settings;
 using Rubberduck.SmartIndenter;
@@ -330,6 +330,7 @@ namespace RubberduckTests.Settings
         }
 
         [TestMethod]
+        [TestCategory("Settings")]
         public void LinesBetweenProceduresIsSetInCtor()
         {
             var defaultConfig = GetDefaultConfig();

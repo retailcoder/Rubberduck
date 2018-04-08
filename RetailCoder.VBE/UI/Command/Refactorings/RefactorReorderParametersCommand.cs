@@ -4,7 +4,7 @@ using Rubberduck.Common;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.ReorderParameters;
-using Rubberduck.UI.Refactorings;
+using Rubberduck.UI.Refactorings.ReorderParameters;
 using Rubberduck.VBEditor;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
@@ -33,7 +33,7 @@ namespace Rubberduck.UI.Command.Refactorings
             DeclarationType.PropertySet
         };
 
-        protected override bool CanExecuteImpl(object parameter)
+        protected override bool EvaluateCanExecute(object parameter)
         {
             var pane = Vbe.ActiveCodePane;
             {
@@ -58,7 +58,7 @@ namespace Rubberduck.UI.Command.Refactorings
             }
         }
 
-        protected override void ExecuteImpl(object parameter)
+        protected override void OnExecute(object parameter)
         {
             var pane = Vbe.ActiveCodePane;
             var module = pane.CodeModule;
@@ -69,7 +69,7 @@ namespace Rubberduck.UI.Command.Refactorings
                 }
                 var selection = new QualifiedSelection(new QualifiedModuleName(module.Parent), pane.Selection);
 
-                using (var view = new ReorderParametersDialog())
+                using (var view = new ReorderParametersDialog(new ReorderParametersViewModel(_state)))
                 {
                     var factory = new ReorderParametersPresenterFactory(Vbe, view, _state, _msgbox);
                     var refactoring = new ReorderParametersRefactoring(Vbe, factory, _msgbox);

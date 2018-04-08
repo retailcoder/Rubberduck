@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using Rubberduck.VBEditor.SafeComWrappers.MSForms;
@@ -31,7 +32,7 @@ namespace Rubberduck.VBEditor.SafeComWrappers.Office.Core
         {
             try
             {
-                var existing = Target[name];
+                var existing = Target.Cast<Microsoft.Office.Core.CommandBar>().FirstOrDefault(bar => bar.Name == name);
                 if (existing != null)
                 {
                     existing.Delete();
@@ -67,20 +68,14 @@ namespace Rubberduck.VBEditor.SafeComWrappers.Office.Core
             return ((IEnumerable<ICommandBar>)this).GetEnumerator();
         }
 
-        public int Count
-        {
-            get { return IsWrappingNullReference ? 0 : Target.Count; }
-        }
+        public int Count => IsWrappingNullReference ? 0 : Target.Count;
 
-        public ICommandBar this[object index]
-        {
-            get { return new CommandBar(IsWrappingNullReference ? null : Target[index]); }
-        }
+        public ICommandBar this[object index] => new CommandBar(IsWrappingNullReference ? null : Target[index]);
 
-        public override void Release(bool final = false)
-        {
-            // important: no-op
-        }
+        //public override void Release(bool final = false)
+        //{
+        //    // important: no-op
+        //}
 
         public override bool Equals(ISafeComWrapper<Microsoft.Office.Core.CommandBars> other)
         {

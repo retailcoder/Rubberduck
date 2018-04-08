@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using Rubberduck.Parsing;
@@ -8,12 +9,11 @@ using Rubberduck.UI;
 using Rubberduck.UI.Controls;
 using Rubberduck.VBEditor;
 using Rubberduck.VBEditor.Application;
-using Rubberduck.VBEditor.SafeComWrappers;
-using Rubberduck.VBEditor.Extensions;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UnitTesting
 {
+    [SuppressMessage("ReSharper", "ExplicitCallerInfoArgument")]
     public class TestMethod : ViewModelBase, IEquatable<TestMethod>, INavigateSource
     {
         private readonly ICollection<AssertCompletedEventArgs> _assertResults = new List<AssertCompletedEventArgs>();
@@ -26,7 +26,7 @@ namespace Rubberduck.UnitTesting
         }
 
         private Declaration _declaration;
-        public Declaration Declaration { get { return _declaration; } }
+        public Declaration Declaration => _declaration;
 
         public void SetDeclaration(Declaration declaration)
         {
@@ -66,11 +66,11 @@ namespace Rubberduck.UnitTesting
         private TestResult _result = new TestResult(TestOutcome.Unknown);
         public TestResult Result
         {
-            get { return _result; } 
+            get =>_result;
             set { _result = value; OnPropertyChanged(); }
         }
 
-        void HandleAssertCompleted(object sender, AssertCompletedEventArgs e)
+        private void HandleAssertCompleted(object sender, AssertCompletedEventArgs e)
         {
             _assertResults.Add(e);
         }
@@ -94,19 +94,25 @@ namespace Rubberduck.UnitTesting
 
         public object[] ToArray()
         {
-            return new object[] { Declaration.QualifiedName.QualifiedModuleName.ProjectName, Declaration.QualifiedName.QualifiedModuleName.ComponentName, Declaration.IdentifierName, 
-                _result.Outcome.ToString(), _result.Output, _result.StartTime.ToString(CultureInfo.InvariantCulture), _result.EndTime.ToString(CultureInfo.InvariantCulture), _result.Duration };
+            return new object[] {
+                Declaration.QualifiedName.QualifiedModuleName.ProjectName,
+                Declaration.QualifiedName.QualifiedModuleName.ComponentName,
+                Declaration.IdentifierName, 
+                _result.Outcome.ToString(),
+                _result.Output,
+                _result.StartTime.ToString(CultureInfo.InvariantCulture),
+                _result.EndTime.ToString(CultureInfo.InvariantCulture),
+                _result.Duration };
         }
 
         public bool Equals(TestMethod other)
         {
-            return Declaration.QualifiedName.Equals(other.Declaration.QualifiedName);
+            return other != null && Declaration.QualifiedName.Equals(other.Declaration.QualifiedName);
         }
 
         public override bool Equals(object obj)
         {
-            return obj is TestMethod
-                && ((TestMethod)obj).Declaration.QualifiedName.Equals(Declaration.QualifiedName);
+            return obj is TestMethod method && method.Declaration.QualifiedName.Equals(Declaration.QualifiedName);
         }
 
         public override int GetHashCode()
@@ -116,7 +122,7 @@ namespace Rubberduck.UnitTesting
 
         public override string ToString()
         {
-            return string.Format("{0}: {1} ({2}ms) {3}", Declaration.QualifiedName, Result.Outcome, Result.Duration, Result.Output);
+            return $"{Declaration.QualifiedName}: {Result.Outcome} ({Result.Duration}ms) {Result.Output}";
         }
     }
 }

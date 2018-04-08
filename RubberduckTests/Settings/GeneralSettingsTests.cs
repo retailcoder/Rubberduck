@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Rubberduck.Settings;
 using Rubberduck.UI.Settings;
@@ -133,6 +133,16 @@ namespace RubberduckTests.Settings
             var viewModel = new GeneralSettingsViewModel(defaultConfig, GetOperatingSystemMock().Object);
 
             Assert.AreEqual(defaultConfig.UserSettings.GeneralSettings.AutoSavePeriod, viewModel.AutoSavePeriod);
+        }
+
+        [TestCategory("Settings")]
+        [TestMethod]
+        public void SourceControlEnabledIsSetInCtor()
+        {
+            var defaultConfig = GetDefaultConfig();
+            var viewModel = new GeneralSettingsViewModel(defaultConfig, GetOperatingSystemMock().Object);
+
+            Assert.AreEqual(defaultConfig.UserSettings.GeneralSettings.SourceControlEnabled, viewModel.SourceControlEnabled);
         }
 
         //[TestCategory("Settings")]

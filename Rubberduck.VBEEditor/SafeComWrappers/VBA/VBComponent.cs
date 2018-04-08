@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Rubberduck.VBEditor.Extensions;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using Rubberduck.VBEditor.SafeComWrappers.Office.Core.Abstract;
@@ -10,56 +11,23 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
 {
     public class VBComponent : SafeComWrapper<VB.VBComponent>, IVBComponent
     {
-        public VBComponent(VB.VBComponent target) 
-            : base(target)
-        {
-        }
+        public VBComponent(VB.VBComponent target) : base(target) { }
 
-        public ComponentType Type
-        {
-            get { return IsWrappingNullReference ? 0 : (ComponentType)Target.Type; }
-        }
-
-        public ICodeModule CodeModule
-        {
-            get { return new CodeModule(IsWrappingNullReference ? null : Target.CodeModule); }
-        }
-
-        public IVBE VBE
-        {
-            get { return new VBE(IsWrappingNullReference ? null : Target.VBE); }
-        }
-
-        public IVBComponents Collection
-        {
-            get { return new VBComponents(IsWrappingNullReference ? null : Target.Collection); }
-        }
-
-        public IProperties Properties
-        {
-            get { return new Properties(IsWrappingNullReference ? null : Target.Properties); }
-        }
-
-        public bool HasOpenDesigner
-        {
-            get { return !IsWrappingNullReference && Target.HasOpenDesigner; }
-        }
-
-        public string DesignerId
-        {
-            get { return IsWrappingNullReference ? string.Empty : Target.DesignerID; }
-        }
+        public ComponentType Type => IsWrappingNullReference ? 0 : (ComponentType)Target.Type;
+        public ICodeModule CodeModule => new CodeModule(IsWrappingNullReference ? null : Target.CodeModule);
+        public IVBE VBE => new VBE(IsWrappingNullReference ? null : Target.VBE);
+        public IVBComponents Collection => new VBComponents(IsWrappingNullReference ? null : Target.Collection);
+        public IProperties Properties => new Properties(IsWrappingNullReference ? null : Target.Properties);
+        public bool HasOpenDesigner => !IsWrappingNullReference && Target.HasOpenDesigner;
+        public string DesignerId => IsWrappingNullReference ? string.Empty : Target.DesignerID;
 
         public string Name
         {
-            get { return IsWrappingNullReference ? string.Empty : Target.Name; }
+            get => IsWrappingNullReference ? string.Empty : Target.Name;
             set { if (!IsWrappingNullReference) Target.Name = value; }
         }
 
-        private string SafeName
-        {
-            get { return Path.GetInvalidFileNameChars().Aggregate(Name, (current, c) => current.Replace(c.ToString(), "_")); }
-        }
+        private string SafeName => Path.GetInvalidFileNameChars().Aggregate(Name, (current, c) => current.Replace(c.ToString(), "_"));
 
         public IControls Controls
         {
@@ -103,30 +71,21 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
             }
         }
 
-        public IWindow DesignerWindow()
-        {
-            return new Window(IsWrappingNullReference ? null : Target.DesignerWindow());
-        }
-
-        public void Activate()
-        {
-            Target.Activate();
-        }
-
-        public bool IsSaved { get { return !IsWrappingNullReference && Target.Saved; } }
-
-        public void Export(string path)
-        {
-            Target.Export(path);
-        }
+        public IWindow DesignerWindow() => new Window(IsWrappingNullReference ? null : Target.DesignerWindow());
+        public void Activate() => Target.Activate();
+        public bool IsSaved => !IsWrappingNullReference && Target.Saved;
+        public void Export(string path) => Target.Export(path);
 
         /// <summary>
         /// Exports the component to the folder. The file is name matches the component name and file extension is based on the component's type.
         /// </summary>
         /// <param name="folder">Destination folder for the resulting source file.</param>
-        public string ExportAsSourceFile(string folder)
+        /// <param name="tempFile">True if a unique temp file name should be generated. WARNING: filenames generated with this flag are not persisted.</param>
+        public string ExportAsSourceFile(string folder, bool tempFile = false)
         {
-            var fullPath = Path.Combine(folder, SafeName + Type.FileExtension());
+            var fullPath = tempFile
+                ? Path.Combine(folder, Path.GetRandomFileName())
+                : Path.Combine(folder, SafeName + Type.FileExtension());
             switch (Type)
             {
                 case ComponentType.UserForm:
@@ -143,10 +102,7 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
             return fullPath;
         }
 
-        public IVBProject ParentProject
-        {
-            get { return Collection.Parent; }
-        }
+        public IVBProject ParentProject => Collection.Parent;
 
         private void ExportUserFormModule(string path)
         {
@@ -158,7 +114,9 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
             var legitEmptyLineCount = visibleCode.TakeWhile(string.IsNullOrWhiteSpace).Count();
 
             var tempFile = ExportToTempFile();
-            var contents = File.ReadAllLines(tempFile);
+            var tempFilePath = Directory.GetParent(tempFile).FullName;
+            var fileEncoding = System.Text.Encoding.Default;    //We use the current ANSI codepage because that is what the VBE does.
+            var contents = File.ReadAllLines(tempFile, fileEncoding);
             var nonAttributeLines = contents.TakeWhile(line => !line.StartsWith("Attribute")).Count();
             var attributeLines = contents.Skip(nonAttributeLines).TakeWhile(line => line.StartsWith("Attribute")).Count();
             var declarationsStartLine = nonAttributeLines + attributeLines + 1;
@@ -174,7 +132,34 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
                        contents.Skip(declarationsStartLine + emptyLineCount - legitEmptyLineCount))
                                .ToArray();
             }
-            File.WriteAllLines(path, code);
+            File.WriteAllLines(path, code, fileEncoding);
+
+            // LINQ hates this search, therefore, iterate the long way
+            foreach (string line in contents)
+            {
+                if (line.Contains("OleObjectBlob"))
+                {
+                    var binaryFileName = line.Trim().Split('"')[1];
+                    var destPath = Directory.GetParent(path).FullName;
+                    if (File.Exists(Path.Combine(tempFilePath, binaryFileName)) && !destPath.Equals(tempFilePath))
+                    {
+                        System.Diagnostics.Debug.WriteLine(Path.Combine(destPath, binaryFileName));
+                        if (File.Exists(Path.Combine(destPath, binaryFileName)))
+                        {
+                            try
+                            {
+                                File.Delete(Path.Combine(destPath, binaryFileName));
+                            }
+                            catch (Exception)
+                            {
+                                // Meh?
+                            }
+                        }
+                        File.Copy(Path.Combine(tempFilePath, binaryFileName), Path.Combine(destPath, binaryFileName));
+                    }
+                    break;
+                }
+            }
         }
 
         private void ExportDocumentModule(string path)
@@ -182,8 +167,10 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
             var lineCount = CodeModule.CountOfLines;
             if (lineCount > 0)
             {
+                //One cannot reimport document modules as such in the VBE; so we simply export and import the contents of the code pane.
+                //Because of this, it is OK, and actually preferable, to use the default UTF8 encoding.
                 var text = CodeModule.GetLines(1, lineCount);
-                File.WriteAllText(path, text);
+                File.WriteAllText(path, text, Encoding.UTF8);  
             }
         }
 
@@ -193,17 +180,17 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
             Export(path);
             return path;
         }
-        public override void Release(bool final = false)
-        {
-            if (!IsWrappingNullReference)
-            {
-                DesignerWindow().Release();
-                Controls.Release();
-                Properties.Release();
-                CodeModule.Release();
-                base.Release(final);
-            }
-        }
+        //public override void Release(bool final = false)
+        //{
+        //    if (!IsWrappingNullReference)
+        //    {
+        //        DesignerWindow().Release();
+        //        Controls.Release();
+        //        Properties.Release();
+        //        CodeModule.Release();
+        //        base.Release(final);
+        //    }
+        //}
 
         public override bool Equals(ISafeComWrapper<VB.VBComponent> other)
         {

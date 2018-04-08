@@ -21,39 +21,25 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
         public event EventHandler<ReferenceEventArgs> ItemAdded;
         public event EventHandler<ReferenceEventArgs> ItemRemoved;
 
-        public int Count
-        {
-            get { return IsWrappingNullReference ? 0 : Target.Count; }
-        }
+        public int Count => IsWrappingNullReference ? 0 : Target.Count;
 
-        public IVBProject Parent
-        {
-            get { return new VBProject(IsWrappingNullReference ? null : Target.Parent); }
-        }
+        public IVBProject Parent => new VBProject(IsWrappingNullReference ? null : Target.Parent);
 
-        public IVBE VBE
-        {
-            get { return new VBE(IsWrappingNullReference ? null : Target.VBE); }
-        }
+        public IVBE VBE => new VBE(IsWrappingNullReference ? null : Target.VBE);
 
         private void Target_ItemRemoved(VB.Reference reference)
         {
             var handler = ItemRemoved;
-            if (handler == null) { return; }
-            handler.Invoke(this, new ReferenceEventArgs(new Reference(reference)));
+            handler?.Invoke(this, new ReferenceEventArgs(new Reference(reference)));
         }
 
         private void Target_ItemAdded(VB.Reference reference)
         {
             var handler = ItemAdded;
-            if (handler == null) { return; }
-            handler.Invoke(this, new ReferenceEventArgs(new Reference(reference)));
+            handler?.Invoke(this, new ReferenceEventArgs(new Reference(reference)));
         }
 
-        public IReference this[object index]
-        {
-            get { return new Reference(Target.Item(index)); }
-        }
+        public IReference this[object index] => new Reference(Target.Item(index));
 
         public IReference AddFromGuid(string guid, int major, int minor)
         {
@@ -80,19 +66,19 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
             return ((IEnumerable<IReference>)this).GetEnumerator();
         }
 
-        public override void Release(bool final = false)
-        {
-            if (!IsWrappingNullReference)
-            {
-                Target.ItemAdded -= Target_ItemAdded;
-                Target.ItemRemoved -= Target_ItemRemoved;
-                for (var i = 1; i <= Count; i++)
-                {
-                    this[i].Release();
-                }
-                base.Release(final);
-            }
-        }
+        //public override void Release(bool final = false)
+        //{
+        //    if (!IsWrappingNullReference)
+        //    {
+        //        Target.ItemAdded -= Target_ItemAdded;
+        //        Target.ItemRemoved -= Target_ItemRemoved;
+        //        for (var i = 1; i <= Count; i++)
+        //        {
+        //            this[i].Release();
+        //        }
+        //        base.Release(final);
+        //    }
+        //}
 
         public override bool Equals(ISafeComWrapper<VB.References> other)
         {

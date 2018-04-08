@@ -13,29 +13,20 @@ namespace Rubberduck.VBEditor.SafeComWrappers.Office.Core
         {
         }
 
-        public int Count
-        {
-            get { return IsWrappingNullReference ? 0 : Target.Count; }
-        }
+        public int Count => IsWrappingNullReference ? 0 : Target.Count;
 
-        public ICommandBar Parent
-        {
-            get { return new CommandBar(IsWrappingNullReference ? null : Target.Parent); }
-        }
+        public ICommandBar Parent => new CommandBar(IsWrappingNullReference ? null : Target.Parent);
 
-        public ICommandBarControl this[object index]
-        {
-            get { return new CommandBarControl(!IsWrappingNullReference ? Target[index] : null); }
-        }
+        public ICommandBarControl this[object index] => new CommandBarControl(!IsWrappingNullReference ? Target[index] : null);
 
         public ICommandBarControl Add(ControlType type)
         {
-            return new CommandBarControl(IsWrappingNullReference ? null : Target.Add(type, Temporary:true));
+            return new CommandBarControl(IsWrappingNullReference ? null : Target.Add(type, Temporary: CommandBarControl.AddCommandBarControlsTemporarily));
         }
 
         public ICommandBarControl Add(ControlType type, int before)
         {
-            return new CommandBarControl(IsWrappingNullReference ? null : Target.Add(type, Before: before, Temporary: true));
+            return new CommandBarControl(IsWrappingNullReference ? null : Target.Add(type, Before: before, Temporary: CommandBarControl.AddCommandBarControlsTemporarily));
         }
 
         IEnumerator<ICommandBarControl> IEnumerable<ICommandBarControl>.GetEnumerator()
@@ -53,17 +44,17 @@ namespace Rubberduck.VBEditor.SafeComWrappers.Office.Core
                 : ((IEnumerable<ICommandBarControl>) this).GetEnumerator();
         }
 
-        public override void Release(bool final = false)
-        {
-            if (!IsWrappingNullReference)
-            {
-                for (var i = 1; i <= Count; i++)
-                {
-                    this[i].Release();
-                }
-                base.Release(final);
-            }
-        }
+        //public override void Release(bool final = false)
+        //{
+        //    if (!IsWrappingNullReference)
+        //    {
+        //        for (var i = 1; i <= Count; i++)
+        //        {
+        //            this[i].Release();
+        //        }
+        //        base.Release(final);
+        //    }
+        //}
 
         public override bool Equals(ISafeComWrapper<Microsoft.Office.Core.CommandBarControls> other)
         {

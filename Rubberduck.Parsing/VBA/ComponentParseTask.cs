@@ -4,7 +4,6 @@ using Antlr4.Runtime.Tree;
 using NLog;
 using Rubberduck.Parsing.Annotations;
 using Rubberduck.Parsing.Grammar;
-using Rubberduck.Parsing.Preprocessing;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.VBEditor;
 using System;
@@ -13,16 +12,19 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Rubberduck.Parsing.PreProcessing;
+using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.Symbols.ParsingExceptions;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.Parsing.VBA
 {
     class ComponentParseTask
     {
-        private readonly IVBComponent _component;
-        private readonly QualifiedModuleName _qualifiedName;
+        private readonly QualifiedModuleName _module;
         private readonly TokenStreamRewriter _rewriter;
         private readonly IAttributeParser _attributeParser;
+        private readonly IModuleExporter _exporter;
         private readonly IVBAPreprocessor _preprocessor;
         private readonly VBAModuleParser _parser;
 
@@ -32,164 +34,150 @@ namespace Rubberduck.Parsing.VBA
 
         private readonly Guid _taskId;
 
-        public ComponentParseTask(IVBComponent vbComponent, IVBAPreprocessor preprocessor, IAttributeParser attributeParser, TokenStreamRewriter rewriter = null)
+        public ComponentParseTask(QualifiedModuleName module, IVBAPreprocessor preprocessor, IAttributeParser attributeParser, IModuleExporter exporter, TokenStreamRewriter rewriter = null)
         {
             _taskId = Guid.NewGuid();
 
             _attributeParser = attributeParser;
+            _exporter = exporter;
             _preprocessor = preprocessor;
-            _component = vbComponent;
+            _module = module;
             _rewriter = rewriter;
-            _qualifiedName = new QualifiedModuleName(vbComponent);
             _parser = new VBAModuleParser();
         }
         
-        public void Start(CancellationToken token)
+        public void Start(CancellationToken cancellationToken)
         {
             try
             {
-                Logger.Trace("Starting ParseTaskID {0} on thread {1}.", _taskId, Thread.CurrentThread.ManagedThreadId);
+                Logger.Trace($"Starting ParseTaskID {_taskId} on thread {Thread.CurrentThread.ManagedThreadId}.");
 
-                var code = RewriteAndPreprocess(token);
-                token.ThrowIfCancellationRequested();
-
-                var attributes = _attributeParser.Parse(_component, token);
+                var tokenStream = RewriteAndPreprocess(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();  
 
                 // temporal coupling... comments must be acquired before we walk the parse tree for declarations
                 // otherwise none of the annotations get associated to their respective Declaration
                 var commentListener = new CommentListener();
-                var annotationListener = new AnnotationListener(new VBAParserAnnotationFactory(), _qualifiedName);
+                var annotationListener = new AnnotationListener(new VBAParserAnnotationFactory(), _module);
 
                 var stopwatch = Stopwatch.StartNew();
-                ITokenStream stream;
-                var tree = ParseInternal(_component.Name, code, new IParseTreeListener[]{ commentListener, annotationListener }, out stream);
+                var codePaneParseResults = ParseInternal(_module.ComponentName, tokenStream, new IParseTreeListener[]{ commentListener, annotationListener });
                 stopwatch.Stop();
-                token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
 
-                var comments = QualifyAndUnionComments(_qualifiedName, commentListener.Comments, commentListener.RemComments);
-                token.ThrowIfCancellationRequested();
+                var comments = QualifyAndUnionComments(_module, commentListener.Comments, commentListener.RemComments);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var attributesPassParseResults = RunAttributesPass(cancellationToken);
+                var rewriter = new MemberAttributesRewriter(_exporter, _module.Component.CodeModule, new TokenStreamRewriter(attributesPassParseResults.tokenStream ?? tokenStream));
 
                 var completedHandler = ParseCompleted;
-                if (completedHandler != null && !token.IsCancellationRequested)
+                if (completedHandler != null && !cancellationToken.IsCancellationRequested)
                     completedHandler.Invoke(this, new ParseCompletionArgs
                     {
-                        ParseTree = tree,
-                        Tokens = stream,
-                        Attributes = attributes,
+                        ParseTree = codePaneParseResults.tree,
+                        AttributesTree = attributesPassParseResults.tree,
+                        Tokens = codePaneParseResults.tokenStream,
+                        AttributesRewriter = rewriter,
+                        Attributes = attributesPassParseResults.attributes,
                         Comments = comments,
                         Annotations = annotationListener.Annotations
                     });
             }
             catch (COMException exception)
             {
-                Logger.Error(exception, "Exception thrown in thread {0}, ParseTaskID {1}.", Thread.CurrentThread.ManagedThreadId, _taskId);
+                Logger.Error(exception, $"COM Exception thrown in thread {Thread.CurrentThread.ManagedThreadId} while parsing module {_module.ComponentName}, ParseTaskID {_taskId}.");
                 var failedHandler = ParseFailure;
-                if (failedHandler != null)
-                    failedHandler.Invoke(this, new ParseFailureArgs
-                    {
-                        Cause = exception
-                    });
+                failedHandler?.Invoke(this, new ParseFailureArgs
+                {
+                    Cause = exception
+                });
             }
-            catch (SyntaxErrorException exception)
+            catch (PreprocessorSyntaxErrorException syntaxErrorException)
             {
-                //System.Diagnostics.Debug.Assert(false, "A RecognitionException should be notified of, not thrown as a SyntaxErrorException. This lets the parser recover from parse errors.");
-                Logger.Error(exception, "Exception thrown in thread {0}, ParseTaskID {1}.", Thread.CurrentThread.ManagedThreadId, _taskId);
-                var failedHandler = ParseFailure;
-                if (failedHandler != null)
-                    failedHandler.Invoke(this, new ParseFailureArgs
-                    {
-                        Cause = exception
-                    });
+                var parsePassText = syntaxErrorException.ParsePass == ParsePass.CodePanePass
+                    ? "code pane"
+                    : "exported";
+                Logger.Error($"Syntax error while preprocessing; offending token '{syntaxErrorException.OffendingSymbol.Text}' at line {syntaxErrorException.LineNumber}, column {syntaxErrorException.Position} in the {parsePassText} version of module {_module.ComponentName}.");
+                Logger.Debug(syntaxErrorException, $"SyntaxErrorException thrown in thread {Thread.CurrentThread.ManagedThreadId}, ParseTaskID {_taskId}.");
+
+                ReportException(syntaxErrorException);
+            }
+            catch (ParsePassSyntaxErrorException syntaxErrorException)
+            {
+                var parsePassText = syntaxErrorException.ParsePass == ParsePass.CodePanePass
+                    ? "code pane"
+                    : "exported";
+                Logger.Error($"Syntax error; offending token '{syntaxErrorException.OffendingSymbol.Text}' at line {syntaxErrorException.LineNumber}, column {syntaxErrorException.Position} in the {parsePassText} version of module {_module.ComponentName}.");
+                Logger.Debug(syntaxErrorException, $"SyntaxErrorException thrown in thread {Thread.CurrentThread.ManagedThreadId}, ParseTaskID {_taskId}.");
+
+                ReportException(syntaxErrorException);
+            }
+            catch (SyntaxErrorException syntaxErrorException)
+            {
+                Logger.Error($"Syntax error; offending token '{syntaxErrorException.OffendingSymbol.Text}' at line {syntaxErrorException.LineNumber}, column {syntaxErrorException.Position} in module {_module.ComponentName}.");
+                Logger.Debug(syntaxErrorException, $"SyntaxErrorException thrown in thread {Thread.CurrentThread.ManagedThreadId}, ParseTaskID {_taskId}.");
+
+                ReportException(syntaxErrorException);
             }
             catch (OperationCanceledException exception)
             {
-                //We return this, so that the calling code knows that the operation actually has been cancelled.
-                var failedHandler = ParseFailure;
-                if (failedHandler != null)
-                    failedHandler.Invoke(this, new ParseFailureArgs
-                    {
-                        Cause = exception
-                    });
+                //We report this, so that the calling code knows that the operation actually has been cancelled.
+                ReportException(exception);
             }
             catch (Exception exception)
             {
-                Logger.Error(exception, "Exception thrown in thread {0}, ParseTaskID {1}.", Thread.CurrentThread.ManagedThreadId, _taskId);
-                var failedHandler = ParseFailure;
-                if (failedHandler != null)
-                    failedHandler.Invoke(this, new ParseFailureArgs
-                    {
-                        Cause = exception
-                    });
+                Logger.Error(exception, $" Unexpected exception thrown in thread {Thread.CurrentThread.ManagedThreadId} while parsing module {_module.ComponentName}, ParseTaskID {_taskId}.");
+
+                ReportException(exception);
             }
         }
 
-        private static string[] GetSanitizedCode(ICodeModule module)
+        private void ReportException(Exception exception)
+        {
+            var failedHandler = ParseFailure;
+            failedHandler?.Invoke(this, new ParseFailureArgs
+            {
+                Cause = exception
+            });
+        }
+
+        private (IParseTree tree, ITokenStream tokenStream, IDictionary<Tuple<string, DeclarationType>, Attributes> attributes) RunAttributesPass(CancellationToken cancellationToken)
+        {
+            Logger.Trace($"ParseTaskID {_taskId} begins attributes pass.");
+            var attributesParseResults = _attributeParser.Parse(_module, cancellationToken);
+            Logger.Trace($"ParseTaskID {_taskId} finished attributes pass.");
+            return attributesParseResults;
+        }
+
+        private static string GetCode(ICodeModule module)
         {
             var lines = module.CountOfLines;
             if (lines == 0)
             {
-                return new string[] { };
+                return string.Empty;
             }
 
-            var code = module.GetLines(1, lines).Replace("\r", string.Empty).Split('\n');
+            var codeLines = module.GetLines(1, lines);
+            var code = string.Concat(codeLines);
 
-            StripLineNumbers(code);
             return code;
         }
 
-        private static void StripLineNumbers(string[] lines)
+        private CommonTokenStream RewriteAndPreprocess(CancellationToken cancellationToken)
         {
-            var continuing = false;
-            for (var line = 0; line < lines.Length; line++)
-            {
-                var code = lines[line];
-                int? lineNumber;
-                if (!continuing && HasNumberedLine(code, out lineNumber))
-                {
-                    var lineNumberLength = lineNumber.ToString().Length;
-                    if (lines[line].Length > lineNumberLength)
-                    {
-                        // replace line number with as many spaces as characters taken, to avoid shifting the tokens
-                        lines[line] = new string(' ', lineNumberLength) + code.Substring(lineNumber.ToString().Length + 1);
-                    }
-                }
-
-                continuing = code.EndsWith(" _");
-            }
+            var code = _rewriter?.GetText() ?? string.Join(Environment.NewLine, GetCode(_module.Component.CodeModule));
+            var tokenStreamProvider = new SimpleVBAModuleTokenStreamProvider();
+            var tokens = tokenStreamProvider.Tokens(code);
+            _preprocessor.PreprocessTokenStream(_module.Name, tokens, new PreprocessorExceptionErrorListener(_module.ComponentName, ParsePass.CodePanePass), cancellationToken);
+            return tokens;
         }
 
-        private static bool HasNumberedLine(string codeLine, out int? lineNumber)
-        {
-            lineNumber = null;
-
-            if (string.IsNullOrWhiteSpace(codeLine.Trim()))
-            {
-                return false;
-            }
-
-            int line;
-            var firstToken = codeLine.TrimStart().Split(' ')[0];
-            if (int.TryParse(firstToken, out line))
-            {
-                lineNumber = line;
-                return true;
-            }
-
-            return false;
-        }
-
-        private string RewriteAndPreprocess(CancellationToken token)
-        {
-            var code = _rewriter == null ? string.Join(Environment.NewLine, GetSanitizedCode(_component.CodeModule)) : _rewriter.GetText();
-            var processed = _preprocessor.Execute(_component.Name, code, token);
-            return processed;
-        }
-
-        private IParseTree ParseInternal(string moduleName, string code, IParseTreeListener[] listeners, out ITokenStream outStream)
+        private (IParseTree tree, ITokenStream tokenStream) ParseInternal(string moduleName, CommonTokenStream tokenStream, IParseTreeListener[] listeners)
         {
             //var errorNotifier = new SyntaxErrorNotificationListener();
             //errorNotifier.OnSyntaxError += ParserSyntaxError;
-            return _parser.Parse(moduleName, code, listeners, new ExceptionErrorListener(), out outStream);
+            return _parser.Parse(moduleName, tokenStream, listeners, new MainParseExceptionErrorListener(moduleName, ParsePass.CodePanePass));
         }
 
         private IEnumerable<CommentNode> QualifyAndUnionComments(QualifiedModuleName qualifiedName, IEnumerable<VBAParser.CommentContext> comments, IEnumerable<VBAParser.RemCommentContext> remComments)
@@ -203,7 +191,9 @@ namespace Rubberduck.Parsing.VBA
         public class ParseCompletionArgs
         {
             public ITokenStream Tokens { get; internal set; }
+            public IModuleRewriter AttributesRewriter { get; internal set; }
             public IParseTree ParseTree { get; internal set; }
+            public IParseTree AttributesTree { get; internal set; }
             public IDictionary<Tuple<string, DeclarationType>, Attributes> Attributes { get; internal set; }
             public IEnumerable<CommentNode> Comments { get; internal set; }
             public IEnumerable<IAnnotation> Annotations { get; internal set; }
@@ -217,10 +207,10 @@ namespace Rubberduck.Parsing.VBA
         private class CommentListener : VBAParserBaseListener
         {
             private readonly IList<VBAParser.RemCommentContext> _remComments = new List<VBAParser.RemCommentContext>();
-            public IEnumerable<VBAParser.RemCommentContext> RemComments { get { return _remComments; } }
+            public IEnumerable<VBAParser.RemCommentContext> RemComments => _remComments;
 
             private readonly IList<VBAParser.CommentContext> _comments = new List<VBAParser.CommentContext>();
-            public IEnumerable<VBAParser.CommentContext> Comments { get { return _comments; } }
+            public IEnumerable<VBAParser.CommentContext> Comments => _comments;
 
             public override void ExitRemComment([NotNull] VBAParser.RemCommentContext context)
             {

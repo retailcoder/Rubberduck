@@ -1,4 +1,4 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using RubberduckTests.Mocks;
@@ -17,6 +17,7 @@ namespace RubberduckTests.Binding
         private const string BINDING_TARGET_NAME = "BindingTarget";
         private const string TEST_CLASS_NAME = "TestClass";
 
+        [TestCategory("Binding")]
         [TestMethod]
         public void EnclosingModuleComesBeforeEnclosingProject()
         {
@@ -27,14 +28,16 @@ namespace RubberduckTests.Binding
             var enclosingProject = enclosingProjectBuilder.Build();
             builder.AddProject(enclosingProject);
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Function && d.IdentifierName == BINDING_TARGET_NAME);
+                var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Function && d.IdentifierName == BINDING_TARGET_NAME);
 
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
-        [Ignore] // todo: figure out why this test randomly fails
+        [TestCategory("Binding")]
         [TestMethod]
         public void EnclosingProjectComesBeforeOtherProceduralModule()
         {
@@ -45,14 +48,17 @@ namespace RubberduckTests.Binding
             var enclosingProject = enclosingProjectBuilder.Build();
             builder.AddProject(enclosingProject);
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Project && d.IdentifierName == BINDING_TARGET_NAME);
+                var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Project && d.IdentifierName == BINDING_TARGET_NAME);
 
-            Assert.AreEqual(state.Status, ParserState.Ready);
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(state.Status, ParserState.Ready);
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
+        [TestCategory("Binding")]
         [TestMethod]
         public void OtherProceduralModule()
         {
@@ -63,16 +69,18 @@ namespace RubberduckTests.Binding
             var enclosingProject = enclosingProjectBuilder.Build();
             builder.AddProject(enclosingProject);
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Function && d.IdentifierName == BINDING_TARGET_NAME);
+                var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Function && d.IdentifierName == BINDING_TARGET_NAME);
 
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
         private static RubberduckParserState Parse(Mock<IVBE> vbe)
         {
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            var parser = MockParser.Create(vbe.Object);
             parser.Parse(new CancellationTokenSource());
             if (parser.State.Status != ParserState.Ready)
             {
@@ -84,21 +92,21 @@ namespace RubberduckTests.Binding
 
         private string CreateCaller()
         {
-            return string.Format(@"
+            return $@"
 Declare PtrSafe Function EnumWindows Lib ""user32"" (ByVal lpEnumFunc As LongPtr, ByVal lParam As LongPtr) As Long
 
 Public Sub Caller()
-    EnumWindows AddressOf {0}, 1
+    EnumWindows AddressOf {BINDING_TARGET_NAME}, 1
 End Sub
-", BINDING_TARGET_NAME);
+";
         }
 
         private string CreateCallee()
         {
-            return string.Format(@"
-Public Function {0}() As LongPtr
+            return $@"
+Public Function {BINDING_TARGET_NAME}() As LongPtr
 End Function
-", BINDING_TARGET_NAME);
+";
         }
     }
 }

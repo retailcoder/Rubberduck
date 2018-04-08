@@ -24,14 +24,15 @@ namespace Rubberduck.UI.Controls
             TextArea.TextView.LinkTextUnderline = false;
             TextArea.TextView.LinkTextForegroundBrush = new SolidColorBrush(Colors.Green);
             Options.RequireControlModifierForHyperlinkClick = false;
-            Options.EnableHyperlinks = true;
+            //This needs some work if hyperlinks need to open in an external browser.
+            Options.EnableHyperlinks = false;
             Options.EnableEmailHyperlinks = true;
         }
 
         public new string Text
         {
-            get { return base.Text; }
-            set { base.Text = value; }
+            get => base.Text; 
+            set => base.Text = value;
         }
 
         public static readonly DependencyProperty TextProperty =
@@ -49,10 +50,7 @@ namespace Rubberduck.UI.Controls
 
         public void RaisePropertyChanged(string property)
         {
-            if (PropertyChanged != null)
-            {
-                PropertyChanged(this, new PropertyChangedEventArgs(property));
-            }
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

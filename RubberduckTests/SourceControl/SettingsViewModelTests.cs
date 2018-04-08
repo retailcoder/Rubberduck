@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Windows.Forms;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -50,13 +50,10 @@ namespace RubberduckTests.SourceControl
         [TestMethod]
         public void ViewIsPopulatedOnRefresh()
         {
-            //arrange
-            var vm = new SettingsViewViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object);
+            var vm = new SettingsPanelViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object);
 
-            //act
             vm.RefreshView();
 
-            //assert
             Assert.AreEqual(Name, vm.UserName, "Name");
             Assert.AreEqual(Email, vm.EmailAddress, "Email");
             Assert.AreEqual(RepoLocation, vm.DefaultRepositoryLocation, "Default Repo Location");
@@ -67,8 +64,7 @@ namespace RubberduckTests.SourceControl
         [TestMethod]
         public void ConfigIsPopulatedFromViewOnSave()
         {
-            //arrange
-            var vm = new SettingsViewViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object);
+            var vm = new SettingsPanelViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object);
 
             //simulate user input
             vm.UserName = OtherName;
@@ -79,7 +75,6 @@ namespace RubberduckTests.SourceControl
             //simulate Update button click
             vm.UpdateSettingsCommand.Execute(null);
 
-            //assert
             Assert.AreEqual(OtherName, _config.UserName, "Name");
             Assert.AreEqual(OtherEmail, _config.EmailAddress, "Email");
             Assert.AreEqual(OtherRepoLocation, _config.DefaultRepositoryLocation, "Default Repo Location");
@@ -90,14 +85,11 @@ namespace RubberduckTests.SourceControl
         [TestMethod]
         public void ConfigIsSavedOnSave()
         {
-            //arrange
-            var vm = new SettingsViewViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object);
+            var vm = new SettingsPanelViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object);
 
-            //act
             //simulate Update button click
             vm.UpdateSettingsCommand.Execute(null);
 
-            //assert
             _configService.Verify(s => s.Save(_config));
         }
 
@@ -105,8 +97,7 @@ namespace RubberduckTests.SourceControl
         [TestMethod]
         public void ChangesToViewAreRevertedOnCancel()
         {
-            //arrange
-            var vm = new SettingsViewViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object);
+            var vm = new SettingsPanelViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object);
 
             //simulate user input
             vm.UserName = OtherName;
@@ -114,11 +105,9 @@ namespace RubberduckTests.SourceControl
             vm.DefaultRepositoryLocation = OtherRepoLocation;
             vm.DefaultRepositoryLocation = OtherCommandPromptLocation;
 
-            //act
             //simulate Cancel button click
             vm.CancelSettingsChangesCommand.Execute(null);
 
-            //assert
             Assert.AreEqual(Name, vm.UserName, "Name");
             Assert.AreEqual(Email, vm.EmailAddress, "Email");
             Assert.AreEqual(RepoLocation, vm.DefaultRepositoryLocation, "Default Repo Location");
@@ -129,18 +118,15 @@ namespace RubberduckTests.SourceControl
         [TestMethod]
         public void OnBrowseDefaultRepoLocation_WhenUserConfirms_ViewMatchesSelectedPath()
         {
-            //arrange
-            var vm = new SettingsViewViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object)
+            var vm = new SettingsPanelViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object)
             {
                 DefaultRepositoryLocation = RepoLocation
             };
             _folderBrowser.Object.SelectedPath = OtherRepoLocation;
             _folderBrowser.Setup(f => f.ShowDialog()).Returns(DialogResult.OK);
             
-            //act
             vm.ShowDefaultRepoFolderPickerCommand.Execute(null);
 
-            //assert
             Assert.AreEqual(_folderBrowser.Object.SelectedPath, vm.DefaultRepositoryLocation);
         }
 
@@ -148,18 +134,15 @@ namespace RubberduckTests.SourceControl
         [TestMethod]
         public void OnBrowseDefaultRepoLocation_WhenUserCancels_ViewRemainsUnchanged()
         {
-            //arrange
-            var vm = new SettingsViewViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object)
+            var vm = new SettingsPanelViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object)
             {
                 DefaultRepositoryLocation = RepoLocation
             };
             _folderBrowser.Object.SelectedPath = OtherRepoLocation;
             _folderBrowser.Setup(f => f.ShowDialog()).Returns(DialogResult.Cancel);
 
-            //act
             vm.ShowDefaultRepoFolderPickerCommand.Execute(null);
 
-            //assert
             Assert.AreEqual(RepoLocation, vm.DefaultRepositoryLocation);
         }
 
@@ -167,18 +150,15 @@ namespace RubberduckTests.SourceControl
         [TestMethod]
         public void OnBrowseCommandPromptLocation_WhenUserConfirms_ViewMatchesSelectedPath()
         {
-            //arrange
-            var vm = new SettingsViewViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object)
+            var vm = new SettingsPanelViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object)
             {
                 CommandPromptLocation = CommandPromptLocation
             };
             _openFileDialog.Setup(o => o.FileName).Returns(OtherCommandPromptLocation);
             _openFileDialog.Setup(o => o.ShowDialog()).Returns(DialogResult.OK);
 
-            //act
             vm.ShowCommandPromptExePickerCommand.Execute(null);
 
-            //assert
             Assert.AreEqual(_openFileDialog.Object.FileName, vm.CommandPromptLocation);
         }
 
@@ -186,18 +166,15 @@ namespace RubberduckTests.SourceControl
         [TestMethod]
         public void OnBrowseCommandPromptLocation_WhenUserCancels_ViewRemainsUnchanged()
         {
-            //arrange
-            var vm = new SettingsViewViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object)
+            var vm = new SettingsPanelViewModel(_configService.Object, _folderBrowserFactory.Object, _openFileDialog.Object)
             {
                 CommandPromptLocation = CommandPromptLocation
             };
             _openFileDialog.Setup(o => o.FileName).Returns(OtherCommandPromptLocation);
             _openFileDialog.Setup(o => o.ShowDialog()).Returns(DialogResult.Cancel);
 
-            //act
             vm.ShowDefaultRepoFolderPickerCommand.Execute(null);
 
-            //assert
             Assert.AreEqual(CommandPromptLocation, vm.CommandPromptLocation);
         }
     }

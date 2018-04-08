@@ -3,7 +3,7 @@ using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.Rename;
 using Rubberduck.Settings;
-using Rubberduck.UI.Refactorings;
+using Rubberduck.UI.Refactorings.Rename;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.UI.Command.Refactorings
@@ -26,7 +26,7 @@ namespace Rubberduck.UI.Command.Refactorings
             get { return RubberduckHotkey.RefactorRename; }
         }
 
-        protected override bool CanExecuteImpl(object parameter)
+        protected override bool EvaluateCanExecute(object parameter)
         {
             if (Vbe.ActiveCodePane == null)
             {
@@ -34,10 +34,10 @@ namespace Rubberduck.UI.Command.Refactorings
             }
 
             var target = _state.FindSelectedDeclaration(Vbe.ActiveCodePane);
-            return _state.Status == ParserState.Ready && target != null && !target.IsBuiltIn;
+            return _state.Status == ParserState.Ready && target != null && target.IsUserDefined;
         }
 
-        protected override void ExecuteImpl(object parameter)
+        protected override void OnExecute(object parameter)
         {
             if (Vbe.ActiveCodePane == null) { return; }
 
@@ -51,14 +51,14 @@ namespace Rubberduck.UI.Command.Refactorings
                 target = _state.FindSelectedDeclaration(Vbe.ActiveCodePane);
             }
 
-            if (target == null || target.IsBuiltIn)
+            if (target == null || !target.IsUserDefined)
             {
                 return;
             }
 
-            using (var view = new RenameDialog())
+            using (var view = new RenameDialog(new RenameViewModel(_state)))
             {
-                var factory = new RenamePresenterFactory(Vbe, view, _state, _messageBox);
+                var factory = new RenamePresenterFactory(Vbe, view, _state);
                 var refactoring = new RenameRefactoring(Vbe, factory, _messageBox, _state);
 
                 refactoring.Refactor(target);

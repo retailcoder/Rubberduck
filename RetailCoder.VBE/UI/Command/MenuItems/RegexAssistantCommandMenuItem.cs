@@ -2,14 +2,14 @@
 
 namespace Rubberduck.UI.Command.MenuItems
 {
-    class RegexAssistantCommandMenuItem : CommandMenuItemBase
+    public class RegexAssistantCommandMenuItem : CommandMenuItemBase
     {
         public RegexAssistantCommandMenuItem(CommandBase command) : base(command)
         {
         }
 
-        public override string Key { get { return "ToolsMenu_RegexAssistant"; } }
+        public override string Key => "ToolsMenu_RegexAssistant";
 
-        public override int DisplayOrder { get { return (int)ToolsMenuItemDisplayOrder.RegexAssistant; } }
+        public override int DisplayOrder => (int)ToolsMenuItemDisplayOrder.RegexAssistant;
     }
 }

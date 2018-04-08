@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 using System.Windows.Data;
-using Rubberduck.Inspections.Abstract;
+using Rubberduck.Parsing.Inspections.Abstract;
 
 namespace Rubberduck.UI.Inspections
 {
@@ -10,7 +10,7 @@ namespace Rubberduck.UI.Inspections
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var inspection = value as IInspection;
-            if (inspection == null)
+            if (inspection == null )
             {
                 return null;
             }

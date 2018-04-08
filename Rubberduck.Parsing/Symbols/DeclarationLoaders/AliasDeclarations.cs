@@ -15,6 +15,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
         private Declaration _interactionModule;
         private Declaration _stringsModule;
         private Declaration _dateTimeModule;
+        private Declaration _hiddenModule;
 
         public AliasDeclarations(RubberduckParserState state)
         {
@@ -37,6 +38,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
             Grammar.Tokens.Command,
             Grammar.Tokens.Environ,
             Grammar.Tokens.Chr,
+            Grammar.Tokens.ChrB,
             Grammar.Tokens.ChrW,
             Grammar.Tokens.Format,
             Grammar.Tokens.LCase,
@@ -49,24 +51,22 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
             Grammar.Tokens.Right,
             Grammar.Tokens.RightB,
             Grammar.Tokens.RTrim,
+            Grammar.Tokens.Space,
             Grammar.Tokens.String,
             Grammar.Tokens.UCase,
             Grammar.Tokens.Date,
             Grammar.Tokens.Time,
+            Grammar.Tokens.Input,
+            Grammar.Tokens.InputB
         };
 
         private IReadOnlyList<Declaration> AddAliasDeclarations()
         {
             var finder = _state.DeclarationFinder;;
 
-            if (WeHaveAlreadyLoadedTheDeclarationsBefore(finder))
-            {
-                return new List<Declaration>();
-            }
-
             UpdateAliasFunctionModulesFromReferencedProjects(finder);
 
-            if (NoReferenceToProjectContainingTheFunctionAliases())
+            if (NoReferenceToProjectContainingTheFunctionAliases() || WeHaveAlreadyLoadedTheDeclarationsBefore(finder))
             {
                 return new List<Declaration>();
             }
@@ -93,28 +93,26 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
             _interactionModule = finder.FindStdModule("Interaction", vba, true);
             _stringsModule = finder.FindStdModule("Strings", vba, true);
             _dateTimeModule = finder.FindStdModule("DateTime", vba, true);
+            _hiddenModule = finder.FindStdModule("_HiddenModule", vba, true);
         }
-
-
-        private static bool WeHaveAlreadyLoadedTheDeclarationsBefore(DeclarationFinder finder)
-        {
-            return ThereIsAGlobalBuiltInErrVariableDeclaration(finder);
-        }
-
-        private static bool ThereIsAGlobalBuiltInErrVariableDeclaration(DeclarationFinder finder)
-        {
-            return finder.MatchName(Grammar.Tokens.Err).Any(declaration => declaration.IsBuiltIn
-                                                                    && declaration.DeclarationType == DeclarationType.Variable
-                                                                    && declaration.Accessibility == Accessibility.Global);
-        }
-
 
         private bool NoReferenceToProjectContainingTheFunctionAliases()
         {
             return _conversionModule == null;
-                // All the modules containing function aliases are part of the same project. --> Only need to check one.
+            // All the modules containing function aliases are part of the same project. --> Only need to check one.
         }
 
+        private bool WeHaveAlreadyLoadedTheDeclarationsBefore(DeclarationFinder finder)
+        {
+            return ThereIsAnErrorFunctionDeclaration(finder);
+        }
+
+        private bool ThereIsAnErrorFunctionDeclaration(DeclarationFinder finder)
+        {
+            var errorFunction = ErrorFunction();
+            return finder.MatchName(errorFunction.IdentifierName)
+                            .Any(declaration => declaration.Equals(errorFunction));
+        }
 
         private List<Declaration> ReferencedBuiltInFunctionsThatMightHaveAnAlias(RubberduckParserState state)
         {
@@ -147,7 +145,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -165,7 +163,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -183,6 +181,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 CommandFunction(),
                 EnvironFunction(),
                 ChrFunction(),
+                ChrBFunction(),
                 ChrwFunction(),
                 FormatFunction(),
                 LCaseFunction(),
@@ -195,8 +194,11 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 RightFunction(),
                 RightBFunction(),
                 RTrimFunction(),
+                SpaceFunction(),
                 StringFunction(),
                 UCaseFunction(),
+                InputFunction(),
+                InputBFunction(),
             };
         }
 
@@ -213,7 +215,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -231,7 +233,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -249,7 +251,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -267,7 +269,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -285,7 +287,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -303,7 +305,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -321,7 +323,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -339,7 +341,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -357,7 +359,25 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
+                new List<IAnnotation>(),
+                new Attributes());
+        }
+
+        private FunctionDeclaration ChrBFunction()
+        {
+            return new FunctionDeclaration(
+                new QualifiedMemberName(_stringsModule.QualifiedName.QualifiedModuleName, "ChrB"),
+                _stringsModule,
+                _stringsModule,
+                "Variant",
+                null,
+                string.Empty,
+                Accessibility.Global,
+                null,
+                new Selection(),
+                false,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -375,7 +395,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -393,7 +413,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -411,7 +431,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -429,7 +449,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -447,7 +467,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -465,7 +485,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -483,7 +503,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -501,7 +521,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -519,7 +539,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -537,7 +557,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -555,7 +575,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -573,7 +593,25 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
+                new List<IAnnotation>(),
+                new Attributes());
+        }
+
+        private FunctionDeclaration SpaceFunction()
+        {
+            return new FunctionDeclaration(
+                new QualifiedMemberName(_stringsModule.QualifiedName.QualifiedModuleName, "Space"),
+                _stringsModule,
+                _stringsModule,
+                "Variant",
+                null,
+                string.Empty,
+                Accessibility.Global,
+                null,
+                new Selection(),
+                false,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -591,7 +629,7 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }
@@ -609,7 +647,43 @@ namespace Rubberduck.Parsing.Symbols.DeclarationLoaders
                 null,
                 new Selection(),
                 false,
-                true,
+                false,
+                new List<IAnnotation>(),
+                new Attributes());
+        }
+
+        private FunctionDeclaration InputFunction()
+        {
+            return new FunctionDeclaration(
+                new QualifiedMemberName(_hiddenModule.QualifiedName.QualifiedModuleName, "Input"),
+                _hiddenModule,
+                _hiddenModule,
+                "Variant",
+                null,
+                string.Empty,
+                Accessibility.Global,
+                null,
+                new Selection(),
+                false,
+                false,
+                new List<IAnnotation>(),
+                new Attributes());
+        }
+
+        private FunctionDeclaration InputBFunction()
+        {
+            return new FunctionDeclaration(
+                new QualifiedMemberName(_hiddenModule.QualifiedName.QualifiedModuleName, "InputB"),
+                _hiddenModule,
+                _hiddenModule,
+                "Variant",
+                null,
+                string.Empty,
+                Accessibility.Global,
+                null,
+                new Selection(),
+                false,
+                false,
                 new List<IAnnotation>(),
                 new Attributes());
         }

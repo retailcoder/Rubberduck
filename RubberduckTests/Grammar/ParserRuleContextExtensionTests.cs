@@ -1,13 +1,8 @@
-﻿using System.Linq;
-using System.Threading;
+using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Moq;
 using Rubberduck.Parsing;
 using Rubberduck.Parsing.Grammar;
-using Rubberduck.Parsing.VBA;
 using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.Application;
-using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using RubberduckTests.Mocks;
 
@@ -19,10 +14,11 @@ namespace RubberduckTests.Grammar
     {
         [TestMethod]
         [TestCategory("Inspections")]
+        [TestCategory("Grammar")]
         public void Evil_Code_Selection_Not_Evil()
         {
             const string inputCode =
-@" _
+                @" _
  _
  Function _
  _
@@ -38,23 +34,19 @@ namespace RubberduckTests.Grammar
  _
  Function";
 
-            //Arrange
-            var builder = new MockVbeBuilder();
             IVBComponent component;
-            var vbe = builder.BuildFromSingleStandardModule(inputCode, out component);
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out component);
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            var declaration = parser.State.AllDeclarations.Single(d => d.IdentifierName.Equals("Foo"));
+                var declaration = state.AllDeclarations.Single(d => d.IdentifierName.Equals("Foo"));
 
-            var actual = ((VBAParser.FunctionStmtContext)declaration.Context).GetProcedureSelection();
-            var expected = new Selection(3, 2, 11, 14);
+                var actual = ((VBAParser.FunctionStmtContext)declaration.Context).GetProcedureSelection();
+                var expected = new Selection(3, 2, 11, 14);
 
-            Assert.AreEqual(actual, expected);
+                Assert.AreEqual(actual, expected);
+            }
         }
     }
 }

@@ -13,29 +13,13 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
         {
         }
 
-        public int Count
-        {
-            get { return Target.Count; }
-        }
+        public int Count => Target.Count;
 
-        public IVBE VBE
-        {
-            get { return new VBE(IsWrappingNullReference ? null : Target.VBE); }
-        }
+        public IVBE VBE => new VBE(IsWrappingNullReference ? null : Target.VBE);
 
-        public IApplication Parent
-        {
-            get
-            {
-                throw new NotImplementedException();
-                 /*return new Application(IsWrappingNullReference ? null : Target.Parent);*/
-            }
-        }
+        public IApplication Parent => throw new NotImplementedException();
 
-        public IWindow this[object index]
-        {
-            get { return new Window(Target.Item(index)); }
-        }
+        public IWindow this[object index] => new Window(Target.Item(index));
 
         public ToolWindowInfo CreateToolWindow(IAddIn addInInst, string progId, string caption, string guidPosition)
         {
@@ -54,17 +38,17 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
             return new ComWrapperEnumerator<IWindow>(Target, o => new Window((VB.Window)o));
         }
 
-        public override void Release(bool final = false)
-        {
-            if (!IsWrappingNullReference)
-            {
-                for (var i = 1; i <= Count; i++)
-                {
-                    this[i].Release();
-                }
-                base.Release(final);
-            }
-        }
+        //public override void Release(bool final = false)
+        //{
+        //    if (!IsWrappingNullReference)
+        //    {
+        //        for (var i = 1; i <= Count; i++)
+        //        {
+        //            this[i].Release();
+        //        }
+        //        base.Release(final);
+        //    }
+        //}
 
         public override bool Equals(ISafeComWrapper<VB.Windows> other)
         {

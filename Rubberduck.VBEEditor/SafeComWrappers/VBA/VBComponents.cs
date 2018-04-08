@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.Extensions;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
@@ -14,7 +15,7 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
     public class VBComponents : SafeComWrapper<VB.VBComponents>, IVBComponents
     {
         private static readonly Guid VBComponentsEventsGuid = new Guid("0002E116-0000-0000-C000-000000000046");
-        private static object _lockObject = new object();
+        private static readonly object Locker = new object();
         private static VB.VBComponents _components;
 
         private enum ComponentEventDispId
@@ -35,29 +36,14 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
             }
         }
 
-        public int Count
-        {
-            get { return IsWrappingNullReference ? 0 : Target.Count; }
-        }
-
-        public IVBProject Parent
-        {
-            get { return new VBProject(IsWrappingNullReference ? null : Target.Parent); }
-        }
-
-        public IVBE VBE
-        {
-            get { return new VBE(IsWrappingNullReference ? null : Target.VBE); }
-        }
-
-        public IVBComponent this[object index]
-        {
-            get { return new VBComponent(IsWrappingNullReference ? null : Target.Item(index)); }
-        }
+        public int Count => IsWrappingNullReference ? 0 : Target.Count;
+        public IVBProject Parent => new VBProject(IsWrappingNullReference ? null : Target.Parent);
+        public IVBE VBE => new VBE(IsWrappingNullReference ? null : Target.VBE);
+        public IVBComponent this[object index] => new VBComponent(IsWrappingNullReference ? null : Target.Item(index));
 
         public void Remove(IVBComponent item)
         {
-            if (item != null && item.Target != null && !IsWrappingNullReference)
+            if (item?.Target != null && !IsWrappingNullReference && item.Type != ComponentType.Document)
             {
                 Target.Remove((VB.VBComponent)item.Target);
             }
@@ -97,18 +83,6 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
                 : ((IEnumerable<IVBComponent>) this).GetEnumerator();
         }
 
-        public override void Release(bool final = false)
-        {
-            if (!IsWrappingNullReference)
-            {                
-                for (var i = 1; i <= Count; i++)
-                {
-                    this[i].Release();
-                }
-                base.Release(final);
-            }
-        }
-
         public override bool Equals(ISafeComWrapper<VB.VBComponents> other)
         {
             return IsEqualIfNull(other) || (other != null && ReferenceEquals(other.Target, Target));
@@ -126,6 +100,8 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
 
         public void ImportSourceFile(string path)
         {
+            if (IsWrappingNullReference) { return; }
+
             var ext = Path.GetExtension(path);
             var name = Path.GetFileNameWithoutExtension(path);
             if (!File.Exists(path))
@@ -133,27 +109,38 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
                 return;
             }
 
-            var codeString = File.ReadAllText(path);
-            var codeLines = codeString.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
             if (ext == ComponentTypeExtensions.DocClassExtension)
             {
-                var component = this[name];
-                if (component.IsWrappingNullReference)
+                try
                 {
-                    throw new IndexOutOfRangeException(string.Format("Could not find document component named '{0}'.", name));
+                    var temp = this[name];
                 }
+                catch
+                {
+                    throw new IndexOutOfRangeException($"Could not find document component named '{name}'.  Try adding a document component with the same name and try again.");
+                }
+
+                var component = this[name];
                 component.CodeModule.Clear();
+
+                var codeString = File.ReadAllText(path, Encoding.UTF8);
                 component.CodeModule.AddFromString(codeString);
             }
             else if (ext == ComponentTypeExtensions.FormExtension)
             {
-                var component = this[name];
-                if (component.IsWrappingNullReference)
+                try
                 {
-                    component = Add(ComponentType.UserForm);
-                    component.Properties["Caption"].Value = name;
-                    component.Name = name;
+                    var temp = this[name];
                 }
+                catch
+                {
+                    Import(path);
+                }
+
+                var component = this[name];
+
+                var codeString = File.ReadAllText(path, Encoding.Default);  //The VBE uses the current ANSI codepage from the windows settings to export and import.
+                var codeLines = codeString.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
 
                 var nonAttributeLines = codeLines.TakeWhile(line => !line.StartsWith("Attribute")).Count();
                 var attributeLines = codeLines.Skip(nonAttributeLines).TakeWhile(line => line.StartsWith("Attribute")).Count();
@@ -169,15 +156,10 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
             }
         }
 
-        /// <summary>
-        /// Safely removes the specified VbComponent from the collection.
-        /// </summary>
-        /// <remarks>
-        /// UserForms, Class modules, and Standard modules are completely removed from the project.
-        /// Since Document type components can't be removed through the VBE, all code in its CodeModule are deleted instead.
-        /// </remarks>
         public void RemoveSafely(IVBComponent component)
         {
+            if (component.IsWrappingNullReference) { return; }
+
             switch (component.Type)
             {
                 case ComponentType.ClassModule:
@@ -198,9 +180,9 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
 
         private static void AttachEvents(VB.VBComponents components)
         {
-            lock (_lockObject)
+            lock (Locker)
             {
-                if (_components == null)
+                if (_components == null && components != null)
                 {
                     _components = components;
                     _componentAdded = OnComponentAdded;
@@ -221,7 +203,7 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
 
         internal static void DetatchEvents()
         {
-            lock (_lockObject)
+            lock (Locker)
             {
                 if (_components != null)
                 {

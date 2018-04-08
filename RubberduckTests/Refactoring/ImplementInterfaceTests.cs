@@ -1,11 +1,6 @@
-using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Moq;
-using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.ImplementInterface;
 using Rubberduck.VBEditor;
-using Rubberduck.VBEditor.Application;
-using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.SafeComWrappers;
 using RubberduckTests.Mocks;
 
@@ -15,652 +10,578 @@ namespace RubberduckTests.Refactoring
     public class ImplementInterfaceTests
     {
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_Procedure()
         {
             //Input
             const string inputCode1 =
-@"Public Sub Foo()
+                @"Public Sub Foo()
 End Sub";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Sub Class1_Foo()
     Err.Raise 5 'TODO implement interface member
 End Sub
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_Procedure_ClassHasOtherProcedure()
         {
             //Input
             const string inputCode1 =
-@"Public Sub Foo()
+                @"Public Sub Foo()
 End Sub";
 
             const string inputCode2 =
-@"Implements Class1
+                @"Implements Class1
+
 Public Sub Bar()
 End Sub";
 
-            var selection = new Selection(1, 1, 1, 1);
-
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
+
+Public Sub Bar()
+End Sub
 
 Private Sub Class1_Foo()
     Err.Raise 5 'TODO implement interface member
 End Sub
+";
 
-Public Sub Bar()
-End Sub";
-
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_Procedure_WithParams()
         {
             //Input
             const string inputCode1 =
-@"Public Sub Foo(ByVal a As Integer, ByRef b, c, d As Long)
+                @"Public Sub Foo(ByVal a As Integer, ByRef b, c, d As Long)
 End Sub";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Sub Class1_Foo(ByVal a As Integer, ByRef b As Variant, ByRef c As Variant, ByRef d As Long)
     Err.Raise 5 'TODO implement interface member
 End Sub
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_Function()
         {
             //Input
             const string inputCode1 =
-@"Public Function Foo() As Integer
+                @"Public Function Foo() As Integer
 End Function";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Function Class1_Foo() As Integer
     Err.Raise 5 'TODO implement interface member
 End Function
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_Function_WithImplicitType()
         {
             //Input
             const string inputCode1 =
-@"Public Function Foo()
+                @"Public Function Foo()
 End Function";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Function Class1_Foo() As Variant
     Err.Raise 5 'TODO implement interface member
 End Function
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_Function_WithParam()
         {
             //Input
             const string inputCode1 =
-@"Public Function Foo(a)
+                @"Public Function Foo(a)
 End Function";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Function Class1_Foo(ByRef a As Variant) As Variant
     Err.Raise 5 'TODO implement interface member
 End Function
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_PropertyGet()
         {
             //Input
             const string inputCode1 =
-@"Public Property Get Foo() As Integer
+                @"Public Property Get Foo() As Integer
 End Property";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Property Get Class1_Foo() As Integer
     Err.Raise 5 'TODO implement interface member
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_PropertyGet_WithImplicitType()
         {
             //Input
             const string inputCode1 =
-@"Public Property Get Foo()
+                @"Public Property Get Foo()
 End Property";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Property Get Class1_Foo() As Variant
     Err.Raise 5 'TODO implement interface member
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_PropertyGet_WithParam()
         {
             //Input
             const string inputCode1 =
-@"Public Property Get Foo(a)
+                @"Public Property Get Foo(a)
 End Property";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Property Get Class1_Foo(ByRef a As Variant) As Variant
     Err.Raise 5 'TODO implement interface member
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_PropertyLet()
         {
             //Input
             const string inputCode1 =
-@"Public Property Let Foo(ByRef value As Long)
+                @"Public Property Let Foo(ByRef value As Long)
 End Property";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Property Let Class1_Foo(ByRef value As Long)
     Err.Raise 5 'TODO implement interface member
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_PropertyLet_WithParam()
         {
             //Input
             const string inputCode1 =
-@"Public Property Let Foo(a)
+                @"Public Property Let Foo(a)
 End Property";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Property Let Class1_Foo(ByRef a As Variant)
     Err.Raise 5 'TODO implement interface member
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_PropertySet()
         {
             //Input
             const string inputCode1 =
-@"Public Property Set Foo(ByRef value As Variant)
+                @"Public Property Set Foo(ByRef value As Variant)
 End Property";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Property Set Class1_Foo(ByRef value As Variant)
     Err.Raise 5 'TODO implement interface member
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_PropertySet_WithParam()
         {
             //Input
             const string inputCode1 =
-@"Public Property Set Foo(a)
+                @"Public Property Set Foo(a)
 End Property";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = new Selection(1, 1, 1, 1);
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Property Set Class1_Foo(ByRef a As Variant)
     Err.Raise 5 'TODO implement interface member
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementInterface_PropertySet_AllTypes()
         {
             //Input
             const string inputCode1 =
-@"Public Sub Foo()
+                @"Public Sub Foo()
 End Sub
 
 Public Function Bar(ByVal a As Integer) As Boolean
@@ -673,13 +594,11 @@ Public Property Let Buz(ByVal a As Boolean, ByRef value As Integer)
 End Property";
 
             const string inputCode2 =
-@"Implements Class1";
-
-            var selection = Selection.Home;
+                @"Implements Class1";
 
             //Expectation
             const string expectedCode =
-@"Implements Class1
+                @"Implements Class1
 
 Private Sub Class1_Foo()
     Err.Raise 5 'TODO implement interface member
@@ -698,39 +617,35 @@ Private Property Let Class1_Buz(ByVal a As Boolean, ByRef value As Integer)
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
-                 .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
-                 .Build();
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode1)
+                .AddComponent("Class2", ComponentType.ClassModule, inputCode2)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void CreatesMethodStubForAllProcedureKinds()
         {
             //Input
             const string interfaceCode =
-@"Public Sub Foo(ByVal arg1 As Integer, ByVal arg2 As String)
+                @"Public Sub Foo(ByVal arg1 As Integer, ByVal arg2 As String)
 End Sub
 
 Public Function Fizz(b)
@@ -746,11 +661,11 @@ Public Property Set Buzz(value)
 End Property";
 
             const string inputCode =
-@"Implements IClassModule";
+                @"Implements IClassModule";
 
             //Expectation
             const string expectedCode =
-@"Implements IClassModule
+                @"Implements IClassModule
 
 Private Sub IClassModule_Foo(ByVal arg1 As Integer, ByVal arg2 As String)
     Err.Raise 5 'TODO implement interface member
@@ -773,34 +688,30 @@ Private Property Set IClassModule_Buzz(ByRef value As Variant)
 End Property
 ";
 
-            //Arrange
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
-                 .AddComponent("IClassModule", ComponentType.ClassModule, interfaceCode)
-                 .AddComponent("Class1", ComponentType.ClassModule, inputCode)
-                 .Build();
+                .AddComponent("IClassModule", ComponentType.ClassModule, interfaceCode)
+                .AddComponent("Class1", ComponentType.ClassModule, inputCode)
+                .Build();
             var vbe = builder.AddProject(project).Build();
             var component = project.Object.VBComponents[1];
 
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
-            var module = project.Object.VBComponents[1].CodeModule;
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            //Act
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
-
-            //Assert
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
 
         [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementsInterfaceInDocumentModule()
         {
             const string interfaceCode = @"Option Explicit
@@ -814,31 +725,33 @@ Private Sub IInterface_DoSomething()
     Err.Raise 5 'TODO implement interface member
 End Sub
 ";
-            var selection = Selection.Home;
+
             var vbe = new MockVbeBuilder()
                 .ProjectBuilder("TestProject", ProjectProtection.Unprotected)
                 .AddComponent("IInterface", ComponentType.ClassModule, interfaceCode)
-                .AddComponent("Sheet1", ComponentType.Document, initialCode, selection)
+                .AddComponent("Sheet1", ComponentType.Document, initialCode, Selection.Home)
                 .MockVbeBuilder()
                 .Build();
 
             var project = vbe.Object.VBProjects[0];
             var component = project.VBComponents["Sheet1"];
 
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
-            var module = component.CodeModule;
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
- 
-            [TestMethod]
+
+        [TestMethod]
+        [TestCategory("Refactorings")]
+        [TestCategory("Implement Interface")]
         public void ImplementsInterfaceInUserFormModule()
         {
             const string interfaceCode = @"Option Explicit
@@ -852,28 +765,28 @@ Private Sub IInterface_DoSomething()
     Err.Raise 5 'TODO implement interface member
 End Sub
 ";
-            var selection = Selection.Home;
+
             var vbe = new MockVbeBuilder()
                 .ProjectBuilder("TestProject", ProjectProtection.Unprotected)
                 .AddComponent("IInterface", ComponentType.ClassModule, interfaceCode)
-                .AddComponent("Form1", ComponentType.UserForm, initialCode, selection)
+                .AddComponent("Form1", ComponentType.UserForm, initialCode, Selection.Home)
                 .MockVbeBuilder()
                 .Build();
 
             var project = vbe.Object.VBProjects[0];
             var component = project.VBComponents["Form1"];
 
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
-            var module = component.CodeModule;
+                var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), Selection.Home);
 
-            var refactoring = new ImplementInterfaceRefactoring(vbe.Object, parser.State, null);
-            refactoring.Refactor(qualifiedSelection);
+                var refactoring = new ImplementInterfaceRefactoring(vbe.Object, state, null);
+                refactoring.Refactor(qualifiedSelection);
 
-            Assert.AreEqual(expectedCode, module.Content());
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
+            }
         }
     }
 }

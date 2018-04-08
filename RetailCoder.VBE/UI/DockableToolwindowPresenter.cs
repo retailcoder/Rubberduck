@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using NLog;
@@ -19,20 +20,19 @@ namespace Rubberduck.UI
         UserControl UserControl { get; }
     }
 
-    public abstract class DockableToolwindowPresenter : IDockablePresenter, IDisposable
+    public abstract class DockableToolwindowPresenter : IDockablePresenter
     {
         private readonly IAddIn _addin;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly IWindow _window;
-        private readonly UserControl _userControl;
         private readonly WindowSettings _settings;  //Storing this really doesn't matter - it's only checked on startup and never persisted.
 
         protected DockableToolwindowPresenter(IVBE vbe, IAddIn addin, IDockableUserControl view, IConfigProvider<WindowSettings> settingsProvider)
         {
             _vbe = vbe;
             _addin = addin;
-            Logger.Trace(string.Format("Initializing Dockable Panel ({0})", GetType().Name));
-            _userControl = view as UserControl;
+            Logger.Trace($"Initializing Dockable Panel ({GetType().Name})");
+            UserControl = view as UserControl;
             if (settingsProvider != null)
             {
                 _settings = settingsProvider.Create();
@@ -40,12 +40,10 @@ namespace Rubberduck.UI
             _window = CreateToolWindow(view);
         }
 
-        public UserControl UserControl { get { return _userControl; } }
-
-        private readonly IVBE _vbe;
-        protected IVBE VBE { get { return _vbe; } }
+        public UserControl UserControl { get; }
 
         private object _userControlObject;
+        private readonly IVBE _vbe;
 
         private IWindow CreateToolWindow(IDockableUserControl control)
         {
@@ -99,46 +97,13 @@ namespace Rubberduck.UI
             }
         }
 
-        public virtual void Show()
-        {
-            _window.IsVisible = true;
-        }
-
-        public void Hide()
-        {
-            _window.IsVisible = false;
-        }
-
-        private bool _disposed;
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
+        public virtual void Show() => _window.IsVisible = true;
+        public virtual void Hide() => _window.IsVisible = false;
 
         ~DockableToolwindowPresenter()
         {
-            Dispose(false);
-        }
-
-        public bool IsDisposed { get { return _disposed; } }
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-            if (disposing && _window != null)
-            {
-                // cleanup unmanaged resource wrappers
-                _window.Close();
-                _window.Release(true);
-            }
-            if (!disposing)
-            {
-                return;
-            }
-            _disposed = true;
+            // destructor for tracking purposes only - do not suppress unless 
+            Debug.WriteLine("DockableToolwindowPresenter finalized.");
         }
     }
 }

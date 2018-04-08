@@ -1,4 +1,3 @@
-﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Linq;
 using Rubberduck.Parsing.Symbols;
@@ -11,6 +10,7 @@ namespace RubberduckTests.Symbols
     public class PropertySetDeclarationTests
     {
         [TestMethod]
+        [TestCategory("Resolver")]
         public void PropertySetsHaveDeclarationTypePropertySet()
         {
             var propertySet = GetTestPropertySet("test", null);
@@ -21,7 +21,7 @@ namespace RubberduckTests.Symbols
             private static PropertySetDeclaration GetTestPropertySet(string name, Attributes attributes)
             {
                 var qualifiedName = new QualifiedMemberName(StubQualifiedModuleName(), name);
-                return new PropertySetDeclaration(qualifiedName, null, null, "test", Accessibility.Implicit, null, Selection.Home, false, null, attributes);
+                return new PropertySetDeclaration(qualifiedName, null, null, "test", Accessibility.Implicit, null, Selection.Home, true, null, attributes);
             }
 
                 private static QualifiedModuleName StubQualifiedModuleName()
@@ -31,6 +31,7 @@ namespace RubberduckTests.Symbols
 
 
         [TestMethod]
+        [TestCategory("Resolver")]
         public void ByDefaultPropertySetsDoNotHaveParameters()
         {
             var propertySet = GetTestPropertySet("test", null);
@@ -40,6 +41,7 @@ namespace RubberduckTests.Symbols
 
 
         [TestMethod]
+        [TestCategory("Resolver")]
         public void ParametersReturnsTheParametersAddedViaAddParameters()
         {
             var propertySet = GetTestPropertySet("test", null);
@@ -58,6 +60,7 @@ namespace RubberduckTests.Symbols
 
 
         [TestMethod]
+        [TestCategory("Resolver")]
         public void ByDefaultPropertySetsAreNotDefaultMembers()
         {
             var propertySet = GetTestPropertySet("test", null);
@@ -67,6 +70,7 @@ namespace RubberduckTests.Symbols
 
 
         [TestMethod]
+        [TestCategory("Resolver")]
         public void PropertySetsAreDefaultMembersIfTheyHaveTheDefaultMemberAttribute()
         {
             var attributes = new Attributes();

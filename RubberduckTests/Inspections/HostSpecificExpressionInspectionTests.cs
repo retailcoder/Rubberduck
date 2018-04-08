@@ -2,12 +2,10 @@ using System.Linq;
 using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using Rubberduck.Inspections;
+using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.VBEditor.Application;
-using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.SafeComWrappers;
-using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using RubberduckTests.Mocks;
 
 namespace RubberduckTests.Inspections
@@ -36,16 +34,22 @@ End Sub
             mockHost.SetupGet(m => m.ApplicationName).Returns("Excel");
             vbe.Setup(m => m.HostApplication()).Returns(() => mockHost.Object);
 
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
-            parser.State.AddTestLibrary("VBA.4.2.xml");
-            parser.State.AddTestLibrary("Excel.1.8.xml");
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+            var parser = MockParser.Create(vbe.Object);
+            using (var state = parser.State)
+            {
+                state.AddTestLibrary("VBA.4.2.xml");
+                state.AddTestLibrary("Excel.1.8.xml");
+                parser.Parse(new CancellationTokenSource());
+                if (state.Status >= ParserState.Error)
+                {
+                    Assert.Inconclusive("Parser Error");
+                }
 
-            var inspection = new HostSpecificExpressionInspection(parser.State);
-            var inspectionResults = inspection.GetInspectionResults();
+                var inspection = new HostSpecificExpressionInspection(state);
+                var inspectionResults = inspection.GetInspectionResults();
 
-            Assert.AreEqual(1, inspectionResults.Count());
+                Assert.AreEqual(1, inspectionResults.Count());
+            }
         }
     }
 }

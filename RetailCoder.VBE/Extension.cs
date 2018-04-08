@@ -1,8 +1,4 @@
 ﻿using Extensibility;
-using Ninject;
-using Ninject.Extensions.Factory;
-using Rubberduck.Common.WinAPI;
-using Rubberduck.Root;
 using Rubberduck.UI;
 using System;
 using System.ComponentModel;
@@ -14,12 +10,17 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Windows.Threading;
-using Ninject.Extensions.Interception;
+using Castle.Windsor;
+using Microsoft.Vbe.Interop;
 using NLog;
+using Rubberduck.Root;
 using Rubberduck.Settings;
 using Rubberduck.SettingsProvider;
 using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using Rubberduck.VBEditor.WindowsApi;
+using User32 = Rubberduck.Common.WinAPI.User32;
+using Windows = Rubberduck.VBEditor.SafeComWrappers.VBA.Windows;
 
 namespace Rubberduck
 {
@@ -27,21 +28,20 @@ namespace Rubberduck
     /// Special thanks to Carlos Quintero (MZ-Tools) for providing the general structure here.
     /// </remarks>
     [ComVisible(true)]
-    [Guid(ClassId)]
-    [ProgId(ProgId)]
+    [Guid(RubberduckGuid.ExtensionGuid)]
+    [ProgId(RubberduckProgId.ExtensionProgId)]
     [EditorBrowsable(EditorBrowsableState.Never)]
     // ReSharper disable once InconsistentNaming // note: underscore prefix hides class from COM API
     public class _Extension : IDTExtensibility2
     {
-        private const string ClassId = "8D052AD8-BBD2-4C59-8DEC-F697CA1F8A66";
-        private const string ProgId = "Rubberduck.Extension";
-
         private IVBE _ide;
         private IAddIn _addin;
         private bool _isInitialized;
         private bool _isBeginShutdownExecuted;
 
-        private IKernel _kernel;
+        private GeneralSettings _initialSettings;
+
+        private IWindsorContainer _container;
         private App _app;
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
 
@@ -54,11 +54,11 @@ namespace Rubberduck
             {
                 if (Application is Microsoft.Vbe.Interop.VBE)
                 {
-                    var vbe = (Microsoft.Vbe.Interop.VBE) Application;                  
+                    var vbe = (VBE) Application;                  
                     _ide = new VBEditor.SafeComWrappers.VBA.VBE(vbe);
                     VBENativeServices.HookEvents(_ide);
                     
-                    var addin = (Microsoft.Vbe.Interop.AddIn)AddInInst;
+                    var addin = (AddIn)AddInInst;
                     _addin = new VBEditor.SafeComWrappers.VBA.AddIn(addin) { Object = this };
                 }
                 else if (Application is Microsoft.VB6.Interop.VBIDE.VBE)
@@ -152,12 +152,12 @@ namespace Rubberduck
             };
             var configProvider = new GeneralConfigProvider(configLoader);
             
-            var settings = configProvider.Create();
-            if (settings != null)
+            _initialSettings = configProvider.Create();
+            if (_initialSettings != null)
             {
                 try
                 {
-                    var cultureInfo = CultureInfo.GetCultureInfo(settings.Language.Code);
+                    var cultureInfo = CultureInfo.GetCultureInfo(_initialSettings.Language.Code);
                     Dispatcher.CurrentDispatcher.Thread.CurrentUICulture = cultureInfo;
                 }
                 catch (CultureNotFoundException)
@@ -170,12 +170,12 @@ namespace Rubberduck
             }
 
             Splash splash = null;
-            if (settings.ShowSplash)
+            if (_initialSettings.ShowSplash)
             {
                 splash = new Splash
                 {
                     // note: IVersionCheck.CurrentVersion could return this string.
-                    Version = string.Format("version {0}", Assembly.GetExecutingAssembly().GetName().Version)
+                    Version = $"version {Assembly.GetExecutingAssembly().GetName().Version}"
                 };
                 splash.Show();
                 splash.Refresh();
@@ -198,59 +198,90 @@ namespace Rubberduck
             }
             finally
             {
-                if (splash != null)
-                {
-                    splash.Dispose();
-                }
+                splash?.Dispose();
             }
         }
 
         private void Startup()
         {
-            var currentDomain = AppDomain.CurrentDomain;
-            currentDomain.AssemblyResolve += LoadFromSameFolder;
+            try
+            {
+                var currentDomain = AppDomain.CurrentDomain;
+                currentDomain.UnhandledException += HandlAppDomainException;
+                currentDomain.AssemblyResolve += LoadFromSameFolder;
 
-            _kernel = new StandardKernel(new NinjectSettings {LoadExtensions = true}, new FuncModule(), new DynamicProxyModule());
-            _kernel.Load(new RubberduckModule(_ide, _addin));
+                _container = new WindsorContainer().Install(new RubberduckIoCInstaller(_ide, _addin, _initialSettings));
+                
+                _app = _container.Resolve<App>();
+                _app.Startup();
 
-            _app = _kernel.Get<App>();
-            _app.Startup();
+                _isInitialized = true;
 
-            _isInitialized = true;
+            }
+            catch (Exception e)
+            {
+                _logger.Log(LogLevel.Fatal, e, "Startup sequence threw an unexpected exception.");
+#if DEBUG
+                throw; // <<~ uncomment to crash the process
+#endif
+            }
+        }
+
+        private void HandlAppDomainException(object sender, UnhandledExceptionEventArgs e)
+        {
+            _logger.Log(LogLevel.Fatal, e);
         }
 
         private void ShutdownAddIn()
         {
-            VBENativeServices.UnhookEvents();
-
             var currentDomain = AppDomain.CurrentDomain;
-            currentDomain.AssemblyResolve -= LoadFromSameFolder;
-
-            User32.EnumChildWindows(_ide.MainWindow.Handle(), EnumCallback, new IntPtr(0));
-
-            if (_app != null)
-            {
-                _app.Shutdown();
-                _app = null;
-            }
-
-            if (_kernel != null)
-            {
-                _kernel.Dispose();
-                _kernel = null;
-            }
-
             try
             {
-                _ide.Release();
+                _logger.Log(LogLevel.Info, "Rubberduck is shutting down.");
+                _logger.Log(LogLevel.Trace, "Unhooking VBENativeServices events...");
+                VBENativeServices.UnhookEvents();
+
+                _logger.Log(LogLevel.Trace, "Broadcasting shutdown...");
+                User32.EnumChildWindows(_ide.MainWindow.Handle(), EnumCallback, new IntPtr(0));
+
+                _logger.Log(LogLevel.Trace, "Releasing dockable hosts...");
+                Windows.ReleaseDockableHosts();
+
+                if (_app != null)
+                {
+                    _logger.Log(LogLevel.Trace, "Initiating App.Shutdown...");
+                    _app.Shutdown();
+                    _app = null;
+                }
+
+                if (_container != null)
+                {
+                    _logger.Log(LogLevel.Trace, "Disposing IoC container...");
+                    _container.Dispose();
+                    _container = null;
+                }
+
+                _isInitialized = false;
+                _logger.Log(LogLevel.Info, "No exceptions were thrown.");
             }
             catch (Exception e)
             {
                 _logger.Error(e);
+                _logger.Log(LogLevel.Warn, "Exception is swallowed.");
+                //throw; // <<~ uncomment to crash the process
             }
-
-            GC.WaitForPendingFinalizers();
-            _isInitialized = false;
+            finally
+            {
+                _logger.Log(LogLevel.Trace, "Unregistering AppDomain handlers....");
+                currentDomain.AssemblyResolve -= LoadFromSameFolder;
+                currentDomain.UnhandledException -= HandlAppDomainException;
+                _logger.Log(LogLevel.Trace, "Done. Initiating garbage collection...");
+                GC.Collect();
+                _logger.Log(LogLevel.Trace, "Done. Waiting for pending finalizers...");
+                GC.WaitForPendingFinalizers();
+                _logger.Log(LogLevel.Trace, "Done. Shutdown completed. Quack!");
+                _isInitialized = false;
+            }
         }
 
         private static int EnumCallback(IntPtr hwnd, IntPtr lparam)

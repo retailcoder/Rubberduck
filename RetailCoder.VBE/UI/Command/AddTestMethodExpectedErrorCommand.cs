@@ -48,7 +48,7 @@ namespace Rubberduck.UI.Command
             "End Sub\r\n"
             );
 
-        protected override bool CanExecuteImpl(object parameter)
+        protected override bool EvaluateCanExecute(object parameter)
         {
             var pane = _vbe.ActiveCodePane;
             {
@@ -78,7 +78,7 @@ namespace Rubberduck.UI.Command
             }
         }
 
-        protected override void ExecuteImpl(object parameter)
+        protected override void OnExecute(object parameter)
         {
             var pane = _vbe.ActiveCodePane;
             if (pane.IsWrappingNullReference)
@@ -101,7 +101,7 @@ namespace Rubberduck.UI.Command
                 module.InsertLines(module.CountOfLines, body);
             }
 
-            _state.OnParseRequested(this, _vbe.SelectedVBComponent);
+            _state.OnParseRequested(this);
         }
 
         private string GetNextTestMethodName(IVBComponent component)

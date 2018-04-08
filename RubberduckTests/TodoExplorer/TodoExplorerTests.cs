@@ -1,4 +1,4 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Linq;
 using System.Threading;
@@ -7,8 +7,6 @@ using Rubberduck.Settings;
 using Rubberduck.UI.ToDoItems;
 using RubberduckTests.Mocks;
 using Rubberduck.Common;
-using Rubberduck.VBEditor.Application;
-using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.SafeComWrappers;
 
 namespace RubberduckTests.TodoExplorer
@@ -17,10 +15,11 @@ namespace RubberduckTests.TodoExplorer
     public class TodoExplorerTests
     {
         [TestMethod]
+        [TestCategory("Annotations")]
         public void PicksUpComments()
         {
             var content =
-@"' Todo this is a todo comment
+                @"' Todo this is a todo comment
 ' Note this is a note comment
 ' Bug this is a bug comment
 ";
@@ -30,25 +29,29 @@ namespace RubberduckTests.TodoExplorer
                 .AddComponent("Module1", ComponentType.StandardModule, content);
 
             var vbe = builder.AddProject(project.Build()).Build();
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            var parser = MockParser.Create(vbe.Object);
+            using (var state = parser.State)
+            {
+                var vm = new ToDoExplorerViewModel(state, GetConfigService(), GetOperatingSystemMock().Object);
 
-            var vm = new ToDoExplorerViewModel(parser.State, GetConfigService(), GetOperatingSystemMock().Object);
+                parser.Parse(new CancellationTokenSource());
+                if (state.Status >= ParserState.Error)
+                {
+                    Assert.Inconclusive("Parser Error");
+                }
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var comments = vm.Items.Select(s => s.Type);
 
-            var comments = vm.Items.Select(s => s.Type);
-
-            Assert.IsTrue(comments.SequenceEqual(new[] { "TODO ", "NOTE ", "BUG " }));
+                Assert.IsTrue(comments.SequenceEqual(new[] { "TODO ", "NOTE ", "BUG " }));
+            }
         }
 
         [TestMethod]
+        [TestCategory("Annotations")]
         public void PicksUpComments_StrangeCasing()
         {
             var content =
-@"' tODO this is a todo comment
+                @"' tODO this is a todo comment
 ' NOTE  this is a note comment
 ' bug this is a bug comment
 ' bUg this is a bug comment
@@ -59,28 +62,32 @@ namespace RubberduckTests.TodoExplorer
                 .AddComponent("Module1", ComponentType.StandardModule, content);
 
             var vbe = builder.AddProject(project.Build()).Build();
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            var parser = MockParser.Create(vbe.Object);
+            using (var state = parser.State)
+            {
+                var vm = new ToDoExplorerViewModel(state, GetConfigService(), GetOperatingSystemMock().Object);
 
-            var vm = new ToDoExplorerViewModel(parser.State, GetConfigService(), GetOperatingSystemMock().Object);
+                parser.Parse(new CancellationTokenSource());
+                if (state.Status >= ParserState.Error)
+                {
+                    Assert.Inconclusive("Parser Error");
+                }
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                var comments = vm.Items.Select(s => s.Type);
 
-            var comments = vm.Items.Select(s => s.Type);
-
-            Assert.IsTrue(comments.SequenceEqual(new[] { "TODO ", "NOTE ", "BUG ", "BUG " }));
+                Assert.IsTrue(comments.SequenceEqual(new[] { "TODO ", "NOTE ", "BUG ", "BUG " }));
+            }
         }
 
         [TestMethod]
+        [TestCategory("Annotations")]
         public void RemoveRemovesComment()
         {
             var input =
-@"Dim d As Variant  ' bug should be Integer";
+                @"Dim d As Variant  ' bug should be Integer";
 
             var expected =
-@"Dim d As Variant  ";
+                @"Dim d As Variant  ";
 
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("TestProject1", ProjectProtection.Unprotected)
@@ -88,21 +95,24 @@ namespace RubberduckTests.TodoExplorer
                 .Build();
 
             var vbe = builder.AddProject(project).Build();
-            var mockHost = new Mock<IHostApplication>();
-            mockHost.SetupAllProperties();
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            var parser = MockParser.Create(vbe.Object);
+            using (var state = parser.State)
+            {
+                var vm = new ToDoExplorerViewModel(state, GetConfigService(), GetOperatingSystemMock().Object);
 
-            var vm = new ToDoExplorerViewModel(parser.State, GetConfigService(), GetOperatingSystemMock().Object);
+                parser.Parse(new CancellationTokenSource());
+                if (state.Status >= ParserState.Error)
+                {
+                    Assert.Inconclusive("Parser Error");
+                }
 
-            parser.Parse(new CancellationTokenSource());
-            if (parser.State.Status >= ParserState.Error) { Assert.Inconclusive("Parser Error"); }
+                vm.SelectedItem = vm.Items.Single();
+                vm.RemoveCommand.Execute(null);
 
-            vm.SelectedItem = vm.Items.Single();
-            vm.RemoveCommand.Execute(null);
-
-            var module = project.Object.VBComponents[0].CodeModule;
-            Assert.AreEqual(expected, module.Content());
-            Assert.IsFalse(vm.Items.Any());
+                var module = project.Object.VBComponents[0].CodeModule;
+                Assert.AreEqual(expected, module.Content());
+                Assert.IsFalse(vm.Items.Any());
+            }
         }
 
         private IGeneralConfigService GetConfigService()

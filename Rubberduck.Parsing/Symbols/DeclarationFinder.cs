@@ -10,6 +10,8 @@ using System.Linq;
 using Antlr4.Runtime;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.VBEditor.Application;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Parsing.Symbols
 {
@@ -22,14 +24,25 @@ namespace Rubberduck.Parsing.Symbols
         }
 
         public static IEnumerable<TValue> AllValues<TKey, TValue>(
-        this IDictionary<TKey, IList<TValue>> source)
+            this IDictionary<TKey, IList<TValue>> source)
         {
             return source.SelectMany(item => item.Value).ToList();
+        }
+
+        public static IEnumerable<TValue> AllValues<TKey, TValue>(
+            this IDictionary<TKey, List<TValue>> source)
+        {
+            return source.SelectMany(item => item.Value);
         }
 
         public static ConcurrentDictionary<TKey, ConcurrentBag<TValue>> ToConcurrentDictionary<TKey, TValue>(this IEnumerable<IGrouping<TKey, TValue>> source)
         {
             return new ConcurrentDictionary<TKey, ConcurrentBag<TValue>>(source.Select(x => new KeyValuePair<TKey, ConcurrentBag<TValue>>(x.Key, new ConcurrentBag<TValue>(x))));
+        }
+
+        public static Dictionary<TKey, List<TValue>> ToDictionary<TKey, TValue>(this IEnumerable<IGrouping<TKey, TValue>> source)
+        {
+            return source.ToDictionary(group => group.Key, group => group.ToList());
         }
     }
 
@@ -40,36 +53,206 @@ namespace Rubberduck.Parsing.Symbols
 
         private readonly IHostApplication _hostApp;
         private readonly AnnotationService _annotationService;
-        private readonly ConcurrentDictionary<string, ConcurrentBag<Declaration>> _declarationsByName;
-        private readonly ConcurrentDictionary<QualifiedModuleName, ConcurrentBag<Declaration>> _declarations;
-        private readonly ConcurrentDictionary<QualifiedMemberName, ConcurrentBag<Declaration>> _newUndeclared;
-        private readonly ConcurrentBag<UnboundMemberDeclaration> _newUnresolved;
-        private readonly List<UnboundMemberDeclaration> _unresolved;
-        private readonly ConcurrentDictionary<QualifiedModuleName, ConcurrentBag<IAnnotation>> _annotations;
-        private readonly ConcurrentDictionary<Declaration, ConcurrentBag<Declaration>> _parametersByParent;
-        private readonly ConcurrentDictionary<DeclarationType, ConcurrentBag<Declaration>> _userDeclarationsByType;
+        private IDictionary<string, List<Declaration>> _declarationsByName;
+        private IDictionary<QualifiedModuleName, List<Declaration>> _declarations;
+        private ConcurrentDictionary<QualifiedMemberName, ConcurrentBag<Declaration>> _newUndeclared;
+        private ConcurrentBag<UnboundMemberDeclaration> _newUnresolved;
+        private List<UnboundMemberDeclaration> _unresolved;
+        private IDictionary<QualifiedModuleName, List<IAnnotation>> _annotations;
+        private IDictionary<Declaration, List<Declaration>> _parametersByParent;
+        private IDictionary<DeclarationType, List<Declaration>> _userDeclarationsByType;
+        private IDictionary<QualifiedSelection, List<Declaration>> _declarationsBySelection;
+        private IDictionary<QualifiedSelection, List<IdentifierReference>> _referencesBySelection;
 
-        private readonly Lazy<ConcurrentDictionary<Declaration, Declaration[]>> _handlersByWithEventsField;
-        private readonly Lazy<ConcurrentDictionary<VBAParser.ImplementsStmtContext, Declaration[]>> _membersByImplementsContext;
-        private readonly Lazy<ConcurrentDictionary<Declaration, Declaration[]>> _interfaceMembers;
+        private Lazy<IDictionary<DeclarationType, List<Declaration>>> _builtInDeclarationsByType;
+        private Lazy<IDictionary<Declaration, List<Declaration>>> _handlersByWithEventsField;
+        private Lazy<IDictionary<VBAParser.ImplementsStmtContext, List<Declaration>>> _membersByImplementsContext;
+        private Lazy<IDictionary<Declaration, List<Declaration>>> _interfaceMembers;
+        private Lazy<List<Declaration>> _nonBaseAsType;
+        private Lazy<List<Declaration>> _eventHandlers;
+        private Lazy<List<Declaration>> _projects;
+        private Lazy<List<Declaration>> _classes;
         
-        private static readonly object ThreadLock = new object();
+        private readonly object threadLock = new object();
+
+        private static QualifiedSelection GetGroupingKey(Declaration declaration)
+        {
+            // we want the procedures' whole body, not just their identifier:
+            return declaration.DeclarationType.HasFlag(DeclarationType.Member)
+                ? new QualifiedSelection(
+                    declaration.QualifiedName.QualifiedModuleName,
+                    declaration.Context.GetSelection())
+                : declaration.QualifiedSelection;
+        }
 
         public DeclarationFinder(IReadOnlyList<Declaration> declarations, IEnumerable<IAnnotation> annotations, IReadOnlyList<UnboundMemberDeclaration> unresolvedMemberDeclarations, IHostApplication hostApp = null)
         {
             _hostApp = hostApp;
-            _annotations = annotations.GroupBy(node => node.QualifiedSelection.QualifiedName).ToConcurrentDictionary();
-            _declarations = declarations.GroupBy(item => item.QualifiedName.QualifiedModuleName).ToConcurrentDictionary();
-            _declarationsByName = declarations.GroupBy(declaration => declaration.IdentifierName.ToLowerInvariant()).ToConcurrentDictionary();
-            _parametersByParent = declarations.Where(declaration => declaration.DeclarationType == DeclarationType.Parameter)
-                .GroupBy(declaration => declaration.ParentDeclaration).ToConcurrentDictionary();
-            _userDeclarationsByType = declarations.Where(declaration => !declaration.IsBuiltIn).GroupBy(declaration => declaration.DeclarationType).ToConcurrentDictionary();
-            _eventHandlers = new Lazy<ConcurrentBag<Declaration>>(() => FindEventHandlers(declarations), true);
 
-            _projects = _projects = new Lazy<ConcurrentBag<Declaration>>(() => new ConcurrentBag<Declaration>(declarations.Where(d => d.DeclarationType == DeclarationType.Project)), true);
-            _classes = new Lazy<ConcurrentBag<Declaration>>(() => new ConcurrentBag<Declaration>(declarations.Where(d => d.DeclarationType == DeclarationType.ClassModule)), true);
+            _newUndeclared = new ConcurrentDictionary<QualifiedMemberName, ConcurrentBag<Declaration>>(new Dictionary<QualifiedMemberName, ConcurrentBag<Declaration>>());
+            _newUnresolved = new ConcurrentBag<UnboundMemberDeclaration>(new List<UnboundMemberDeclaration>());
 
-            var withEventsFields = UserDeclarations(DeclarationType.Variable).Where(item => item.IsWithEvents).ToArray();
+            _annotationService = new AnnotationService(this);
+
+            var collectionConstructionActions = CollectionConstructionActions(declarations, annotations, unresolvedMemberDeclarations);
+            ExecuteCollectionConstructionActions(collectionConstructionActions);
+
+            //Temporal coupling: the initializers of the lazy collections use the regular collections filled above.
+            InitializeLazyCollections();
+        }
+
+        protected virtual void ExecuteCollectionConstructionActions(List<Action> collectionConstructionActions)
+        {
+            collectionConstructionActions.ForEach(action => action.Invoke());
+        }
+
+        private List<Action> CollectionConstructionActions(IReadOnlyList<Declaration> declarations, IEnumerable<IAnnotation> annotations, IReadOnlyList<UnboundMemberDeclaration> unresolvedMemberDeclarations)
+        {
+            var actions = new List<Action>();
+
+            actions.Add(() => 
+                _unresolved = unresolvedMemberDeclarations
+                    .ToList()
+                );
+            actions.Add(() =>
+                _annotations = annotations
+                    .GroupBy(node => node.QualifiedSelection.QualifiedName)
+                    .ToDictionary()
+                );
+            actions.Add(() => 
+                _declarations = declarations
+                    .GroupBy(item => item.QualifiedName.QualifiedModuleName)
+                    .ToDictionary()
+                );
+            actions.Add(() => 
+                _declarationsByName = declarations
+                    .GroupBy(declaration => declaration.IdentifierName.ToLowerInvariant())
+                    .ToDictionary()
+                );
+            actions.Add(() =>
+                _declarationsBySelection = declarations
+                    .Where(declaration => declaration.IsUserDefined)
+                    .GroupBy(GetGroupingKey)
+                    .ToDictionary()
+                );
+            actions.Add(() => 
+                _referencesBySelection = declarations
+                    .SelectMany(declaration => declaration.References)
+                    .GroupBy(reference => new QualifiedSelection(reference.QualifiedModuleName, reference.Selection))
+                    .ToDictionary()
+                );
+            actions.Add(() =>
+                _parametersByParent = declarations
+                    .Where(declaration => declaration.DeclarationType == DeclarationType.Parameter)
+                    .GroupBy(declaration => declaration.ParentDeclaration)
+                    .ToDictionary()
+                );
+            actions.Add(() =>
+                _userDeclarationsByType = declarations
+                    .Where(declaration => declaration.IsUserDefined)
+                    .GroupBy(declaration => declaration.DeclarationType)
+                    .ToDictionary()
+                );
+
+            return actions;
+        }
+
+        private void InitializeLazyCollections()
+        {
+            _builtInDeclarationsByType = new Lazy<IDictionary<DeclarationType, List<Declaration>>>(() =>
+                _declarations
+                    .AllValues()
+                    .Where(declaration => !declaration.IsUserDefined)
+                    .GroupBy(declaration => declaration.DeclarationType)
+                    .ToDictionary()
+                , true);
+
+            _nonBaseAsType = new Lazy<List<Declaration>>(() =>
+                _declarations
+                    .AllValues()
+                    .Where(d => !string.IsNullOrWhiteSpace(d.AsTypeName)
+                                    && !d.AsTypeIsBaseType
+                                    && d.DeclarationType != DeclarationType.Project
+                                    && d.DeclarationType != DeclarationType.ProceduralModule)
+                    .ToList()
+                , true);
+
+            _eventHandlers = new Lazy<List<Declaration>>(() => FindAllEventHandlers(), true);
+            _projects = new Lazy<List<Declaration>>(() => DeclarationsWithType(DeclarationType.Project).ToList(), true);
+            _classes = new Lazy<List<Declaration>>(() => DeclarationsWithType(DeclarationType.ClassModule).ToList(), true);
+            _handlersByWithEventsField = new Lazy<IDictionary<Declaration, List<Declaration>>>(() => FindAllHandlersByWithEventField(), true);
+            _interfaceMembers = new Lazy<IDictionary<Declaration, List<Declaration>>>(() => FindAllIinterfaceMembersByModule(), true);
+            _membersByImplementsContext = new Lazy<IDictionary<VBAParser.ImplementsStmtContext, List<Declaration>>>(() =>
+                FindAllImplementingMembersByImplementsContext(),
+                true);
+        }
+
+        private IDictionary<VBAParser.ImplementsStmtContext, List<Declaration>> FindAllImplementingMembersByImplementsContext()
+        {
+            var implementsInstructions = UserDeclarations(DeclarationType.ClassModule)
+                .SelectMany(cls => cls.References
+                    .Where(reference => ParserRuleContextHelper.HasParent<VBAParser.ImplementsStmtContext>(reference.Context))
+                    .Select(reference =>
+                        new
+                        {
+                            IdentifierReference = reference,
+                            Context = ParserRuleContextHelper.GetParent<VBAParser.ImplementsStmtContext>(reference.Context)
+                        }
+                    )
+                ).ToList();
+
+            var implementingNames = implementsInstructions.SelectMany(item =>
+                    Members(item.IdentifierReference.Declaration.QualifiedName.QualifiedModuleName)
+                        .Where(member => member.DeclarationType.HasFlag(DeclarationType.Member))
+                        .Select(member => item.IdentifierReference.Declaration.IdentifierName + "_" + member.IdentifierName)
+                        )
+                    .ToHashSet();
+
+            var implementableMembers = implementsInstructions.Select(item =>
+                new
+                {
+                    item.Context,
+                    Members = Members(item.IdentifierReference.QualifiedModuleName)
+                        .Where(implementingTypeMember => implementingNames.Contains(implementingTypeMember.IdentifierName))
+                        .ToList()
+                });
+
+            return implementableMembers.ToDictionary(item => item.Context, item => item.Members);
+        }
+
+        private IDictionary<Declaration, List<Declaration>> FindAllIinterfaceMembersByModule()
+        {
+            var implementsInstructions = UserDeclarations(DeclarationType.ClassModule)
+                .SelectMany(cls => cls.References
+                    .Where(reference => ParserRuleContextHelper.HasParent<VBAParser.ImplementsStmtContext>(reference.Context))
+                    .Select(reference =>
+                        new
+                        {
+                            IdentifierReference = reference,
+                            Context = ParserRuleContextHelper.GetParent<VBAParser.ImplementsStmtContext>(reference.Context)
+                        }
+                    )
+                );
+
+            var interfaceModules = implementsInstructions.Select(item => item.IdentifierReference.Declaration).Distinct();
+
+            var interfaceMembers = interfaceModules.Select(item =>
+                new
+                {
+                    InterfaceModule = item,
+                    InterfaceMembers = Members(item.QualifiedName.QualifiedModuleName)
+                        .Where(member => member.DeclarationType.HasFlag(DeclarationType.Member))
+                });
+
+            return interfaceMembers.ToDictionary(
+                        item => item.InterfaceModule,
+                        item => item.InterfaceMembers.ToList()
+                     );
+        }
+
+        private IDictionary<Declaration, List<Declaration>> FindAllHandlersByWithEventField()
+        {
+            var withEventsFields = UserDeclarations(DeclarationType.Variable).Where(item => item.IsWithEvents);
             var events = withEventsFields.Select(field =>
                 new
                 {
@@ -77,70 +260,75 @@ namespace Rubberduck.Parsing.Symbols
                     AvailableEvents = FindEvents(field.AsTypeDeclaration).ToArray()
                 });
 
-            _handlersByWithEventsField = new Lazy<ConcurrentDictionary<Declaration, Declaration[]>>(() =>
-                new ConcurrentDictionary<Declaration, Declaration[]>(
-                    events.Select(item =>
-                        new
-                        {
-                            item.WithEventsField,
-                            Handlers = item.AvailableEvents.SelectMany(evnt =>
-                                _declarations[item.WithEventsField.ParentDeclaration.QualifiedName.QualifiedModuleName]
-                                    .Where(member => member.DeclarationType == DeclarationType.Procedure
-                                                  && member.IdentifierName == item.WithEventsField.IdentifierName + "_" + evnt.IdentifierName))
-                        })
-                        .ToDictionary(item => item.WithEventsField, item => item.Handlers.ToArray())
-                    ), true);
-
-            _newUndeclared = new ConcurrentDictionary<QualifiedMemberName, ConcurrentBag<Declaration>>(new Dictionary<QualifiedMemberName, ConcurrentBag<Declaration>>());
-            _newUnresolved = new ConcurrentBag<UnboundMemberDeclaration>(new List<UnboundMemberDeclaration>());
-            _unresolved = unresolvedMemberDeclarations.ToList();
-            
-            _annotationService = new AnnotationService(this);
-
-            var implementsInstructions = UserDeclarations(DeclarationType.ClassModule).SelectMany(cls => 
-                cls.References.Where(reference => ParserRuleContextHelper.HasParent<VBAParser.ImplementsStmtContext>(reference.Context))
-                    .Select(reference => new { IdentifierReference = reference, Context = ParserRuleContextHelper.GetParent<VBAParser.ImplementsStmtContext>(reference.Context)}));
-
-            var interfaceModules = implementsInstructions.Select(item => item.IdentifierReference.Declaration).Distinct();
-
-            var interfaceMembers = interfaceModules.Select(item => new
-                {
-                    InterfaceModule = item,
-                    InterfaceMembers = _declarations[item.QualifiedName.QualifiedModuleName]
-                        .Where(member => member.DeclarationType.HasFlag(DeclarationType.Member))
-                });
-
-            _interfaceMembers = new Lazy<ConcurrentDictionary<Declaration, Declaration[]>>(() =>
-                 new ConcurrentDictionary<Declaration, Declaration[]>(
-                         interfaceMembers.ToDictionary(
-                                                item => item.InterfaceModule,
-                                                item => item.InterfaceMembers.ToArray()
-                                            )
-                     )
-                , true);
-
-            var implementingNames = new Lazy<IEnumerable<string>>(() => implementsInstructions.SelectMany(item =>
-                    _declarations[item.IdentifierReference.Declaration.QualifiedName.QualifiedModuleName]
-                        .Where(member => member.DeclarationType.HasFlag(DeclarationType.Member))
-                        .Select(member => item.IdentifierReference.Declaration.IdentifierName + "_" + member.IdentifierName)), true);
-
-            var implementableMembers = implementsInstructions.Select(item =>
-                new
-                {
-                    item.Context,
-                    Members = _declarations[item.IdentifierReference.QualifiedModuleName].Where(implementingTypeMember =>
-                        implementingNames.Value.Contains(implementingTypeMember.IdentifierName)).ToArray()
-                });
-
-            _membersByImplementsContext = new Lazy<ConcurrentDictionary<VBAParser.ImplementsStmtContext, Declaration[]>>(() =>
-            new ConcurrentDictionary<VBAParser.ImplementsStmtContext, Declaration[]>(
-                implementableMembers.ToDictionary(item => item.Context, item => item.Members)), true);
+            var handlersByWithEventsField = events.Select(item =>
+                    new
+                    {
+                        item.WithEventsField,
+                        Handlers = item.AvailableEvents.SelectMany(evnt =>
+                            Members(item.WithEventsField.ParentDeclaration.QualifiedName.QualifiedModuleName)
+                                .Where(member => member.DeclarationType == DeclarationType.Procedure
+                                                && member.IdentifierName == item.WithEventsField.IdentifierName + "_" + evnt.IdentifierName))
+                    })
+                    .ToDictionary(item => item.WithEventsField, item => item.Handlers.ToList());
+            return handlersByWithEventsField;
         }
 
-        public IEnumerable<Declaration> FreshUndeclared
+        public Declaration FindSelectedDeclaration(ICodePane activeCodePane)
         {
-            get { return _newUndeclared.AllValues(); }
+            if (activeCodePane == null || activeCodePane.IsWrappingNullReference)
+            {
+                return null;
+            }
+            
+            var qualifiedSelection = activeCodePane.GetQualifiedSelection();
+            if (!qualifiedSelection.HasValue || qualifiedSelection.Value.Equals(default(QualifiedSelection)))
+            {
+                return null;
+            }
+
+            var selection = qualifiedSelection.Value.Selection;
+
+            // statistically we'll be on an IdentifierReference more often than on a Declaration:
+            var matches = _referencesBySelection
+                .Where(kvp => kvp.Key.QualifiedName.Equals(qualifiedSelection.Value.QualifiedName)
+                    && kvp.Key.Selection.ContainsFirstCharacter(qualifiedSelection.Value.Selection))
+                .SelectMany(kvp => kvp.Value)
+                .OrderByDescending(reference => reference.Declaration.DeclarationType)
+                .Select(reference => reference.Declaration)
+                .Distinct()
+                .ToArray();
+
+            if (!matches.Any())
+            {
+                matches = _declarationsBySelection
+                    .Where(kvp => kvp.Key.QualifiedName.Equals(qualifiedSelection.Value.QualifiedName)
+                        && kvp.Key.Selection.ContainsFirstCharacter(selection))
+                    .SelectMany(kvp => kvp.Value)
+                    .OrderByDescending(declaration => declaration.DeclarationType)
+                    .Distinct()
+                    .ToArray();
+            }
+
+            switch (matches.Length)
+            {
+                case 0:
+                    return ModuleDeclaration(qualifiedSelection.Value.QualifiedName);
+
+                case 1:
+                    return matches.Single();
+
+                default:
+                    // they're sorted by type, so a local comes before the procedure it's in
+                    return matches.FirstOrDefault();
+            }
         }
+
+        public IEnumerable<Declaration> FreshUndeclared => _newUndeclared.AllValues();
+
+        //This does not need a lock because enumerators over a ConcurrentBag uses a snapshot.    
+        public IEnumerable<UnboundMemberDeclaration> FreshUnresolvedMemberDeclarations => _newUnresolved.ToList();
+
+        public IEnumerable<UnboundMemberDeclaration> UnresolvedMemberDeclarations => _unresolved;
 
         public IEnumerable<Declaration> Members(Declaration module)
         {
@@ -149,85 +337,66 @@ namespace Rubberduck.Parsing.Symbols
 
         public IEnumerable<Declaration> Members(QualifiedModuleName module)
         {
-            return _declarations[module];
+            List<Declaration> members;
+            return _declarations.TryGetValue(module, out members)
+                    ? members
+                    : Enumerable.Empty<Declaration>();
         }
 
-        private IEnumerable<Declaration> _nonBaseAsType;
+        public Declaration ModuleDeclaration(QualifiedModuleName module)
+        {
+            return Members(module).SingleOrDefault(member => member.DeclarationType.HasFlag(DeclarationType.Module));
+        }
+
+        public IReadOnlyCollection<QualifiedModuleName> AllModules => _declarations.Keys.AsReadOnly();
+
+        public IEnumerable<Declaration> AllDeclarations => _declarations.AllValues();
+
         public IEnumerable<Declaration> FindDeclarationsWithNonBaseAsType()
         {
-            lock (ThreadLock)
-            {
-                return _nonBaseAsType ?? (_nonBaseAsType = _declarations.AllValues().Where(d =>
-                            !string.IsNullOrWhiteSpace(d.AsTypeName)
-                            && !d.AsTypeIsBaseType
-                            && d.DeclarationType != DeclarationType.Project
-                            && d.DeclarationType != DeclarationType.ProceduralModule).ToList());
-            }
+            return _nonBaseAsType.Value;
         }
-
-        private readonly Lazy<ConcurrentBag<Declaration>> _eventHandlers; 
+ 
         public IEnumerable<Declaration> FindEventHandlers()
         {
-            lock (ThreadLock)
-            {
-                return _eventHandlers.Value;
-            }
+            return _eventHandlers.Value;
         }
 
-        private readonly Lazy<ConcurrentBag<Declaration>> _classes;
-
-        public IEnumerable<Declaration> Classes
-        {
-            get
-            {
-                lock (ThreadLock)
-                {
-                    return _classes.Value;
-                }
-            }
-        }
-
-        private readonly Lazy<ConcurrentBag<Declaration>> _projects;
-
-        public IEnumerable<Declaration> Projects
-        {
-            get
-            {
-                lock (ThreadLock)
-                {
-                    return _projects.Value;
-                }
-            }
-        }
+        public IEnumerable<Declaration> Classes => _classes.Value;
+        public IEnumerable<Declaration> Projects => _projects.Value;
 
         public IEnumerable<Declaration> UserDeclarations(DeclarationType type)
         {
-            ConcurrentBag<Declaration> result;
-            if (!_userDeclarationsByType.TryGetValue(type, out result))
-            {
-                result = new ConcurrentBag<Declaration>(_userDeclarationsByType
+            List<Declaration> result;
+            return _userDeclarationsByType.TryGetValue(type, out result)
+                ? result
+                : _userDeclarationsByType
                     .Where(item => item.Key.HasFlag(type))
-                    .SelectMany(item => item.Value));
-            }
-            return result;
+                    .SelectMany(item => item.Value);
         }
 
-        public IEnumerable<UnboundMemberDeclaration> FreshUnresolvedMemberDeclarations()
+        public IEnumerable<Declaration> AllUserDeclarations => _userDeclarationsByType.AllValues();
+
+        public IEnumerable<Declaration> BuiltInDeclarations(DeclarationType type)
         {
-            lock (ThreadLock)
-            {
-                return _newUnresolved.ToArray();
-            }            
+            List<Declaration> result;
+            return _builtInDeclarationsByType.Value.TryGetValue(type, out result)
+                ? result
+                : _builtInDeclarationsByType.Value
+                    .Where(item => item.Key.HasFlag(type))
+                    .SelectMany(item => item.Value);
         }
 
-        public IEnumerable<UnboundMemberDeclaration> UnresolvedMemberDeclarations()
+        public IEnumerable<Declaration> AllBuiltInDeclarations => _builtInDeclarationsByType.Value.AllValues();
+
+        public IEnumerable<Declaration> DeclarationsWithType(DeclarationType type)
         {
-            return _unresolved.ToList();
+            return BuiltInDeclarations(type).Concat(UserDeclarations(type));
         }
 
         public IEnumerable<Declaration> FindHandlersForWithEventsField(Declaration field)
         {
-            Declaration[] result;
+            List<Declaration> result;
             return _handlersByWithEventsField.Value.TryGetValue(field, out result) 
                 ? result 
                 : Enumerable.Empty<Declaration>();
@@ -235,7 +404,7 @@ namespace Rubberduck.Parsing.Symbols
 
         public IEnumerable<Declaration> FindInterfaceMembersForImplementsContext(VBAParser.ImplementsStmtContext context)
         {
-            Declaration[] result;
+            List<Declaration> result;
             return _membersByImplementsContext.Value.TryGetValue(context, out result)
                 ? result
                 : Enumerable.Empty<Declaration>();
@@ -248,30 +417,32 @@ namespace Rubberduck.Parsing.Symbols
 
         public IEnumerable<Declaration> FindAllInterfaceImplementingMembers()
         {
-            return _membersByImplementsContext.Value.SelectMany(item => item.Value);
+            return _membersByImplementsContext.Value.AllValues();
         }
 
         public Declaration FindParameter(Declaration procedure, string parameterName)
         {
-            return _parametersByParent[procedure].SingleOrDefault(parameter => parameter.IdentifierName == parameterName);
+            List<Declaration> parameters;
+            return _parametersByParent.TryGetValue(procedure, out parameters) 
+                ? parameters.SingleOrDefault(parameter => parameter.IdentifierName == parameterName) 
+                : null;
         }
 
         public IEnumerable<Declaration> FindMemberMatches(Declaration parent, string memberName)
         {
-            ConcurrentBag<Declaration> children;
-            if (_declarations.TryGetValue(parent.QualifiedName.QualifiedModuleName, out children))
-            {
-                return children.Where(item => item.DeclarationType.HasFlag(DeclarationType.Member)
-                                             && item.IdentifierName == memberName).ToList();
-            }
-
-            return Enumerable.Empty<Declaration>();
+            List<Declaration> children;
+            return _declarations.TryGetValue(parent.QualifiedName.QualifiedModuleName, out children)
+                ? children.Where(item => item.DeclarationType.HasFlag(DeclarationType.Member)
+                                             && item.IdentifierName == memberName)
+                : Enumerable.Empty<Declaration>();
         }
 
         public IEnumerable<IAnnotation> FindAnnotations(QualifiedModuleName module)
         {
-            ConcurrentBag<IAnnotation> result;
-            return _annotations.TryGetValue(module, out result) ? result : Enumerable.Empty<IAnnotation>();
+            List<IAnnotation> result;
+            return _annotations.TryGetValue(module, out result) 
+                ? result 
+                : Enumerable.Empty<IAnnotation>();
         }
 
         public bool IsMatch(string declarationName, string potentialMatchName)
@@ -283,10 +454,10 @@ namespace Rubberduck.Parsing.Symbols
         {
             Debug.Assert(module != null);
 
-            var members = _declarations[module.QualifiedName.QualifiedModuleName];
+            var members = Members(module.QualifiedName.QualifiedModuleName);
             return members == null 
                 ? Enumerable.Empty<Declaration>() 
-                : members.Where(declaration => declaration.DeclarationType == DeclarationType.Event).ToList();
+                : members.Where(declaration => declaration.DeclarationType == DeclarationType.Event);
         }
 
         public Declaration FindEvent(Declaration module, string eventName)
@@ -304,7 +475,7 @@ namespace Rubberduck.Parsing.Symbols
         public IEnumerable<Declaration> MatchName(string name)
         {
             var normalizedName = ToNormalizedName(name);
-            ConcurrentBag<Declaration> result;
+            List<Declaration> result;
             return _declarationsByName.TryGetValue(normalizedName, out result) 
                 ? result 
                 : Enumerable.Empty<Declaration>();
@@ -326,7 +497,8 @@ namespace Rubberduck.Parsing.Symbols
             Declaration result = null;
             try
             {
-                result = MatchName(name).SingleOrDefault(project => project.DeclarationType.HasFlag(DeclarationType.Project)
+                result = MatchName(name).SingleOrDefault(project => 
+                    project.DeclarationType.HasFlag(DeclarationType.Project)
                     && (currentScope == null || project.ProjectId == currentScope.ProjectId));
             }
             catch (InvalidOperationException exception)
@@ -337,7 +509,7 @@ namespace Rubberduck.Parsing.Symbols
             return result;
         }
 
-        public Declaration FindStdModule(string name, Declaration parent = null, bool includeBuiltIn = false)
+        public Declaration FindStdModule(string name, Declaration parent, bool includeBuiltIn = false)
         {
             Debug.Assert(parent != null);
             Declaration result = null;
@@ -346,7 +518,7 @@ namespace Rubberduck.Parsing.Symbols
                 var matches = MatchName(name);
                 result = matches.SingleOrDefault(declaration => declaration.DeclarationType.HasFlag(DeclarationType.ProceduralModule)
                     && (parent.Equals(declaration.ParentDeclaration))
-                    && (includeBuiltIn || !declaration.IsBuiltIn));
+                    && (includeBuiltIn || declaration.IsUserDefined));
             }
             catch (InvalidOperationException exception)
             {
@@ -356,7 +528,7 @@ namespace Rubberduck.Parsing.Symbols
             return result;
         }
 
-        public Declaration FindClassModule(string name, Declaration parent = null, bool includeBuiltIn = false)
+        public Declaration FindClassModule(string name, Declaration parent, bool includeBuiltIn = false)
         {
             Debug.Assert(parent != null);
             Declaration result = null;
@@ -365,7 +537,7 @@ namespace Rubberduck.Parsing.Symbols
                 var matches = MatchName(name);
                 result = matches.SingleOrDefault(declaration => declaration.DeclarationType.HasFlag(DeclarationType.ClassModule)
                     && (parent.Equals(declaration.ParentDeclaration))
-                    && (includeBuiltIn || !declaration.IsBuiltIn));
+                    && (includeBuiltIn || declaration.IsUserDefined));
             }
             catch (InvalidOperationException exception)
             {
@@ -481,7 +653,7 @@ namespace Rubberduck.Parsing.Symbols
             {
                 // Only built-in classes such as Worksheet can be considered "real base classes".
                 // User created interfaces work differently and don't allow accessing accessing implementations.
-                if (!supertype.IsBuiltIn)
+                if (supertype.IsUserDefined)
                 {
                     continue;
                 }
@@ -516,7 +688,7 @@ namespace Rubberduck.Parsing.Symbols
                     new QualifiedMemberName(enclosingProcedure.QualifiedName.QualifiedModuleName, identifierName),
                     enclosingProcedure, enclosingProcedure, "Variant", string.Empty, false, false,
                     Accessibility.Implicit, DeclarationType.Variable, context, context.GetSelection(), false, null,
-                    false, annotations, null, true);
+                    true, annotations, null, true);
 
             var hasUndeclared = _newUndeclared.ContainsKey(enclosingProcedure.QualifiedName);
             if (hasUndeclared)
@@ -540,22 +712,20 @@ namespace Rubberduck.Parsing.Symbols
             return undeclaredLocal;
         }
 
-        public void AddUnboundContext(Declaration parentDeclaration, VBAParser.LExprContext context, IBoundExpression withExpression)
+        public void AddUnboundContext(Declaration parentDeclaration, VBAParser.LExpressionContext context, IBoundExpression withExpression)
         {
             
             //The only forms we care about right now are MemberAccessExprContext or WithMemberAccessExprContext.
-            var access = (ParserRuleContext)context.GetChild<VBAParser.MemberAccessExprContext>(0)
-                         ?? context.GetChild<VBAParser.WithMemberAccessExprContext>(0);
-            if (access == null)
+            if (!(context is VBAParser.MemberAccessExprContext) && !(context is VBAParser.WithMemberAccessExprContext))
             {
                 return;
             }
 
-            var identifier = access.GetChild<VBAParser.UnrestrictedIdentifierContext>(0);
+            var identifier = context.GetChild<VBAParser.UnrestrictedIdentifierContext>(0);
             var annotations = _annotationService.FindAnnotations(parentDeclaration.QualifiedName.QualifiedModuleName, context.Start.Line);
 
             var declaration = new UnboundMemberDeclaration(parentDeclaration, identifier,
-                (access is VBAParser.MemberAccessExprContext) ? (ParserRuleContext)access.children[0] : withExpression.Context, 
+                (context is VBAParser.MemberAccessExprContext) ? (ParserRuleContext)context.children[0] : withExpression.Context, 
                 annotations);
 
             _newUnresolved.Add(declaration);
@@ -574,7 +744,7 @@ namespace Rubberduck.Parsing.Symbols
                 return undeclared.SingleOrDefault();
             }
 
-            var item = new Declaration(qualifiedName, hostApp, hostApp, Tokens.Variant, string.Empty, false, false, Accessibility.Global, DeclarationType.BracketedExpression, context, context.GetSelection(), false, null);
+            var item = new Declaration(qualifiedName, hostApp, hostApp, Tokens.Variant, string.Empty, false, false, Accessibility.Global, DeclarationType.BracketedExpression, context, context.GetSelection(), true, null);
             _newUndeclared.TryAdd(qualifiedName, new ConcurrentBag<Declaration> { item });
             return item;
         }
@@ -643,7 +813,13 @@ namespace Rubberduck.Parsing.Symbols
 
         public Declaration FindMemberReferencedProjectInGlobalClassModule(Declaration callingProject, Declaration callingModule, Declaration callingParent, string memberName, DeclarationType memberType)
         {
-            var memberMatches = FindAllInReferencedProjectByPriority(callingProject, memberName, p => p.DeclarationType.HasFlag(memberType) && (Declaration.GetModuleParent(p) == null || Declaration.GetModuleParent(p).DeclarationType == DeclarationType.ClassModule) && ((ClassModuleDeclaration)Declaration.GetModuleParent(p)).IsGlobalClassModule);
+            var memberMatches = FindAllInReferencedProjectByPriority(
+                callingProject, 
+                memberName, 
+                p => p.DeclarationType.HasFlag(memberType) 
+                    && (Declaration.GetModuleParent(p) == null 
+                        || Declaration.GetModuleParent(p).DeclarationType == DeclarationType.ClassModule) 
+                    && ((ClassModuleDeclaration)Declaration.GetModuleParent(p)).IsGlobalClassModule);
             var accessibleMembers = memberMatches.Where(m => AccessibilityCheck.IsMemberAccessible(callingProject, callingModule, callingParent, m));
             var match = accessibleMembers.FirstOrDefault();
             return match;
@@ -651,7 +827,12 @@ namespace Rubberduck.Parsing.Symbols
 
         public Declaration FindMemberReferencedProjectInModule(Declaration callingProject, Declaration callingModule, Declaration callingParent, Declaration memberModule, string memberName, DeclarationType memberType)
         {
-            var memberMatches = FindAllInReferencedProjectByPriority(callingProject, memberName, p => p.DeclarationType.HasFlag(memberType) && memberModule.Equals(Declaration.GetModuleParent(p)));
+            var memberMatches = FindAllInReferencedProjectByPriority(
+                callingProject, 
+                memberName, 
+                p => p.DeclarationType.HasFlag(memberType) 
+                    && memberModule.Equals(Declaration.GetModuleParent(p)
+                ));
             var accessibleMembers = memberMatches.Where(m => AccessibilityCheck.IsMemberAccessible(callingProject, callingModule, callingParent, m));
             var match = accessibleMembers.FirstOrDefault();
             if (match != null)
@@ -667,7 +848,12 @@ namespace Rubberduck.Parsing.Symbols
 
         public Declaration FindMemberReferencedProject(Declaration callingProject, Declaration callingModule, Declaration callingParent, Declaration referencedProject, string memberName, DeclarationType memberType)
         {
-            var memberMatches = FindAllInReferencedProjectByPriority(callingProject, memberName, p => p.DeclarationType.HasFlag(memberType) && referencedProject.Equals(Declaration.GetProjectParent(p)));
+            var memberMatches = FindAllInReferencedProjectByPriority(
+                callingProject, 
+                memberName, 
+                p => p.DeclarationType.HasFlag(memberType) 
+                    && referencedProject.Equals(Declaration.GetProjectParent(p)
+                ));
             return memberMatches.FirstOrDefault(m => 
                     AccessibilityCheck.IsMemberAccessible(callingProject, callingModule, callingParent, m));
         }
@@ -680,7 +866,7 @@ namespace Rubberduck.Parsing.Symbols
         private IEnumerable<Declaration> FindAllInReferencedProjectByPriority(Declaration enclosingProject, string name, Func<Declaration, bool> predicate)
         {
             var interprojectMatches = MatchName(name).Where(predicate).ToList();
-            var projectReferences = ((ProjectDeclaration)enclosingProject).ProjectReferences.ToList();
+            var projectReferences = ((ProjectDeclaration)enclosingProject).ProjectReferences;
             if (interprojectMatches.Count == 0)
             {
                 yield break;
@@ -695,57 +881,164 @@ namespace Rubberduck.Parsing.Symbols
             }
         }
 
-        private IEnumerable<Declaration> FindFormControlHandlers(IReadOnlyList<Declaration> declarations)
+        private IEnumerable<Declaration> FindAllFormControlHandlers()
         {
-            var controls = declarations
-                .Where(declaration => declaration.DeclarationType == DeclarationType.Control);
-            var handlerNames = declarations
-                .Where(declaration => declaration.IsBuiltIn && declaration.DeclarationType == DeclarationType.Event)
-                .SelectMany(e => controls.Select(c => c.IdentifierName + "_" + e.IdentifierName));
-            if (!_userDeclarationsByType.ContainsKey(DeclarationType.Procedure))
-            {
-                return Enumerable.Empty<Declaration>();
-            }
-            var handlers = _userDeclarationsByType[DeclarationType.Procedure]
+            var controls = DeclarationsWithType(DeclarationType.Control);
+            var handlerNames = BuiltInDeclarations(DeclarationType.Event)
+                .SelectMany(e => controls.Select(c => c.IdentifierName + "_" + e.IdentifierName))
+                .ToHashSet();
+            var handlers = UserDeclarations(DeclarationType.Procedure)
                 .Where(procedure => handlerNames.Contains(procedure.IdentifierName));
             return handlers;
         }
 
-        private ConcurrentBag<Declaration> FindEventHandlers(IEnumerable<Declaration> declarations)
+        private List<Declaration> FindAllEventHandlers()
         {
-            var declarationList = declarations.ToList();
+            var handlerNames = BuiltInDeclarations(DeclarationType.Event)
+                .SelectMany(e =>
+                {
+                    var parentModuleSubtypes = ((ClassModuleDeclaration)e.ParentDeclaration).Subtypes;
+                    return parentModuleSubtypes.Any()
+                        ? parentModuleSubtypes.Select(v => v.IdentifierName + "_" + e.IdentifierName)
+                        : new[] { e.ParentDeclaration.IdentifierName + "_" + e.IdentifierName };
+                })
+                .ToHashSet();
 
-            var handlerNames = declarationList.Where(declaration => declaration.IsBuiltIn && declaration.DeclarationType == DeclarationType.Event)
-                                           .SelectMany(e =>
-                                           {
-                                               var parentModuleSubtypes = ((ClassModuleDeclaration)e.ParentDeclaration).Subtypes;
-                                               return parentModuleSubtypes.Any()
-                                                   ? parentModuleSubtypes.Select(v => v.IdentifierName + "_" + e.IdentifierName)
-                                                   : new[] { e.ParentDeclaration.IdentifierName + "_" + e.IdentifierName };
-                                           });
-
-            var handlers = declarationList.Where(item =>
+            var handlers = DeclarationsWithType(DeclarationType.Procedure)
+                .Where(item =>
                 // class module built-in events
-                (item.DeclarationType == DeclarationType.Procedure &&
-                 item.ParentDeclaration.DeclarationType == DeclarationType.ClassModule && (
+                (item.ParentDeclaration.DeclarationType == DeclarationType.ClassModule && (
                      item.IdentifierName.Equals("Class_Initialize", StringComparison.InvariantCultureIgnoreCase) ||
                      item.IdentifierName.Equals("Class_Terminate", StringComparison.InvariantCultureIgnoreCase))) ||
                 // standard module built-in handlers (Excel specific):
                 (_hostApp != null &&
                  _hostApp.ApplicationName.Equals("Excel", StringComparison.InvariantCultureIgnoreCase) &&
-                 item.DeclarationType == DeclarationType.Procedure &&
                  item.ParentDeclaration.DeclarationType == DeclarationType.ProceduralModule && (
                      item.IdentifierName.Equals("auto_open", StringComparison.InvariantCultureIgnoreCase) ||
-                     item.IdentifierName.Equals("auto_close", StringComparison.InvariantCultureIgnoreCase))) ||
-                // user handlers:
-                (!item.IsBuiltIn &&
-                 item.DeclarationType == DeclarationType.Procedure &&
-                 handlerNames.Contains(item.IdentifierName))
+                     item.IdentifierName.Equals("auto_close", StringComparison.InvariantCultureIgnoreCase))))
+                .Concat(
+                    UserDeclarations(DeclarationType.Procedure)
+                        .Where(item => handlerNames.Contains(item.IdentifierName))
                 )
-                .Concat(_handlersByWithEventsField.Value.SelectMany(kvp => kvp.Value))
-                .Concat(FindFormControlHandlers(declarationList));
+                .Concat(_handlersByWithEventsField.Value.AllValues())
+                .Concat(FindAllFormControlHandlers());
+            return handlers.ToList();
+        }
 
-            return new ConcurrentBag<Declaration>(handlers);
+
+        public IEnumerable<Declaration> GetAccessibleDeclarations(Declaration target)
+        {
+            if (target == null)
+            {
+                return Enumerable.Empty<Declaration>();
+            }
+
+            return _declarations.AllValues()
+                .Where(callee => AccessibilityCheck.IsAccessible(
+                    Declaration.GetProjectParent(target),
+                    Declaration.GetModuleParent(target), 
+                    target.ParentDeclaration, 
+                    callee));
+        }
+
+        public IEnumerable<Declaration> GetAccessibleUserDeclarations(Declaration target)
+        {
+            if (target == null)
+            {
+                return Enumerable.Empty<Declaration>();
+            }
+
+            return _userDeclarationsByType.AllValues()
+                .Where(callee => AccessibilityCheck.IsAccessible(
+                    Declaration.GetProjectParent(target),
+                    Declaration.GetModuleParent(target),
+                    target.ParentDeclaration,
+                    callee));
+        }
+
+        public IEnumerable<Declaration> GetDeclarationsWithIdentifiersToAvoid(Declaration target)
+        {
+            if (target == null)
+            {
+                return Enumerable.Empty<Declaration>();
+            }
+
+            List<Declaration> declarationsToAvoid = GetNameCollisionDeclarations(target).ToList();
+
+            declarationsToAvoid.AddRange(GetNameCollisionDeclarations(target.References));
+
+            return declarationsToAvoid.Distinct();
+        }
+
+        private IEnumerable<Declaration> GetNameCollisionDeclarations(Declaration declaration)
+        {
+            if (declaration == null)
+            {
+                return Enumerable.Empty<Declaration>();
+            }
+
+            //Filter accessible declarations to those that would result in name collisions or hiding
+            var declarationsToAvoid = GetAccessibleUserDeclarations(declaration).Where(candidate =>
+                                        (IsAccessibleInOtherProcedureModule(candidate,declaration)
+                                        || candidate.DeclarationType == DeclarationType.Project
+                                        || candidate.DeclarationType.HasFlag(DeclarationType.Module)
+                                        || IsDeclarationInSameProcedureScope(candidate, declaration)
+                                        )).ToHashSet();
+
+            //Add local variables when the target is a method or property
+            if(IsSubroutineOrProperty(declaration))
+            {
+                var localVariableDeclarations = _declarations.AllValues()
+                    .Where(dec => declaration == dec.ParentDeclaration);
+                declarationsToAvoid.UnionWith(localVariableDeclarations);
+            }
+
+            return declarationsToAvoid;
+        }
+
+        private IEnumerable<Declaration> GetNameCollisionDeclarations(IEnumerable<IdentifierReference> references)
+        {
+            var declarationsToAvoid = new HashSet<Declaration>();
+            foreach (var reference in references)
+            {
+                if (!UsesScopeResolution(reference.Context.Parent))
+                {
+                    declarationsToAvoid.UnionWith(GetNameCollisionDeclarations(reference.ParentNonScoping));
+                }
+            }
+            return declarationsToAvoid;
+        }
+
+        private bool IsAccessibleInOtherProcedureModule(Declaration candidate, Declaration declaration)
+        {
+            return IsInProceduralModule(declaration)
+                       && IsInProceduralModule(candidate)
+                       && candidate.Accessibility != Accessibility.Private;
+        }
+
+        private bool UsesScopeResolution(RuleContext ruleContext)
+        {
+            return (ruleContext is VBAParser.WithMemberAccessExprContext)
+                || (ruleContext is VBAParser.MemberAccessExprContext);
+        }
+
+        private bool IsInProceduralModule(Declaration candidateDeclaration)
+        {
+            var candidateModuleDeclaration = Declaration.GetModuleParent(candidateDeclaration);
+
+            return candidateModuleDeclaration?.DeclarationType == DeclarationType.ProceduralModule;
+        }
+
+        private bool IsDeclarationInSameProcedureScope(Declaration candidateDeclaration, Declaration scopingDeclaration)
+        {
+            return candidateDeclaration.ParentScope == scopingDeclaration.ParentScope;
+        }
+
+        private static bool IsSubroutineOrProperty(Declaration declaration)
+        {
+            return declaration.DeclarationType.HasFlag(DeclarationType.Property)
+                || declaration.DeclarationType == DeclarationType.Function
+                || declaration.DeclarationType == DeclarationType.Procedure;
         }
     }
 }

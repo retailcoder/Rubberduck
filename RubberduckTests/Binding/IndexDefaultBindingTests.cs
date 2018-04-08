@@ -1,11 +1,10 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using RubberduckTests.Mocks;
 using System.Linq;
 using System.Threading;
 using Moq;
-using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.SafeComWrappers;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
@@ -19,6 +18,7 @@ namespace RubberduckTests.Binding
         private const string TEST_CLASS_NAME = "TestClass";
         private const string REFERENCED_PROJECT_FILEPATH = @"C:\Temp\ReferencedProjectA";
 
+        [TestCategory("Binding")]
         [TestMethod]
         public void RecursiveDefaultMember()
         {
@@ -50,13 +50,17 @@ End Property
             var enclosingProject = enclosingProjectBuilder.Build();
             builder.AddProject(enclosingProject);
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
+                var declaration =
+                    state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.PropertyGet &&
+                                                          d.IdentifierName == "Test2");
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.PropertyGet && d.IdentifierName == "Test2");
-
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
+        [TestCategory("Binding")]
         [TestMethod]
         public void NormalPropertyFunctionSubroutine()
         {
@@ -78,16 +82,20 @@ End Property
             var enclosingProject = enclosingProjectBuilder.Build();
             builder.AddProject(enclosingProject);
             var vbe = builder.Build();
-            var state = Parse(vbe);
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.PropertyGet && d.IdentifierName == "Test1");
+            using (var state = Parse(vbe))
+            {
+                var declaration =
+                    state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.PropertyGet &&
+                                                          d.IdentifierName == "Test1");
 
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
         private static RubberduckParserState Parse(Mock<IVBE> vbe)
         {
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            var parser = MockParser.Create(vbe.Object);
             parser.Parse(new CancellationTokenSource());
             if (parser.State.Status != ParserState.Ready)
             {

@@ -12,31 +12,19 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
         {
         }
 
-        public int Count
-        {
-            get { return IsWrappingNullReference ? 0 : Target.Count; }
-        }
+        public int Count => IsWrappingNullReference ? 0 : Target.Count;
 
-        public IVBE Parent
-        {
-            get { return new VBE(IsWrappingNullReference ? null : Target.Parent); }
-        }
+        public IVBE Parent => new VBE(IsWrappingNullReference ? null : Target.Parent);
 
-        public IVBE VBE
-        {
-            get { return new VBE(IsWrappingNullReference ? null : Target.VBE); }
-        }
+        public IVBE VBE => new VBE(IsWrappingNullReference ? null : Target.VBE);
 
         public ICodePane Current 
         { 
-            get { return new CodePane(IsWrappingNullReference ? null : Target.Current); }
+            get => new CodePane(IsWrappingNullReference ? null : Target.Current);
             set { if (!IsWrappingNullReference) Target.Current = (VB.CodePane)value.Target; }
         }
 
-        public ICodePane this[object index]
-        {
-            get { return new CodePane(IsWrappingNullReference ? null : Target.Item(index)); }
-        }
+        public ICodePane this[object index] => new CodePane(IsWrappingNullReference ? null : Target.Item(index));
 
         IEnumerator<ICodePane> IEnumerable<ICodePane>.GetEnumerator()
         {
@@ -52,17 +40,17 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
                 : ((IEnumerable<ICodePane>) this).GetEnumerator();
         }
 
-        public override void Release(bool final = false)
-        {
-            if (!IsWrappingNullReference)
-            {
-                for (var i = 1; i <= Count; i++)
-                {
-                    this[i].Release();
-                }
-                base.Release(final);
-            }
-        }
+        //public override void Release(bool final = false)
+        //{
+        //    if (!IsWrappingNullReference)
+        //    {
+        //        for (var i = 1; i <= Count; i++)
+        //        {
+        //            this[i].Release();
+        //        }
+        //        base.Release(final);
+        //    }
+        //}
 
         public override bool Equals(ISafeComWrapper<VB.CodePanes> other)
         {

@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
+using System.Windows;
 using NLog;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Settings;
@@ -25,15 +27,15 @@ namespace Rubberduck.UI.ToDoItems
             _state = state;
             _configService = configService;
             _operatingSystem = operatingSystem;
-            _state.StateChanged += _state_StateChanged;
+            _state.StateChanged += HandleStateChanged;
 
-            _setMarkerGroupingCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), param =>
+            SetMarkerGroupingCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), param =>
             {
                 GroupByMarker = (bool)param;
                 GroupByLocation = !(bool)param;
             });
 
-            _setLocationGroupingCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), param =>
+            SetLocationGroupingCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), param =>
             {
                 GroupByLocation = (bool)param;
                 GroupByMarker = !(bool)param;
@@ -43,50 +45,54 @@ namespace Rubberduck.UI.ToDoItems
         private ObservableCollection<ToDoItem> _items = new ObservableCollection<ToDoItem>();
         public ObservableCollection<ToDoItem> Items
         {
-            get { return _items; }
+            get => _items;
             set
             {
-                if (_items != value)
+                if (_items == value)
                 {
-                    _items = value;
-                    OnPropertyChanged();
+                    return;
                 }
+
+                _items = value;
+                OnPropertyChanged();
             }
         }
 
         private bool _groupByMarker = true;
         public bool GroupByMarker
         {
-            get { return _groupByMarker; }
+            get => _groupByMarker;
             set
             {
-                if (_groupByMarker != value)
+                if (_groupByMarker == value)
                 {
-                    _groupByMarker = value;
-                    OnPropertyChanged();
+                    return;
                 }
+
+                _groupByMarker = value;
+                OnPropertyChanged();
             }
         }
 
         private bool _groupByLocation;
         public bool GroupByLocation
         {
-            get { return _groupByLocation; }
+            get => _groupByLocation;
             set
             {
-                if (_groupByLocation != value)
+                if (_groupByLocation == value)
                 {
-                    _groupByLocation = value;
-                    OnPropertyChanged();
+                    return;
                 }
+
+                _groupByLocation = value;
+                OnPropertyChanged();
             }
         }
 
-        private readonly CommandBase _setMarkerGroupingCommand;
-        public CommandBase SetMarkerGroupingCommand { get { return _setMarkerGroupingCommand; } }
+        public CommandBase SetMarkerGroupingCommand { get; }
 
-        private readonly CommandBase _setLocationGroupingCommand;
-        public CommandBase SetLocationGroupingCommand { get { return _setLocationGroupingCommand; } }
+        public CommandBase SetLocationGroupingCommand { get; }
 
         private CommandBase _refreshCommand;
         public CommandBase RefreshCommand
@@ -105,7 +111,7 @@ namespace Rubberduck.UI.ToDoItems
             }
         }
 
-        private void _state_StateChanged(object sender, EventArgs e)
+        private void HandleStateChanged(object sender, EventArgs e)
         {
             if (_state.Status != ParserState.ResolvedDeclarations)
             {
@@ -118,7 +124,7 @@ namespace Rubberduck.UI.ToDoItems
         private ToDoItem _selectedItem;
         public INavigateSource SelectedItem
         {
-            get { return _selectedItem; }
+            get => _selectedItem;
             set
             {
                 _selectedItem = value as ToDoItem; 
@@ -151,6 +157,54 @@ namespace Rubberduck.UI.ToDoItems
 
                         RefreshCommand.Execute(null);
                     }
+                });
+            }
+        }
+
+        private CommandBase _copyResultsCommand;
+        public CommandBase CopyResultsCommand
+        {
+            get
+            {
+                if (_copyResultsCommand != null)
+                {
+                    return _copyResultsCommand;
+                }
+                return _copyResultsCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ =>
+                {
+                    const string xmlSpreadsheetDataFormat = "XML Spreadsheet";
+                    if (_items == null)
+                    {
+                        return;
+                    }
+                    ColumnInfo[] columnInfos = { new ColumnInfo("Type"), new ColumnInfo("Description"), new ColumnInfo("Project"), new ColumnInfo("Component"), new ColumnInfo("Line", hAlignment.Right), new ColumnInfo("Column", hAlignment.Right) };
+
+                    var resultArray = _items.OfType<IExportable>().Select(result => result.ToArray()).ToArray();
+
+                    var resource = _items.Count == 1
+                        ? RubberduckUI.ToDoExplorer_NumberOfIssuesFound_Singular
+                        : RubberduckUI.ToDoExplorer_NumberOfIssuesFound_Plural;
+
+                    var title = string.Format(resource, DateTime.Now.ToString(CultureInfo.InvariantCulture), _items.Count);
+
+                    var textResults = title + Environment.NewLine + string.Join("", _items.OfType<IExportable>().Select(result => result.ToClipboardString() + Environment.NewLine).ToArray());
+                    var csvResults = ExportFormatter.Csv(resultArray, title, columnInfos);
+                    var htmlResults = ExportFormatter.HtmlClipboardFragment(resultArray, title, columnInfos);
+                    var rtfResults = ExportFormatter.RTF(resultArray, title);
+
+                    // todo: verify that this disposing this stream breaks the xmlSpreadsheetDataFormat
+                    var stream = ExportFormatter.XmlSpreadsheetNew(resultArray, title, columnInfos);
+
+                    IClipboardWriter _clipboard = new ClipboardWriter();
+                    //Add the formats from richest formatting to least formatting
+                    _clipboard.AppendStream(DataFormats.GetDataFormat(xmlSpreadsheetDataFormat).Name, stream);
+                    _clipboard.AppendString(DataFormats.Rtf, rtfResults);
+                    _clipboard.AppendString(DataFormats.Html, htmlResults);
+                    _clipboard.AppendString(DataFormats.CommaSeparatedValue, csvResults);
+                    _clipboard.AppendString(DataFormats.UnicodeText, textResults);
+
+                    _clipboard.Flush();
+
                 });
             }
         }
@@ -204,7 +258,7 @@ namespace Rubberduck.UI.ToDoItems
         {
             if (_state != null)
             {
-                _state.StateChanged -= _state_StateChanged;
+                _state.StateChanged -= HandleStateChanged;
             }
         }
     }

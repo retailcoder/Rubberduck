@@ -28,7 +28,7 @@ namespace Rubberduck.UI.Command.Refactorings
             get { return RubberduckHotkey.RefactorExtractMethod; }
         }
 
-        protected override bool CanExecuteImpl(object parameter)
+        protected override bool EvaluateCanExecute(object parameter)
         {
             if (Vbe.ActiveCodePane == null || _state.Status != ParserState.Ready)
             {
@@ -63,7 +63,7 @@ namespace Rubberduck.UI.Command.Refactorings
             }
         }
 
-        protected override void ExecuteImpl(object parameter)
+        protected override void OnExecute(object parameter)
         {
             var declarations = _state.AllDeclarations;
             var qualifiedSelection = Vbe.ActiveCodePane.GetQualifiedSelection();
@@ -105,7 +105,7 @@ namespace Rubberduck.UI.Command.Refactorings
 
                 var extraction = new ExtractMethodExtraction();
                 // bug: access to disposed closure - todo: make ExtractMethodRefactoring request reparse like everyone else.
-                Action<object> parseRequest = obj => _state.OnParseRequested(obj, component); 
+                Action<object> parseRequest = obj => _state.OnParseRequested(obj); 
 
                 var refactoring = new ExtractMethodRefactoring(module, parseRequest, createMethodModel, extraction);
                 refactoring.InvalidSelection += HandleInvalidSelection;

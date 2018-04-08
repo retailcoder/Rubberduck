@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Rubberduck.Parsing.Symbols;
-using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.ExtractMethod;
 using Rubberduck.VBEditor;
 using RubberduckTests.Mocks;
@@ -44,9 +43,6 @@ namespace RubberduckTests.Refactoring.ExtractMethod
             [TestCategory("ExtractMethodModelTests")]
             public void shouldReturnNewMethod()
             {
-
-                QualifiedModuleName qualifiedModuleName;
-                RubberduckParserState state;
                 var inputCode = @"
 Option Explicit
 Private Sub Foo()
@@ -54,19 +50,22 @@ Private Sub Foo()
     x = 1 + 2
 End Sub";
 
-                MockParser.ParseString(inputCode, out qualifiedModuleName, out state);
-                var declarations = state.AllDeclarations;
+                QualifiedModuleName qualifiedModuleName;
+                using (var state = MockParser.ParseString(inputCode, out qualifiedModuleName))
+                {
+                    var declarations = state.AllDeclarations;
 
-                var SUT = new ExtractedMethod();
+                    var SUT = new ExtractedMethod();
 
-                var expected = "NewMethod";
-                //Act
-                var actual = SUT.getNewMethodName(declarations);
+                    var expected = "NewMethod";
+                    //Act
+                    var actual = SUT.getNewMethodName(declarations);
 
-                //Assert
+                    //Assert
 
-                Assert.AreEqual(expected, actual);
+                    Assert.AreEqual(expected, actual);
 
+                }
             }
 
         }
@@ -78,10 +77,6 @@ End Sub";
             [TestCategory("ExtractMethodModelTests")]
             public void shouldReturnAnIncrementedMethodName()
             {
-
-                QualifiedModuleName qualifiedModuleName;
-                RubberduckParserState state;
-
                 #region inputCode
                 var inputCode = @"
 Option Explicit
@@ -95,18 +90,21 @@ Private Sub NewMethod
 End Sub";
                 #endregion inputCode
 
-                MockParser.ParseString(inputCode, out qualifiedModuleName, out state);
-                var declarations = state.AllDeclarations;
+                QualifiedModuleName qualifiedModuleName;
+                using (var state = MockParser.ParseString(inputCode, out qualifiedModuleName))
+                {
+                    var declarations = state.AllDeclarations;
 
-                var SUT = new ExtractedMethod();
+                    var SUT = new ExtractedMethod();
 
-                var expected = "NewMethod1";
-                //Act
-                var actual = SUT.getNewMethodName(declarations);
+                    var expected = "NewMethod1";
+                    //Act
+                    var actual = SUT.getNewMethodName(declarations);
 
-                //Assert
-                Assert.AreEqual(expected, actual);
+                    //Assert
+                    Assert.AreEqual(expected, actual);
 
+                }
             }
 
         }
@@ -118,9 +116,6 @@ End Sub";
             [TestCategory("ExtractMethodModelTests")]
             public void shouldReturnAnLeastNextMethod()
             {
-
-                QualifiedModuleName qualifiedModuleName;
-                RubberduckParserState state;
                 #region inputCode
                 var inputCode = @"
 Option Explicit
@@ -142,18 +137,21 @@ Private Sub NewMethod4
 End Sub";
                 #endregion inputCode
 
-                MockParser.ParseString(inputCode, out qualifiedModuleName, out state);
-                var declarations = state.AllDeclarations;
+                QualifiedModuleName qualifiedModuleName;
+                using (var state = MockParser.ParseString(inputCode, out qualifiedModuleName))
+                {
+                    var declarations = state.AllDeclarations;
 
-                var SUT = new ExtractedMethod();
+                    var SUT = new ExtractedMethod();
 
-                var expected = "NewMethod2";
-                //Act
-                var actual = SUT.getNewMethodName(declarations);
+                    var expected = "NewMethod2";
+                    //Act
+                    var actual = SUT.getNewMethodName(declarations);
 
-                //Assert
-                Assert.AreEqual(expected, actual);
+                    //Assert
+                    Assert.AreEqual(expected, actual);
 
+                }
             }
 
         }

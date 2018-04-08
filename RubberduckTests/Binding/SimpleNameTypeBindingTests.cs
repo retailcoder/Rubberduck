@@ -1,4 +1,4 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using RubberduckTests.Mocks;
@@ -6,7 +6,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using Moq;
-using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.SafeComWrappers;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
@@ -19,6 +18,7 @@ namespace RubberduckTests.Binding
         private const string TEST_CLASS_NAME = "TestClass";
         private static readonly string ReferencedProjectFilepath = string.Empty; // must be an empty string
 
+        [TestCategory("Binding")]
         [TestMethod]
         public void EnclosingModuleComesBeforeEnclosingProject()
         {
@@ -29,15 +29,17 @@ namespace RubberduckTests.Binding
             var enclosingProject = enclosingProjectBuilder.Build();
             builder.AddProject(enclosingProject);
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Enumeration && d.IdentifierName == BINDING_TARGET_NAME);
+                var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Enumeration && d.IdentifierName == BINDING_TARGET_NAME);
 
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
+        [TestCategory("Binding")]
         [TestMethod]
-        [Ignore] // todo: figure out why this test randomly fails
         public void EnclosingProjectComesBeforeOtherModuleInEnclosingProject()
         {
             var builder = new MockVbeBuilder();
@@ -47,14 +49,17 @@ namespace RubberduckTests.Binding
             var enclosingProject = enclosingProjectBuilder.Build();
             builder.AddProject(enclosingProject);
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Project && d.IdentifierName == BINDING_TARGET_NAME);
+                var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Project && d.IdentifierName == BINDING_TARGET_NAME);
 
-            Assert.AreEqual(state.Status, ParserState.Ready);
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(state.Status, ParserState.Ready);
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
+        [TestCategory("Binding")]
         [TestMethod]
         public void OtherModuleInEnclosingProjectComesBeforeReferencedProjectModule()
         {
@@ -74,13 +79,16 @@ namespace RubberduckTests.Binding
             builder.AddProject(enclosingProject);
 
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Enumeration && d.IdentifierName == BINDING_TARGET_NAME);
+                var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Enumeration && d.IdentifierName == BINDING_TARGET_NAME);
 
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
+        [TestCategory("Binding")]
         [TestMethod]
         public void ReferencedProjectModuleComesBeforeReferencedProjectType()
         {
@@ -99,13 +107,16 @@ namespace RubberduckTests.Binding
             builder.AddProject(enclosingProject);
 
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.ProceduralModule && d.IdentifierName == BINDING_TARGET_NAME);
+                var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.ProceduralModule && d.IdentifierName == BINDING_TARGET_NAME);
 
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
+        [TestCategory("Binding")]
         [TestMethod]
         public void ReferencedProjectType()
         {
@@ -127,16 +138,18 @@ namespace RubberduckTests.Binding
             builder.AddProject(enclosingProject);
 
             var vbe = builder.Build();
-            var state = Parse(vbe);
+            using (var state = Parse(vbe))
+            {
 
-            var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Enumeration && d.IdentifierName == BINDING_TARGET_NAME);
+                var declaration = state.AllUserDeclarations.Single(d => d.DeclarationType == DeclarationType.Enumeration && d.IdentifierName == BINDING_TARGET_NAME);
 
-            Assert.AreEqual(1, declaration.References.Count());
+                Assert.AreEqual(1, declaration.References.Count());
+            }
         }
 
         private static RubberduckParserState Parse(Mock<IVBE> vbe)
         {
-            var parser = MockParser.Create(vbe.Object, new RubberduckParserState(vbe.Object));
+            var parser = MockParser.Create(vbe.Object);
             parser.Parse(new CancellationTokenSource());
             if (parser.State.Status != ParserState.Ready)
             {
@@ -148,20 +161,20 @@ namespace RubberduckTests.Binding
 
         private string CreateEnumType(string typeName)
         {
-            return string.Format(@"
-Public Enum {0}
+            return $@"
+Public Enum {typeName}
     TestEnumMember
 End Enum
-", typeName);
+";
         }
 
         private string CreateUdt(string typeName)
         {
-            return string.Format(@"
-Public Type {0}
+            return $@"
+Public Type {typeName}
     TestTypeMember As String
 End Type
-", typeName);
+";
         }
     }
 }

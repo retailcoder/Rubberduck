@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 
 namespace Rubberduck.VBEditor.SafeComWrappers
@@ -6,42 +5,40 @@ namespace Rubberduck.VBEditor.SafeComWrappers
     public abstract class SafeComWrapper<T> : ISafeComWrapper<T>
         where T : class
     {
-        private readonly T _target;
-
         protected SafeComWrapper(T target)
         {
-            _target = target;
+            Target = target;
         }
 
-        private bool _isReleased;
-        public virtual void Release(bool final = false)
-        {
-            if (IsWrappingNullReference || _isReleased || !Marshal.IsComObject(Target))
-            {
-                _isReleased = true;
-                return;
-            }
+        //private bool _isReleased;
+        //public virtual void Release(bool final = false)
+        //{
+        //    if (IsWrappingNullReference || _isReleased || !Marshal.IsComObject(Target))
+        //    {
+        //        _isReleased = true;
+        //        return;
+        //    }
 
-            try
-            {
-                if (final)
-                {
-                    Marshal.FinalReleaseComObject(Target);
-                }
-                else
-                {
-                    Marshal.ReleaseComObject(Target);
-                }
-            }
-            finally
-            {
-                _isReleased = true;
-            }
-        }
+        //    try
+        //    {
+        //        if (final)
+        //        {
+        //            Marshal.FinalReleaseComObject(Target);
+        //        }
+        //        else
+        //        {
+        //            Marshal.ReleaseComObject(Target);
+        //        }
+        //    }
+        //    finally
+        //    {
+        //        _isReleased = true;
+        //    }
+        //}
 
-        public bool IsWrappingNullReference { get { return _target == null; } }
-        object INullObjectWrapper.Target { get { return _target; } }
-        public T Target { get { return _target; } }
+        public bool IsWrappingNullReference => Target == null;
+        object INullObjectWrapper.Target => Target;
+        public T Target { get; }
 
         /// <summary>
         /// <c>true</c> when wrapping a <c>null</c> reference and <see cref="other"/> is either <c>null</c> or wrapping a <c>null</c> reference.

@@ -15,76 +15,29 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
         {
         }
 
-        public ComponentType Type
-        {
-            get { return IsWrappingNullReference ? 0 : (ComponentType)Target.Type; }
-        }
+        public ComponentType Type => IsWrappingNullReference ? 0 : (ComponentType)Target.Type;
 
-        public ICodeModule CodeModule
-        {
-            get { return new CodeModule(IsWrappingNullReference ? null : Target.CodeModule); }
-        }
+        public ICodeModule CodeModule => new CodeModule(IsWrappingNullReference ? null : Target.CodeModule);
 
-        public IVBE VBE
-        {
-            get { return new VBE(IsWrappingNullReference ? null : Target.VBE); }
-        }
+        public IVBE VBE => new VBE(IsWrappingNullReference ? null : Target.VBE);
 
-        public IVBComponents Collection
-        {
-            get { return new VBComponents(IsWrappingNullReference ? null : Target.Collection); }
-        }
+        public IVBComponents Collection => new VBComponents(IsWrappingNullReference ? null : Target.Collection);
 
-        public IProperties Properties
-        {
-            get { return new Properties(IsWrappingNullReference ? null : Target.Properties); }
-        }
+        public IProperties Properties => new Properties(IsWrappingNullReference ? null : Target.Properties);
 
-        public bool HasOpenDesigner
-        {
-            get { return !IsWrappingNullReference && Target.HasOpenDesigner; }
-        }
+        public bool HasOpenDesigner => !IsWrappingNullReference && Target.HasOpenDesigner;
 
-        public string DesignerId
-        {
-            get { return IsWrappingNullReference ? string.Empty : Target.DesignerID; }
-        }
+        public string DesignerId => IsWrappingNullReference ? string.Empty : Target.DesignerID;
 
         public string Name
         {
-            get { return IsWrappingNullReference ? string.Empty : Target.Name; }
-            set { Target.Name = value; }
+            get => IsWrappingNullReference ? string.Empty : Target.Name;
+            set => Target.Name = value;
         }
 
-        public IControls Controls
-        {
-            get
-            {
-                throw new NotImplementedException();
-                //var designer = IsWrappingNullReference
-                //    ? null
-                //    : Target.Designer as VB.UserForm;
+        public IControls Controls => throw new NotImplementedException();
 
-                //return designer == null 
-                //    ? new Controls(null) 
-                //    : new Controls(designer.Controls);
-            }
-        }
-
-        public IControls SelectedControls
-        {
-            get
-            {
-                throw new NotImplementedException();
-                //var designer = IsWrappingNullReference
-                //    ? null
-                //    : Target.Designer as VB.UserForm;
-
-                //return designer == null 
-                //    ? new Controls(null) 
-                //    : new Controls(designer.Selected);
-            }
-        }
+        public IControls SelectedControls => throw new NotImplementedException();
 
         public bool HasDesigner
         {
@@ -110,14 +63,7 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
             Target.Activate();
         }
 
-        public bool IsSaved
-        {
-            get
-            {
-                throw new NotImplementedException();
-                /*return !IsWrappingNullReference && Target.Saved;*/
-            }
-        }
+        public bool IsSaved => throw new NotImplementedException();
 
         public void Export(string path)
         {
@@ -128,9 +74,12 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
         /// Exports the component to the folder. The file name matches the component name and file extension is based on the component's type.
         /// </summary>
         /// <param name="folder">Destination folder for the resulting source file.</param>
-        public string ExportAsSourceFile(string folder)
+        /// <param name="tempFile">True if a unique temp file name should be generated. WARNING: filenames generated with this flag are not persisted.</param>
+        public string ExportAsSourceFile(string folder, bool tempFile = false)
         {
-            var fullPath = Path.Combine(folder, Name + Type.FileExtension());
+            var fullPath = tempFile
+                ? Path.Combine(folder, Path.GetRandomFileName())
+                : Path.Combine(folder, Name + Type.FileExtension());
             switch (Type)
             {
                 case ComponentType.UserForm:
@@ -194,17 +143,17 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
             Export(path);
             return path;
         }
-        public override void Release(bool final = false)
-        {
-            if (!IsWrappingNullReference)
-            {
-                DesignerWindow().Release();
-                Controls.Release();
-                Properties.Release();
-                CodeModule.Release();
-                base.Release(final);
-            }
-        }
+        //public override void Release(bool final = false)
+        //{
+        //    if (!IsWrappingNullReference)
+        //    {
+        //        DesignerWindow().Release();
+        //        Controls.Release();
+        //        Properties.Release();
+        //        CodeModule.Release();
+        //        base.Release(final);
+        //    }
+        //}
 
         public override bool Equals(ISafeComWrapper<VB.VBComponent> other)
         {

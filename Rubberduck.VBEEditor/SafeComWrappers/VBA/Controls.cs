@@ -13,15 +13,9 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
         {
         }
 
-        public int Count
-        {
-            get { return IsWrappingNullReference ? 0 : Target.Count; }
-        }
+        public int Count => IsWrappingNullReference ? 0 : Target.Count;
 
-        public IControl this[object index]
-        {
-            get { return IsWrappingNullReference ? new Control(null) : new Control((VB.Forms.Control) Target.Item(index)); }
-        }
+        public IControl this[object index] => IsWrappingNullReference ? new Control(null) : new Control((VB.Forms.Control) Target.Item(index));
 
         IEnumerator<IControl> IEnumerable<IControl>.GetEnumerator()
         {
@@ -38,17 +32,17 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
                 : ((IEnumerable<IControl>) this).GetEnumerator();
         }
 
-        public override void Release(bool final = false)
-        {
-            if (!IsWrappingNullReference)
-            {
-                for (var i = 1; i <= Count; i++)
-                {
-                    this[i].Release();
-                }
-                base.Release(final);
-            } 
-        }
+        //public override void Release(bool final = false)
+        //{
+        //    if (!IsWrappingNullReference)
+        //    {
+        //        //for (var i = 1; i <= Count; i++)
+        //        //{
+        //        //    this[i].Release();
+        //        //}
+        //        base.Release(final);
+        //    } 
+        //}
 
         public override bool Equals(ISafeComWrapper<VB.Forms.Controls> other)
         {

@@ -1,13 +1,14 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using System.Threading;
+using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
+using RubberduckTests.Mocks;
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class DeclareAsExplicitVariantQuickFixTests :  QuickFixTestBase
+    public class DeclareAsExplicitVariantQuickFixTests
     {
 
         [Test]
@@ -22,8 +23,15 @@ End Sub";
                 @"Sub Foo(arg1 As Variant)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new VariableTypeNotDeclaredInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new VariableTypeNotDeclaredInspection(state);
+                new DeclareAsExplicitVariantQuickFix(state).Fix(inspection.GetInspectionResults(CancellationToken.None).First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -38,8 +46,15 @@ End Sub";
                 @"Sub Foo(Foo As Variant)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new VariableTypeNotDeclaredInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new VariableTypeNotDeclaredInspection(state);
+                new DeclareAsExplicitVariantQuickFix(state).Fix(inspection.GetInspectionResults(CancellationToken.None).First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -56,8 +71,15 @@ End Sub";
     Dim var1 As Variant
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new VariableTypeNotDeclaredInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new VariableTypeNotDeclaredInspection(state);
+                new DeclareAsExplicitVariantQuickFix(state).Fix(inspection.GetInspectionResults(CancellationToken.None).First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -72,8 +94,15 @@ End Sub";
                 @"Sub Foo(ByVal Fizz As Variant)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new VariableTypeNotDeclaredInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new VariableTypeNotDeclaredInspection(state);
+                new DeclareAsExplicitVariantQuickFix(state).Fix(inspection.GetInspectionResults(CancellationToken.None).First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -88,14 +117,16 @@ End Sub";
                 @"Sub Foo(ByVal Fizz As Variant = False)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new VariableTypeNotDeclaredInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new VariableTypeNotDeclaredInspection(state);
+                new DeclareAsExplicitVariantQuickFix(state).Fix(inspection.GetInspectionResults(CancellationToken.None).First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
-
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new DeclareAsExplicitVariantQuickFix();
-        }
     }
 }

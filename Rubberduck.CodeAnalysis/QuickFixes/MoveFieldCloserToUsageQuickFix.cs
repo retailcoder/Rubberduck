@@ -2,7 +2,6 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Interaction;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.MoveCloserToUsage;
 using Rubberduck.Resources.Inspections;
@@ -14,22 +13,19 @@ namespace Rubberduck.Inspections.QuickFixes
     {
         private readonly IVBE _vbe;
         private readonly RubberduckParserState _state;
-        private readonly IRewritingManager _rewritingManager;
         private readonly IMessageBox _messageBox;
 
-        public MoveFieldCloserToUsageQuickFix(IVBE vbe, RubberduckParserState state, IMessageBox messageBox, IRewritingManager rewritingManager)
+        public MoveFieldCloserToUsageQuickFix(IVBE vbe, RubberduckParserState state, IMessageBox messageBox)
             : base(typeof(MoveFieldCloserToUsageInspection))
         {
             _vbe = vbe;
             _state = state;
-            _rewritingManager = rewritingManager;
             _messageBox = messageBox;
         }
 
-        //The rewriteSession is optional since it is not used in this particular quickfix because it is a refactoring quickfix.
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession = null)
+        public override void Fix(IInspectionResult result)
         {
-            var refactoring = new MoveCloserToUsageRefactoring(_vbe, _state, _messageBox, _rewritingManager);
+            var refactoring = new MoveCloserToUsageRefactoring(_vbe, _state, _messageBox);
             refactoring.Refactor(result.Target);
         }
 
@@ -38,8 +34,8 @@ namespace Rubberduck.Inspections.QuickFixes
             return string.Format(InspectionResults.MoveFieldCloserToUsageInspection, result.Target.IdentifierName);
         }
 
-        public override bool CanFixInProcedure => false;
-        public override bool CanFixInModule => false;
-        public override bool CanFixInProject => false;
+        public override bool CanFixInProcedure => true;
+        public override bool CanFixInModule => true;
+        public override bool CanFixInProject => true;
     }
 }

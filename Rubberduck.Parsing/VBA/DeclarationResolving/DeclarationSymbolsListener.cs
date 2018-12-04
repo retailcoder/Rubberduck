@@ -44,11 +44,6 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
 
         private IEnumerable<IAnnotation> FindMemberAnnotations(int firstMemberLine)
         {
-            return FindAnnotations(firstMemberLine, AnnotationType.MemberAnnotation);
-        }
-
-        private IEnumerable<IAnnotation> FindAnnotations(int firstLine, AnnotationType annotationTypeFlag)
-        {
             if (_annotations == null)
             {
                 return null;
@@ -57,35 +52,20 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
             var annotations = new List<IAnnotation>();
 
             // VBE 1-based indexing
-            for (var currentLine = firstLine - 1; currentLine >= 1; currentLine--)
+            for (var currentLine = firstMemberLine - 1; currentLine >= 1; currentLine--)
             {
-                //Annotation sections end at the first line without an annotation with the specified flag or identifier annotation.
-                //Identifier annotations are treated in a special way because identifier references can appear on the same line as other constructs that can be annotated.
                 if (!_annotations.Any(annotation => annotation.QualifiedSelection.Selection.StartLine <= currentLine
-                                                    && annotation.QualifiedSelection.Selection.EndLine >= currentLine
-                                                    && (annotation.AnnotationType.HasFlag(annotationTypeFlag)
-                                                        || annotation.AnnotationType.HasFlag(AnnotationType.IdentifierAnnotation))))
+                                                        && annotation.QualifiedSelection.Selection.EndLine >= currentLine))
                 {
                     break;
                 }
 
-                var annotationsStartingOnCurrentLine = _annotations.Where(a => a.QualifiedSelection.Selection.StartLine == currentLine
-                                                                               && a.AnnotationType.HasFlag(annotationTypeFlag));
+                var annotationsStartingOnCurrentLine = _annotations.Where(a => a.QualifiedSelection.Selection.StartLine == currentLine);
 
                 annotations.AddRange(annotationsStartingOnCurrentLine);
             }
 
             return annotations;
-        }
-
-        private IEnumerable<IAnnotation> FindVariableAnnotations(int firstVariableLine)
-        {
-            return FindAnnotations(firstVariableLine, AnnotationType.VariableAnnotation);
-        }
-
-        private IEnumerable<IAnnotation> FindGeneralAnnotations(int firstLine)
-        {
-            return FindAnnotations(firstLine, AnnotationType.GeneralAnnotation);
         }
 
         private Declaration CreateDeclaration(
@@ -132,6 +112,7 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                 _attributes.TryGetValue(key, out var attributes);
                 _membersAllowingAttributes.TryGetValue(key, out var attributesPassContext);
 
+                var annotations = FindMemberAnnotations(selection.StartLine);
                 switch (declarationType)
                 {
                     case DeclarationType.Procedure:
@@ -144,8 +125,8 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             context,
                             attributesPassContext,
                             selection, 
-                            true,
-                            FindMemberAnnotations(selection.StartLine), 
+                            true, 
+                            annotations, 
                             attributes);
                         break;
                     case DeclarationType.Function:
@@ -162,7 +143,7 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             selection,
                             isArray,
                             true,
-                            FindMemberAnnotations(selection.StartLine),
+                            annotations,
                             attributes);
                         break;
                     case DeclarationType.Event:
@@ -178,7 +159,7 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             selection,
                             isArray,
                             true,
-                            FindGeneralAnnotations(selection.StartLine),
+                            annotations,
                             attributes);
                         break;
                     case DeclarationType.LibraryProcedure:
@@ -193,8 +174,8 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             accessibility, 
                             context, 
                             selection, 
-                            true,
-                            FindMemberAnnotations(selection.StartLine));
+                            true, 
+                            annotations);
                         break;
                     case DeclarationType.PropertyGet:
                         result = new PropertyGetDeclaration(
@@ -210,7 +191,7 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             selection,
                             isArray,
                             true,
-                            FindMemberAnnotations(selection.StartLine),
+                            annotations,
                             attributes);
                         break;
                     case DeclarationType.PropertySet:
@@ -223,8 +204,8 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             context,
                             attributesPassContext,
                             selection, 
-                            true,
-                            FindMemberAnnotations(selection.StartLine), 
+                            true, 
+                            annotations, 
                             attributes);
                         break;
                     case DeclarationType.PropertyLet:
@@ -237,8 +218,8 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             context,
                             attributesPassContext,
                             selection, 
-                            true,
-                            FindMemberAnnotations(selection.StartLine), 
+                            true, 
+                            annotations, 
                             attributes);
                         break;
                     case DeclarationType.EnumerationMember:
@@ -248,8 +229,8 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             _currentScope, 
                             asTypeName, 
                             asTypeContext, 
-                            typeHint,
-                            FindVariableAnnotations(selection.StartLine),
+                            typeHint, 
+                            annotations,
                             accessibility, 
                             declarationType,
                             (context as VBAParser.EnumerationStmt_ConstantContext)?.expression()?.GetText() ?? string.Empty,
@@ -271,7 +252,7 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             selection,
                             isArray,
                             asTypeContext,
-                            FindVariableAnnotations(selection.StartLine),
+                            annotations,
                             attributes);
                         break;
                     default:
@@ -291,7 +272,7 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                             isArray,
                             asTypeContext,
                             true,
-                            FindGeneralAnnotations(selection.StartLine),
+                            annotations,
                             attributes);
                         break;
                 }
@@ -685,7 +666,7 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                     ? Tokens.Variant
                     : asTypeClause.type().GetText()
                 : SymbolList.TypeHintToTypeName[typeHint];
-            var withEvents = context.WITHEVENTS() != null;
+            var withEvents = parent.WITHEVENTS() != null;
             var isAutoObject = asTypeClause != null && asTypeClause.NEW() != null;
             bool isArray = context.LPAREN() != null;
             AddDeclaration(
@@ -727,7 +708,7 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                 asTypeName,
                 asTypeClause,
                 typeHint,
-                FindVariableAnnotations(constStmt.Start.Line),
+                FindMemberAnnotations(constStmt.Start.Line),
                 accessibility,
                 DeclarationType.Constant,
                 value,

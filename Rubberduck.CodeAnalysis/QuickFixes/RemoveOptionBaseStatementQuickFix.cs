@@ -1,19 +1,23 @@
 using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class RemoveOptionBaseStatementQuickFix : QuickFixBase
     {
-        public RemoveOptionBaseStatementQuickFix()
-            : base(typeof(RedundantOptionInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public RemoveOptionBaseStatementQuickFix(RubberduckParserState state)
+            : base(typeof(RedundantOptionInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
             rewriter.Remove(result.Context);
         }
 

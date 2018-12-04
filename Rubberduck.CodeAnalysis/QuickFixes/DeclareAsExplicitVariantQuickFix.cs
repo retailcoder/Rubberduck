@@ -3,19 +3,23 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class DeclareAsExplicitVariantQuickFix : QuickFixBase
     {
-        public DeclareAsExplicitVariantQuickFix()
+        private readonly RubberduckParserState _state;
+        
+        public DeclareAsExplicitVariantQuickFix(RubberduckParserState state)
             : base(typeof(VariableTypeNotDeclaredInspection))
-        {}
-
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.Target.QualifiedModuleName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.Target);
 
             ParserRuleContext identifierNode =
                 result.Context is VBAParser.VariableSubStmtContext || result.Context is VBAParser.ConstSubStmtContext

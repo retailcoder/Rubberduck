@@ -169,27 +169,8 @@ namespace Rubberduck.UI.Command.MenuItems.CommandBars
             }
         }
 
-        private ICommandBars _parent;
-        public ICommandBars Parent
-        {
-            get => _parent;
-            set
-            {
-                _parent?.Dispose();
-                _parent = value;
-            }
-        }
-
-        private ICommandBar _item;
-        public ICommandBar Item
-        {
-            get => _item;
-            private set
-            {
-                _item?.Dispose();
-                _item = value;
-            }
-        }
+        public ICommandBars Parent { get; set; }
+        public ICommandBar Item { get; private set; }
 
         public void RemoveCommandBar()
         {
@@ -200,9 +181,9 @@ namespace Rubberduck.UI.Command.MenuItems.CommandBars
                     Logger.Debug("Removing commandbar.");
                     RemoveChildren();
                     Item.Delete();
-
-                    // Setting them to null will automatically dispose those
+                    Item.Dispose();
                     Item = null;
+                    Parent?.Dispose();
                     Parent = null;
                 }
             }

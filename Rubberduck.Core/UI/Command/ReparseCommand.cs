@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 using NLog;
 using Rubberduck.Interaction;
 using Rubberduck.Parsing.VBA;

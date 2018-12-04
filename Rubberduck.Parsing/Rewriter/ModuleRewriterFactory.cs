@@ -20,12 +20,12 @@ namespace Rubberduck.Parsing.Rewriter
             _attributesSourceCodeHandler = attributesSourceCodeHandler;
         }
 
-        public IExecutableModuleRewriter CodePaneRewriter(QualifiedModuleName module, ITokenStream tokenStream)
+        public IModuleRewriter CodePaneRewriter(QualifiedModuleName module, ITokenStream tokenStream)
         {
             return new ModuleRewriter(module, tokenStream, _codePaneSourceCodeHandlerr);
         }
 
-        public IExecutableModuleRewriter AttributesRewriter(QualifiedModuleName module, ITokenStream tokenStream)
+        public IModuleRewriter AttributesRewriter(QualifiedModuleName module, ITokenStream tokenStream)
         {
             return new ModuleRewriter(module, tokenStream, _attributesSourceCodeHandler);
         }

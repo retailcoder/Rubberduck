@@ -149,25 +149,11 @@ namespace Rubberduck.UI.Command.MenuItems.CommandBars
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private bool _isDisposed;
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_isDisposed || !disposing)
-            {
-                return;
-            }
-
             _selectionService.SelectionChanged -= OnSelectionChange;
             _parser.State.StateChanged -= OnParserStateChanged;
             _parser.State.StatusMessageUpdate -= OnParserStatusMessageUpdate;
 
             RemoveCommandBar();
-
-            _isDisposed = true;
         }
     }
 

@@ -1,13 +1,15 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using System.Threading;
+using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
+using RubberduckTests.Mocks;
+using RubberduckTests.Inspections;
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class MakeSingleLineParamegerQuickFixTests : QuickFixTestBase
+    public class MakeSingleLineParamegerQuickFixTests
     {
         [Test]
         [Category("QuickFixes")]
@@ -26,14 +28,17 @@ End Sub";
     ByVal Var1 As Integer)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new MultilineParameterInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+                var inspection = new MultilineParameterInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new MakeSingleLineParameterQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
-
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new MakeSingleLineParameterQuickFix();
-        }
     }
 }

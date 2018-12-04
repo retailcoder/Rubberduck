@@ -320,7 +320,7 @@ End Type
         [Category("Inspections")]
         public void EmptyModule_Ignored_DoesNotReturnResult()
         {
-            const string inputCode = "'@IgnoreModule EmptyModule";
+            const string inputCode = "'@Ignore EmptyModule";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out _);
             using (var state = MockParser.CreateAndParse(vbe.Object))

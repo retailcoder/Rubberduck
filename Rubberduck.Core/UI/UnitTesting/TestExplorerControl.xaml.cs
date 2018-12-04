@@ -50,22 +50,14 @@ namespace Rubberduck.UI.UnitTesting
             });
         }
 
+        private bool _isDisposed;
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private bool _isDisposed;
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_isDisposed || !disposing || DataContext == null)
-            {
-                return;
-            }
+            if (_isDisposed || DataContext == null) { return; }
 
             ((TestExplorerViewModel)DataContext).TestCompleted -= OnTestCompleted;
             DataContextChanged -= TestExplorerControl_DataContextChanged;
+
             _isDisposed = true;
         }
     }

@@ -1,19 +1,23 @@
 using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class RemoveUnassignedIdentifierQuickFix : QuickFixBase
     {
-        public RemoveUnassignedIdentifierQuickFix()
-            : base(typeof(VariableNotAssignedInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public RemoveUnassignedIdentifierQuickFix(RubberduckParserState state)
+            : base(typeof(VariableNotAssignedInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.Target.QualifiedModuleName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.Target);
             rewriter.Remove(result.Target);
         }
 

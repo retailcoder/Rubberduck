@@ -24,6 +24,7 @@ namespace Rubberduck
 
         internal static void Terminate()
         {
+            Vbe.Dispose();
             Vbe = null;
             VbeRuntime = null;
         }

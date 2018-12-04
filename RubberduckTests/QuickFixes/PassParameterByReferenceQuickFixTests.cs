@@ -1,50 +1,58 @@
+using System.Linq;
+using System.Threading;
 using NUnit.Framework;
+using Moq;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using RubberduckTests.Mocks;
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class PassParameterByReferenceQuickFixTests : QuickFixTestBase
+    public class PassParameterByReferenceQuickFixTests
     {
         [Test]
         [Category("QuickFixes")]
         public void AssignedByValParameter_PassByReferenceQuickFixWorks()
         {
 
-            const string inputCode = @"Public Sub Foo(Optional ByVal barByVal As String = ""XYZ"")
+            string inputCode =
+                @"Public Sub Foo(Optional ByVal barByVal As String = ""XYZ"")
     Let barByVal = ""test""
 End Sub";
-            const string expectedCode = @"Public Sub Foo(Optional ByRef barByVal As String = ""XYZ"")
+            string expectedCode =
+                @"Public Sub Foo(Optional ByRef barByVal As String = ""XYZ"")
     Let barByVal = ""test""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new AssignedByValParameterInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var quickFixResult = ApplyPassParameterByReferenceQuickFixToVBAFragment(inputCode);
+            Assert.AreEqual(expectedCode, quickFixResult);
         }
 
         [Test]
         [Category("QuickFixes")]
         public void AssignedByValParameter_PassByReferenceQuickFixWorks_ByValParameterIsOneOfSeveral()
         {
-            const string inputCode = @"Public Sub Foo(ByRef firstArg As Long, Optional ByVal barByVal As String = """", secondArg as Double)
+            var inputCode =
+                @"Public Sub Foo(ByRef firstArg As Long, Optional ByVal barByVal As String = """", secondArg as Double)
     Let barByVal = ""test""
 End Sub";
-            const string expectedCode = @"Public Sub Foo(ByRef firstArg As Long, Optional ByRef barByVal As String = """", secondArg as Double)
+            var expectedCode =
+                @"Public Sub Foo(ByRef firstArg As Long, Optional ByRef barByVal As String = """", secondArg as Double)
     Let barByVal = ""test""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new AssignedByValParameterInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var quickFixResult = ApplyPassParameterByReferenceQuickFixToVBAFragment(inputCode);
+            Assert.AreEqual(expectedCode, quickFixResult);
         }
 
         [Test]
         [Category("QuickFixes")]
         public void AssignedByValParameter_PassByReferenceQuickFixWorks_LineContinued1()
         {
-            const string inputCode = @"
+            var inputCode =
+                    @"
 Private Sub Foo(Optional ByVal  _
     bar _
     As _
@@ -55,8 +63,10 @@ Private Sub Foo(Optional ByVal  _
     Long)
 bar = 42
 End Sub
-";
-            const string expectedCode = @"
+"
+                ;
+            var expectedCode =
+                    @"
 Private Sub Foo(Optional ByRef  _
     bar _
     As _
@@ -67,23 +77,26 @@ Private Sub Foo(Optional ByRef  _
     Long)
 bar = 42
 End Sub
-";
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new AssignedByValParameterInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+"
+                ;
+            var quickFixResult = ApplyPassParameterByReferenceQuickFixToVBAFragment(inputCode);
+            Assert.AreEqual(expectedCode, quickFixResult);
         }
 
         [Test]
         [Category("QuickFixes")]
         public void AssignedByValParameter_PassByReferenceQuickFixWorks_LineContinued2()
         {
-            const string inputCode = @"Private Sub Foo(ByVal barByVal As Long, ByVal _xByValbar As Long,  ByVal _
+            var inputCode =
+                @"Private Sub Foo(ByVal barByVal As Long, ByVal _xByValbar As Long,  ByVal _
     barTwo _
     As _
     Long)
 barTwo = 42
 End Sub
 ";
-            const string expectedCode = @"Private Sub Foo(ByVal barByVal As Long, ByVal _xByValbar As Long,  ByRef _
+            var expectedCode =
+                @"Private Sub Foo(ByVal barByVal As Long, ByVal _xByValbar As Long,  ByRef _
     barTwo _
     As _
     Long)
@@ -91,22 +104,24 @@ barTwo = 42
 End Sub
 ";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new AssignedByValParameterInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var quickFixResult = ApplyPassParameterByReferenceQuickFixToVBAFragment(inputCode);
+            Assert.AreEqual(expectedCode, quickFixResult);
         }
 
         [Test]
         [Category("QuickFixes")]
         public void AssignedByValParameter_PassByReferenceQuickFixWorks_LineContinued3()
         {
-            const string inputCode = @"Private Sub Foo(ByVal barByVal As Long, ByVal barTwoon As Long,  ByVal _
+            var inputCode =
+                @"Private Sub Foo(ByVal barByVal As Long, ByVal barTwoon As Long,  ByVal _
     barTwo _
     As _
     Long)
 barTwo = 42
 End Sub
 ";
-            const string expectedCode = @"Private Sub Foo(ByVal barByVal As Long, ByVal barTwoon As Long,  ByRef _
+            var expectedCode =
+                @"Private Sub Foo(ByVal barByVal As Long, ByVal barTwoon As Long,  ByRef _
     barTwo _
     As _
     Long)
@@ -114,21 +129,23 @@ barTwo = 42
 End Sub
 ";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new AssignedByValParameterInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var quickFixResult = ApplyPassParameterByReferenceQuickFixToVBAFragment(inputCode);
+            Assert.AreEqual(expectedCode, quickFixResult);
         }
 
         [Test]
         [Category("QuickFixes")]
         public void AssignedByValParameter_PassByReferenceQuickFixWorks_LineContinued4()
         {
-            const string inputCode = @"Private Sub Foo(ByVal barByVal As Long, ByVal barTwoon As Long,  ByVal barTwo _
+            var inputCode =
+                @"Private Sub Foo(ByVal barByVal As Long, ByVal barTwoon As Long,  ByVal barTwo _
     As _
     Long)
 barTwo = 42
 End Sub
 ";
-            const string expectedCode = @"Private Sub Foo(ByVal barByVal As Long, ByVal barTwoon As Long,  ByRef barTwo _
+            var expectedCode =
+                @"Private Sub Foo(ByVal barByVal As Long, ByVal barTwoon As Long,  ByRef barTwo _
     As _
     Long)
 barTwo = 42
@@ -136,8 +153,8 @@ End Sub
 ";
 
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new AssignedByValParameterInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var quickFixResult = ApplyPassParameterByReferenceQuickFixToVBAFragment(inputCode);
+            Assert.AreEqual(expectedCode, quickFixResult);
         }
 
         [Test]
@@ -145,7 +162,8 @@ End Sub
         public void AssignedByValParameter_PassByReferenceQuickFixWorks_LineContinued5()
         {
             //weaponized code test
-            const string inputCode = @"Sub DoSomething( _
+            var inputCode =
+@"Sub DoSomething( _
     ByVal foo As Long, _
     ByRef _
         bar, _
@@ -157,7 +175,8 @@ End Sub
 End Sub
 ";
 
-            const string expectedCode = @"Sub DoSomething( _
+            var expectedCode =
+@"Sub DoSomething( _
     ByRef foo As Long, _
     ByRef _
         bar, _
@@ -168,14 +187,26 @@ End Sub
                bar + foo / barbecue
 End Sub
 ";
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new AssignedByValParameterInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var quickFixResult = ApplyPassParameterByReferenceQuickFixToVBAFragment(inputCode);
+            Assert.AreEqual(expectedCode, quickFixResult);
         }
 
-
-        protected override IQuickFix QuickFix(RubberduckParserState state)
+        private string ApplyPassParameterByReferenceQuickFixToVBAFragment(string inputCode)
         {
-            return new PassParameterByReferenceQuickFix();
+            var vbe = BuildMockVBEStandardModuleForVBAFragment(inputCode);
+            using(var state = MockParser.CreateAndParse(vbe.Object))
+            {
+                var inspection = new AssignedByValParameterInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new PassParameterByReferenceQuickFix(state).Fix(inspectionResults.First());
+                return state.GetRewriter(vbe.Object.ActiveVBProject.VBComponents[0]).GetText();
+            }
+        }
+
+        private Mock<IVBE> BuildMockVBEStandardModuleForVBAFragment(string inputCode)
+        {
+            return MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out _);
         }
     }
 }

@@ -100,19 +100,7 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
 
         public IReadOnlyList<string> ComponentNames()
         {
-            var names = new List<string>();
-            using (var components = VBComponents)
-            {
-                foreach (var component in components)
-                {
-                    using (component)
-                    {
-                        names.Add(component.Name);
-                    }
-                }
-
-                return names.ToArray();
-            }
+            return VBComponents.Select(component => component.Name).ToArray();
         }
 
         public void AssignProjectId()
@@ -186,9 +174,9 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
                     return _displayName;
                 }
 
-                using (var vbe = VBE)
-                using (var activeProject = vbe.ActiveVBProject)
-                using (var mainWindow = vbe.MainWindow)
+                var vbe = VBE;
+                var activeProject = vbe.ActiveVBProject;
+                var mainWindow = vbe.MainWindow;
                 {
                     try
                     {
@@ -214,7 +202,5 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
                 }
             }
         }
-
-        protected override void Dispose(bool disposing) => base.Dispose(disposing);
     }
 }

@@ -1,7 +1,6 @@
 using System.Linq;
 using System.Runtime.InteropServices;
 using Rubberduck.Interaction;
-using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.Rename;
@@ -14,14 +13,12 @@ namespace Rubberduck.UI.Command.Refactorings
     public class ProjectExplorerRefactorRenameCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
-        private readonly IRewritingManager _rewritingManager;
         private readonly IMessageBox _msgBox;
 
-        public ProjectExplorerRefactorRenameCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgBox, IRewritingManager rewritingManager) 
+        public ProjectExplorerRefactorRenameCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgBox) 
             : base (vbe)
         {
             _state = state;
-            _rewritingManager = rewritingManager;
             _msgBox = msgBox;
         }
 
@@ -35,7 +32,7 @@ namespace Rubberduck.UI.Command.Refactorings
             using (var view = new RenameDialog(new RenameViewModel(_state)))
             {
                 var factory = new RenamePresenterFactory(Vbe, view, _state);
-                var refactoring = new RenameRefactoring(Vbe, factory, _msgBox, _state, _state.ProjectsProvider, _rewritingManager);
+                var refactoring = new RenameRefactoring(Vbe, factory, _msgBox, _state);
 
                 var target = GetTarget();
 

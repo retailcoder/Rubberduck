@@ -89,21 +89,7 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposing)
-            {
-                return;
-            }
-
-            if (_funcDescPtr != IntPtr.Zero)
-            {
-                ((ComTypes.ITypeInfo)_typeInfo).ReleaseFuncDesc(_funcDescPtr);
-            }
+            if (_funcDescPtr != IntPtr.Zero) ((ComTypes.ITypeInfo)_typeInfo).ReleaseFuncDesc(_funcDescPtr);
             _funcDescPtr = IntPtr.Zero;
         }
 
@@ -246,24 +232,8 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private bool _isDisposed;
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_isDisposed || !disposing)
-            {
-                return;
-            }
-
-            if (_varDescPtr != IntPtr.Zero)
-            {
-                ((ComTypes.ITypeInfo)_typeInfo).ReleaseVarDesc(_varDescPtr);
-            }
+            if (_varDescPtr != IntPtr.Zero) ((ComTypes.ITypeInfo)_typeInfo).ReleaseVarDesc(_varDescPtr);
             _varDescPtr = IntPtr.Zero;
-            _isDisposed = true;
         }
 
         public void Document(StringLineBuilder output)
@@ -288,7 +258,7 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
     ///
     /// This class can also be cast to ComTypes.ITypeInfo for raw access to the underlying type information
     /// </remarks>
-    public sealed class TypeInfoWrapper : ComTypes.ITypeInfo, IDisposable
+    public class TypeInfoWrapper : ComTypes.ITypeInfo, IDisposable
     {
         private DisposableList<TypeInfoWrapper> _typeInfosWrapped;
         private TypeLibWrapper _containerTypeLib;
@@ -494,8 +464,8 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
             {
                 // We have to wrap the ITypeLib returned by GetContainingTypeLib
                 // so we cast to our ITypeInfo_Ptrs interface in order to work with the raw IntPtrs
-                ((ITypeInfo_Ptrs)target_ITypeInfo).GetContainingTypeLib(out var typeLibPtr, out _containerTypeLibIndex);
-                _containerTypeLib?.Dispose();
+                IntPtr typeLibPtr = IntPtr.Zero;
+                ((ITypeInfo_Ptrs)target_ITypeInfo).GetContainingTypeLib(out typeLibPtr, out _containerTypeLibIndex);
                 _containerTypeLib = new TypeLibWrapper(typeLibPtr, true);  
             }
             catch (Exception e)
@@ -748,11 +718,10 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
 
         public TypeInfoWrapper GetSafeRefTypeInfo(int hRef)
         {
+            IntPtr typeInfoPtr = IntPtr.Zero;
             // we cast to our ITypeInfo_Ptrs interface in order to work with the raw IntPtr for aggregation
-            ((ITypeInfo_Ptrs)target_ITypeInfo).GetRefTypeInfo(hRef, out var typeInfoPtr);
+            ((ITypeInfo_Ptrs)target_ITypeInfo).GetRefTypeInfo(hRef, out typeInfoPtr);
             var outVal = new TypeInfoWrapper(typeInfoPtr, _isUserFormBaseClass ? (int?)hRef : null); // takes ownership of the COM reference
-
-            _typeInfosWrapped?.Dispose();
             _typeInfosWrapped = _typeInfosWrapped ?? new DisposableList<TypeInfoWrapper>();
             _typeInfosWrapped.Add(outVal);
             return outVal;
@@ -760,7 +729,7 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
 
         public TypeInfoWrapper GetSafeImplementedTypeInfo(int index)
         {
-            target_ITypeInfo.GetRefTypeOfImplType(index, out var href);
+            target_ITypeInfo.GetRefTypeOfImplType(index, out int href);
             return GetSafeRefTypeInfo(href);
         }
 

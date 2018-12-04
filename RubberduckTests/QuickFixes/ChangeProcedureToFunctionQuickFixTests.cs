@@ -1,13 +1,15 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using NUnit.Framework;
+using RubberduckTests.Mocks;
+using System.Threading;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
+using RubberduckTests.Inspections;
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class ChangeProcedureToFunctionQuickFixTests : QuickFixTestBase
+    public class ChangeProcedureToFunctionQuickFixTests
     {
 
         [Test]
@@ -25,8 +27,17 @@ End Sub";
     Foo = arg1
 End Function";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ProcedureCanBeWrittenAsFunctionInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ProcedureCanBeWrittenAsFunctionInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ChangeProcedureToFunctionQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -44,8 +55,17 @@ End Sub";
     Foo = arg1
 End Function";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ProcedureCanBeWrittenAsFunctionInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ProcedureCanBeWrittenAsFunctionInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ChangeProcedureToFunctionQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -71,8 +91,17 @@ End Function
 Sub Goo(ByVal a As Integer)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ProcedureCanBeWrittenAsFunctionInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ProcedureCanBeWrittenAsFunctionInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ChangeProcedureToFunctionQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -92,8 +121,17 @@ End Function
 Sub Goo(ByVal a As Integer)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ProcedureCanBeWrittenAsFunctionInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ProcedureCanBeWrittenAsFunctionInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ChangeProcedureToFunctionQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -113,8 +151,17 @@ End Function
 Sub Goo(ByVal a As String)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ProcedureCanBeWrittenAsFunctionInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ProcedureCanBeWrittenAsFunctionInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ChangeProcedureToFunctionQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -142,8 +189,17 @@ Private Function Foo(ByVal arg1 As Integer) As Integer
     Foo = arg1
 End Function";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ProcedureCanBeWrittenAsFunctionInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ProcedureCanBeWrittenAsFunctionInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ChangeProcedureToFunctionQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -171,14 +227,18 @@ Sub Goo(ByVal a As Integer)
     fizz = Foo(fizz)
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ProcedureCanBeWrittenAsFunctionInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ProcedureCanBeWrittenAsFunctionInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ChangeProcedureToFunctionQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
-
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new ChangeProcedureToFunctionQuickFix();
-        }
     }
 }

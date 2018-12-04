@@ -2,19 +2,23 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
-    public sealed class RemoveExplicitCallStatementQuickFix : QuickFixBase
+    public sealed class RemoveExplicitCallStatmentQuickFix : QuickFixBase
     {
-        public RemoveExplicitCallStatementQuickFix()
-            : base(typeof(ObsoleteCallStatementInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public RemoveExplicitCallStatmentQuickFix(RubberduckParserState state)
+            : base(typeof(ObsoleteCallStatementInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
 
             var context = (VBAParser.CallStmtContext)result.Context;
             rewriter.Remove(context.CALL());

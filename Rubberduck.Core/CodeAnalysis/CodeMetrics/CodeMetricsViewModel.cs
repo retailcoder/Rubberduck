@@ -65,9 +65,13 @@ namespace Rubberduck.CodeAnalysis.CodeMetrics
                 .GroupBy(declaration => declaration.ProjectId)
                 .ToList();
 
-            var newProjects = userDeclarations
-                .Where(grouping => grouping.Any(declaration => declaration.DeclarationType == DeclarationType.Project))
-                .Select(grouping =>
+            if (userDeclarations.Any(
+                    grouping => grouping.All(declaration => declaration.DeclarationType != DeclarationType.Project)))
+            {
+                return;
+            }
+
+            var newProjects = userDeclarations.Select(grouping =>
                 new CodeExplorerProjectViewModel(_folderHelper,
                     grouping.SingleOrDefault(declaration => declaration.DeclarationType == DeclarationType.Project),
                     grouping,
@@ -116,19 +120,6 @@ namespace Rubberduck.CodeAnalysis.CodeMetrics
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private bool _isDisposed;
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_isDisposed || !disposing)
-            {
-                return;
-            }
-            _isDisposed = true;
-
             _state.StateChanged -= OnStateChanged;
         }
 

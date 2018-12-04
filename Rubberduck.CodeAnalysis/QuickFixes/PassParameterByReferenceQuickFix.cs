@@ -2,19 +2,23 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class PassParameterByReferenceQuickFix : QuickFixBase
     {
-        public PassParameterByReferenceQuickFix()
-            : base(typeof(AssignedByValParameterInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public PassParameterByReferenceQuickFix(RubberduckParserState state)
+            : base(typeof(AssignedByValParameterInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.Target.QualifiedModuleName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.Target);
 
             var token = ((VBAParser.ArgContext)result.Target.Context).BYVAL().Symbol;
             rewriter.Replace(token, Tokens.ByRef);

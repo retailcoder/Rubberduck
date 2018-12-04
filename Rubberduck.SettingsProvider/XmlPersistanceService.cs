@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -77,7 +76,6 @@ namespace Rubberduck.SettingsProvider
             return (T)Convert.ChangeType(null, typeof(T));
         }
 
-        [SuppressMessage("Microsoft.Usage", "CA2202:Do not dispose objects multiple times")] //This is fine. StreamWriter disposes the MemoryStream, but calling twice is a NOP.
         public void Save(T toSerialize)
         {
             var doc = GetConfigurationDoc(FilePath);

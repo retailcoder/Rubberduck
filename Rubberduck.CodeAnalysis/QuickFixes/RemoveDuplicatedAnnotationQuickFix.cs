@@ -7,24 +7,28 @@ using Rubberduck.Parsing.Annotations;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
 using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
-    public sealed class RemoveDuplicatedAnnotationQuickFix : QuickFixBase
+    public class RemoveDuplicatedAnnotationQuickFix : QuickFixBase
     {
-        public RemoveDuplicatedAnnotationQuickFix()
-            : base(typeof(DuplicatedAnnotationInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public RemoveDuplicatedAnnotationQuickFix(RubberduckParserState state)
+            : base(typeof(DuplicatedAnnotationInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
 
             var duplicateAnnotations = result.Target.Annotations
                 .Where(annotation => annotation.AnnotationType == result.Properties.AnnotationType)
                 .OrderBy(annotation => annotation.Context.Start.StartIndex)
-                .Skip(1)
-                .ToList();
+                .Skip(1);
 
             var duplicatesPerAnnotationList = duplicateAnnotations
                 .Select(annotation => (VBAParser.AnnotationListContext) annotation.Context.Parent)

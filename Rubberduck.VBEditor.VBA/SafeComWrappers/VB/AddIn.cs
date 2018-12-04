@@ -94,7 +94,5 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VBA
         {
             return IsWrappingNullReference ? 0 : HashCode.Compute(ProgId, Guid);
         }
-
-        protected override void Dispose(bool disposing) => base.Dispose(disposing);
     }
 }

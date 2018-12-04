@@ -1,10 +1,8 @@
 using System.Globalization;
 using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
-using Rubberduck.Inspections.Inspections.Concrete;
 using Rubberduck.Interaction;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.Rename;
 using Rubberduck.Resources;
@@ -17,29 +15,22 @@ namespace Rubberduck.Inspections.QuickFixes
     {
         private readonly IVBE _vbe;
         private readonly RubberduckParserState _state;
-        private readonly IRewritingManager _rewritingManager;
         private readonly IMessageBox _messageBox;
 
-        public RenameDeclarationQuickFix(IVBE vbe, RubberduckParserState state, IMessageBox messageBox, IRewritingManager rewritingManager)
-            : base(typeof(HungarianNotationInspection), 
-                typeof(UseMeaningfulNameInspection),
-                typeof(DefaultProjectNameInspection), 
-                typeof(UnderscoreInPublicClassModuleMemberInspection),
-                typeof(ExcelUdfNameIsValidCellReferenceInspection))
+        public RenameDeclarationQuickFix(IVBE vbe, RubberduckParserState state, IMessageBox messageBox)
+            : base(typeof(HungarianNotationInspection), typeof(UseMeaningfulNameInspection), typeof(DefaultProjectNameInspection), typeof(UnderscoreInPublicClassModuleMemberInspection))
         {
             _vbe = vbe;
             _state = state;
-            _rewritingManager = rewritingManager;
             _messageBox = messageBox;
         }
 
-        //The rewriteSession is optional since it is not used in this particular quickfix because it is a refactoring quickfix.
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession = null)
+        public override void Fix(IInspectionResult result)
         {
             using (var view = new RenameDialog(new RenameViewModel(_state)))
             {
                 var factory = new RenamePresenterFactory(_vbe, view, _state);
-                var refactoring = new RenameRefactoring(_vbe, factory, _messageBox, _state, _state.ProjectsProvider, _rewritingManager);
+                var refactoring = new RenameRefactoring(_vbe, factory, _messageBox, _state);
                 refactoring.Refactor(result.Target);
             }
         }

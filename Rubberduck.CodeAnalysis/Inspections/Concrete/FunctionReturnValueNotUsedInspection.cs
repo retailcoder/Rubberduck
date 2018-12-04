@@ -28,8 +28,7 @@ namespace Rubberduck.Inspections.Concrete
             var interfaceImplementationMembers = State.DeclarationFinder.FindAllInterfaceImplementingMembers();
             var functions = State.DeclarationFinder
                 .UserDeclarations(DeclarationType.Function)
-                .Where(item => !IsIgnoringInspectionResultFor(item, AnnotationName) &&
-                               item.References.Any(r => !IsReturnStatement(item, r) && !r.IsAssignment))
+                .Where(item => !IsIgnoringInspectionResultFor(item, AnnotationName))
                 .ToList();
             var interfaceMemberIssues = GetInterfaceMemberIssues(interfaceMembers);
             var nonInterfaceFunctions = functions.Except(interfaceMembers.Union(interfaceImplementationMembers));

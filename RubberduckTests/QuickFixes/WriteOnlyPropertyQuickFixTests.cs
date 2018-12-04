@@ -1,16 +1,15 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using System.Threading;
+using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
 using Rubberduck.VBEditor.SafeComWrappers;
-using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using RubberduckTests.Mocks;
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class WriteOnlyPropertyQuickFixTests : QuickFixTestBase
+    public class WriteOnlyPropertyQuickFixTests
     {
         [Test]
         [Category("QuickFixes")]
@@ -27,8 +26,18 @@ End Property
 Property Let Foo(value)
 End Property";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new WriteOnlyPropertyInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+
+            var vbe = MockVbeBuilder.BuildFromSingleModule(inputCode, ComponentType.ClassModule, out var component);
+
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new WriteOnlyPropertyInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new WriteOnlyPropertyQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -46,8 +55,17 @@ End Property
 Public Property Let Foo(ByVal value As Integer)
 End Property";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new WriteOnlyPropertyInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleModule(inputCode, ComponentType.ClassModule, out var component);
+
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new WriteOnlyPropertyInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new WriteOnlyPropertyQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -65,19 +83,18 @@ End Property
 Public Property Let Foo(value1, ByVal value2 As Integer, ByRef value3 As Long, value4 As Date, ByVal value5, value6 As String)
 End Property";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new WriteOnlyPropertyInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleModule(inputCode, ComponentType.ClassModule, out var component);
+
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new WriteOnlyPropertyInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new WriteOnlyPropertyQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
-
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new WriteOnlyPropertyQuickFix();
-        }
-
-        protected override IVBE TestVbe(string code, out IVBComponent component)
-        {
-            return MockVbeBuilder.BuildFromSingleModule(code, ComponentType.ClassModule, out component).Object;
-        }
     }
 }

@@ -9,13 +9,13 @@ namespace Rubberduck.Common.Hotkeys
     {
         private const Keys Modifiers = Keys.Alt | Keys.Control | Keys.Shift;
 
-        public HotkeyInfo(ushort hookId, Keys keys)
+        public HotkeyInfo(IntPtr hookId, Keys keys)
         {
             HookId = hookId;
             Keys = keys;
         }
 
-        public ushort HookId { get; }
+        public IntPtr HookId { get; }
         public Keys Keys { get; }
 
         public override string ToString()

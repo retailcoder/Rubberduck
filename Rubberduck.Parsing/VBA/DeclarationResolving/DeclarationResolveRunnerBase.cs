@@ -159,6 +159,12 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                 {
                     _state.AddDeclaration(createdDeclaration);
                 }
+
+                //This is a hack to deal with annotations on module level variables.
+                var memberAnnotations = declarationsListener.CreatedDeclarations
+                    .SelectMany(declaration => declaration.Annotations)
+                    .ToHashSet();
+                moduleDeclaration.RemoveAnnotations(memberAnnotations);
             }
             catch (Exception exception)
             {
@@ -229,25 +235,43 @@ namespace Rubberduck.Parsing.VBA.DeclarationResolving
                 return null;
             }
 
-            var potentialModuleAnnotations = annotations.Where(annotation =>
-                annotation.AnnotationType.HasFlag(AnnotationType.ModuleAnnotation));
-
-            var lastPossibleDeclarationsSectionLine = LastPossibleDeclarationsSectionLine(tree);
+            var lastDeclarationsSectionLine = LastDeclarationsSectionLine(tree, annotations);
 
             //There is no module body.
-            if (lastPossibleDeclarationsSectionLine == null)
+            if (lastDeclarationsSectionLine == null)
             {
-                return potentialModuleAnnotations;
+                return annotations;
             }
 
-            var lastPossibleModuleAnnotationLine = lastPossibleDeclarationsSectionLine.Value;
-            var moduleAnnotations = potentialModuleAnnotations.Where(annotation => annotation.QualifiedSelection.Selection.EndLine <= lastPossibleModuleAnnotationLine);
-            return moduleAnnotations;
+            var lastPossibleModuleAnnotationLine = lastDeclarationsSectionLine.Value;
+            var moduleAnnotations = annotations.Where(annotation => annotation.QualifiedSelection.Selection.EndLine <= lastPossibleModuleAnnotationLine);
+            return moduleAnnotations.ToList();
         }
 
-        private static int? LastPossibleDeclarationsSectionLine(IParseTree tree)
+        private static int? LastDeclarationsSectionLine(IParseTree tree, ICollection<IAnnotation> annotations)
         {
-            return FirstModuleBodyElementLine(tree) - 1;
+            var firstModuleBodyElementLine = FirstModuleBodyElementLine(tree);
+
+            if (firstModuleBodyElementLine == null)
+            {
+                return null;
+            }
+
+            //The VBE uses 1-based lines.
+            for (var currentLine = firstModuleBodyElementLine.Value - 1; currentLine >= 1; currentLine--)
+            {
+                if (annotations.Any(annotation => annotation.QualifiedSelection.Selection.StartLine <= currentLine
+                                                   && annotation.QualifiedSelection.Selection.EndLine >=
+                                                   currentLine))
+                {
+                    continue;
+                }
+
+                return currentLine;
+            }
+
+            //There is no declaration section.
+            return 0;
         }
 
         private static int? FirstModuleBodyElementLine(IParseTree tree)

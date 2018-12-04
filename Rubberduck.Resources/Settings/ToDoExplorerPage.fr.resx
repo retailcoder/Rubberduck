@@ -129,4 +129,7 @@
   <data name="TodoSettings_TextLabel" xml:space="preserve">
     <value>Texte:</value>
   </data>
+  <data name="TodoSettings_Text" xml:space="preserve">
+    <value>Texte</value>
+  </data>
 </root>

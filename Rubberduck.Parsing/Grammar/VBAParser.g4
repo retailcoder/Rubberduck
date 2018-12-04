@@ -549,9 +549,9 @@ upperBound : constantExpression;
 
 constantExpression : expression;
 
-variableStmt : (DIM | STATIC | visibility) whiteSpace variableListStmt;
+variableStmt : (DIM | STATIC | visibility) whiteSpace (WITHEVENTS whiteSpace)? variableListStmt;
 variableListStmt : variableSubStmt (whiteSpace? COMMA whiteSpace? variableSubStmt)*;
-variableSubStmt : (WITHEVENTS whiteSpace)? identifier (whiteSpace? LPAREN whiteSpace? (subscripts whiteSpace?)? RPAREN)? (whiteSpace asTypeClause)?;
+variableSubStmt : identifier (whiteSpace? LPAREN whiteSpace? (subscripts whiteSpace?)? RPAREN)? (whiteSpace asTypeClause)?;
 
 whileWendStmt : 
     WHILE whiteSpace expression endOfStatement 
@@ -898,7 +898,7 @@ statementKeyword :
 ;
 
 endOfLine :
-    whiteSpace? NEWLINE
+    whiteSpace? NEWLINE whiteSpace?
     | whiteSpace? commentOrAnnotation
 ;
 

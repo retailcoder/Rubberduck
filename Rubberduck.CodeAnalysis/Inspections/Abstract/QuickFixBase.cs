@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using NLog;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 using Rubberduck.Parsing.VBA.Extensions;
-using Rubberduck.Parsing.VBA.Parsing;
 
 namespace Rubberduck.Inspections.Abstract
 {
@@ -40,9 +39,7 @@ namespace Rubberduck.Inspections.Abstract
             _supportedInspections = _supportedInspections.Except(inspections).ToHashSet();
         }
 
-        public virtual CodeKind TargetCodeKind => CodeKind.CodePaneCode;
-
-        public abstract void Fix(IInspectionResult result, IRewriteSession rewriteSession);
+        public abstract void Fix(IInspectionResult result);
         public abstract string Description(IInspectionResult result);
 
         public abstract bool CanFixInProcedure { get; }

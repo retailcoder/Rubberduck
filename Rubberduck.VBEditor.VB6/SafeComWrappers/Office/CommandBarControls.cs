@@ -9,7 +9,7 @@ using VB = Microsoft.Vbe.Interop.VB6;
 // ReSharper disable once CheckNamespace - Special dispensation due to conflicting file vs namespace priorities
 namespace Rubberduck.VBEditor.SafeComWrappers.Office8
 {
-    public sealed class CommandBarControls : SafeComWrapper<MSO.CommandBarControls>, ICommandBarControls
+    public class CommandBarControls : SafeComWrapper<MSO.CommandBarControls>, ICommandBarControls
     {
         private readonly IVBE _vbe;
 
@@ -66,7 +66,5 @@ namespace Rubberduck.VBEditor.SafeComWrappers.Office8
         {
             return IsWrappingNullReference ? 0 : Target.GetHashCode();
         }
-
-        protected override void Dispose(bool disposing) => base.Dispose(disposing);
     }
 }

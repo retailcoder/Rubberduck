@@ -2,7 +2,6 @@
 using System.Runtime.InteropServices;
 using Rubberduck.Common;
 using Rubberduck.Interaction;
-using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.ReorderParameters;
@@ -15,14 +14,12 @@ namespace Rubberduck.UI.Command.Refactorings
     public class RefactorReorderParametersCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
-        private readonly IRewritingManager _rewritingManager;
         private readonly IMessageBox _msgbox;
 
-        public RefactorReorderParametersCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgbox, IRewritingManager rewritingManager) 
+        public RefactorReorderParametersCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgbox) 
             : base (vbe)
         {
             _state = state;
-            _rewritingManager = rewritingManager;
             _msgbox = msgbox;
         }
 
@@ -78,7 +75,7 @@ namespace Rubberduck.UI.Command.Refactorings
             using (var view = new ReorderParametersDialog(new ReorderParametersViewModel(_state)))
             {
                 var factory = new ReorderParametersPresenterFactory(Vbe, view, _state, _msgbox);
-                var refactoring = new ReorderParametersRefactoring(Vbe, factory, _msgbox, _rewritingManager);
+                var refactoring = new ReorderParametersRefactoring(Vbe, factory, _msgbox, _state.ProjectsProvider);
                 refactoring.Refactor(selection.Value);
             }
         }

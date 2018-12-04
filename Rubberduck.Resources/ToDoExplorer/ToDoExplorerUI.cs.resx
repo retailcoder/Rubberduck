@@ -126,6 +126,9 @@
   <data name="TodoExplorer_Caption" xml:space="preserve">
     <value>TODO Explorer</value>
   </data>
+  <data name="TodoSettings_Caption" xml:space="preserve">
+    <value>TODO Explorer</value>
+  </data>
   <data name="TodoSettings_TokenLabel" xml:space="preserve">
     <value>Text tokenu:</value>
   </data>
@@ -150,5 +153,8 @@
   </data>
   <data name="TodoSettings_Text" xml:space="preserve">
     <value>Text</value>
+  </data>
+  <data name="TodoSettings_TextLabel" xml:space="preserve">
+    <value>Text:</value>
   </data>
 </root>

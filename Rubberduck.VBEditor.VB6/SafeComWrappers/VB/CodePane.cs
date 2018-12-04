@@ -102,22 +102,17 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
 
             Show();
 
-            using (var vbe = VBE)
-            using (var mainWindow = vbe.MainWindow)
-            using (var window = Window)
-            {
-                var mainWindowHandle = mainWindow.Handle();
-                var handle = mainWindow.Handle().FindChildWindow(window.Caption);
+            var window = VBE.MainWindow;
+            var mainWindowHandle = window.Handle();
+            var handle = window.Handle().FindChildWindow(Window.Caption);
 
-                if (handle != IntPtr.Zero)
-                {
-                    NativeMethods.ActivateWindow(handle, mainWindowHandle);
-                }
-                else
-                {
-                    _logger.Debug(
-                        "CodePane.ForceFocus() failed to get a handle on the MainWindow.");
-                }
+            if (handle != IntPtr.Zero)
+            {
+                NativeMethods.ActivateWindow(handle, mainWindowHandle);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("CodePane.ForceFocus() failed to get a handle on the MainWindow.");
             }
         }
 
@@ -141,7 +136,5 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
         {
             return IsWrappingNullReference ? 0 : Target.GetHashCode();
         }
-
-        protected override void Dispose(bool disposing) => base.Dispose(disposing);
     }
 }

@@ -1,5 +1,4 @@
-﻿using System.Windows.Input;
-using NLog;
+﻿using NLog;
 using Rubberduck.Resources;
 using Rubberduck.Resources.Settings;
 using Rubberduck.Settings;
@@ -15,20 +14,7 @@ namespace Rubberduck.UI.Settings
             TransferSettingsToView(config.UserSettings.AutoCompleteSettings);
             ExportButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => ExportSettings());
             ImportButtonCommand = new DelegateCommand(LogManager.GetCurrentClassLogger(), _ => ImportSettings());
-
-            IncrementMaxConcatLinesCommand = new DelegateCommand(null, ExecuteIncrementMaxConcatLines, CanExecuteIncrementMaxConcatLines);
-            DecrementMaxConcatLinesCommand = new DelegateCommand(null, ExecuteDecrementMaxConcatLines, CanExecuteDecrementMaxConcatLines);
         }
-
-        public ICommand IncrementMaxConcatLinesCommand { get; }
-
-        private bool CanExecuteIncrementMaxConcatLines(object parameter) => ConcatMaxLines < ConcatMaxLinesMaxValue;
-        private void ExecuteIncrementMaxConcatLines(object parameter) => ConcatMaxLines++;
-
-        public ICommand DecrementMaxConcatLinesCommand { get; }
-
-        private bool CanExecuteDecrementMaxConcatLines(object parameter) => ConcatMaxLines > ConcatMaxLinesMinValue;
-        private void ExecuteDecrementMaxConcatLines(object parameter) => ConcatMaxLines--;
 
         public void SetToDefaults(Configuration config)
         {

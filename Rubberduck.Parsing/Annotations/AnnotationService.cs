@@ -1,15 +1,16 @@
-﻿using Rubberduck.VBEditor;
+﻿using Rubberduck.Parsing.Symbols;
+using Rubberduck.VBEditor;
 using System.Collections.Generic;
 using System.Linq;
 using Rubberduck.Parsing.VBA.DeclarationCaching;
 
 namespace Rubberduck.Parsing.Annotations
 {
-    public sealed class IdentifierAnnotationService
+    public sealed class AnnotationService
     {
         private readonly DeclarationFinder _declarationFinder;
 
-        public IdentifierAnnotationService(DeclarationFinder declarationFinder)
+        public AnnotationService(DeclarationFinder declarationFinder)
         {
             _declarationFinder = declarationFinder;
         }
@@ -21,15 +22,13 @@ namespace Rubberduck.Parsing.Annotations
             // VBE 1-based indexing
             for (var currentLine = line - 1; currentLine >= 1; currentLine--)
             {
-                //Identifier annotation sections end at the first line above without an identifier annotation.
                 if (!moduleAnnotations.Any(annotation => annotation.QualifiedSelection.Selection.StartLine <= currentLine
-                                                            && annotation.QualifiedSelection.Selection.EndLine >= currentLine
-                                                            && annotation.AnnotationType.HasFlag(AnnotationType.IdentifierAnnotation)))
+                                                    && annotation.QualifiedSelection.Selection.EndLine >= currentLine))
                 {
                     break;
                 }
 
-                var annotationsStartingOnCurrentLine = moduleAnnotations.Where(a => a.QualifiedSelection.Selection.StartLine == currentLine && a.AnnotationType.HasFlag(AnnotationType.IdentifierAnnotation));
+                var annotationsStartingOnCurrentLine = moduleAnnotations.Where(a => a.QualifiedSelection.Selection.StartLine == currentLine);
 
                 annotations.AddRange(annotationsStartingOnCurrentLine);
             }

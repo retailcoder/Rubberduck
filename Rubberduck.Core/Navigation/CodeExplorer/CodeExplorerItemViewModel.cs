@@ -143,21 +143,7 @@ namespace Rubberduck.Navigation.CodeExplorer
                 return 0;
             }
 
-            // references come first
-            if (x is CodeExplorerReferenceFolderViewModel ^
-                y is CodeExplorerReferenceFolderViewModel)
-            {
-                return x is CodeExplorerReferenceFolderViewModel ? -1 : 1;
-            }
-
-            // references always sort by priority
-            if (x is CodeExplorerReferenceViewModel first &&
-                y is CodeExplorerReferenceViewModel second)
-            {
-                return first.Priority > second.Priority ? 1 : - 1;
-            }
-
-            // folders come next
+            // folders come first
             if (x is CodeExplorerCustomFolderViewModel ^
                 y is CodeExplorerCustomFolderViewModel)
             {

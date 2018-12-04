@@ -2,20 +2,24 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.Symbols;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class SetExplicitVariantReturnTypeQuickFix : QuickFixBase
     {
-        public SetExplicitVariantReturnTypeQuickFix()
-            :base(typeof(ImplicitVariantReturnTypeInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public SetExplicitVariantReturnTypeQuickFix(RubberduckParserState state)
+            :base(typeof(ImplicitVariantReturnTypeInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.Target.QualifiedModuleName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.Target);
             
             const string asTypeClause = " As Variant";
             switch (result.Target.DeclarationType)

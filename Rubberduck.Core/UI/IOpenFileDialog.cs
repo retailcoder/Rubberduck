@@ -108,20 +108,7 @@ namespace Rubberduck.UI
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private bool _isDisposed;
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_isDisposed || !disposing)
-            {
-                return;
-            }
-
             _openFileDialog.Dispose();
-            _isDisposed = true;
         }
 
         public event EventHandler Disposed;

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Win32;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using Rubberduck.VBEditor.Utility;
@@ -9,27 +7,26 @@ namespace Rubberduck.VBEditor.VbeRuntime.Settings
 {
     public class VbeSettings : IVbeSettings
     {
-        private static readonly List<string> VbeVersions = new List<string> { "6.0", "7.0", "7.1" };
-        private const string VbeSettingPathTemplate = @"HKEY_CURRENT_USER\Software\Microsoft\VBA\{0}\Common";
-        private const string Vb6SettingPath = @"HKEY_CURRENT_USER\Software\Microsoft\VBA\Microsoft Visual Basic";
+        private const string Vbe7SettingPath = @"HKEY_CURRENT_USER\Software\Microsoft\VBA\7.0\Common";
+        private const string Vbe6SettingPath = @"HKEY_CURRENT_USER\Software\Microsoft\VBA\6.0\Common";
 
         private readonly IRegistryWrapper _registry;
         private readonly string _activeRegistryRootPath;
-        
+        private readonly string[] _registryRootPaths = { Vbe7SettingPath, Vbe6SettingPath };
 
         public VbeSettings(IVBE vbe, IRegistryWrapper registry)
         {
             try
             {
-                Version = VbeDllVersion.GetCurrentVersion(vbe);
-                switch (Version)
+                switch (VbeDllVersion.GetCurrentVersion(vbe))
                 {
-                    case DllVersion.Vbe7:
                     case DllVersion.Vbe6:
-                        _activeRegistryRootPath = string.Format(VbeSettingPathTemplate, vbe.Version.Substring(0, 3));
+                        Version = DllVersion.Vbe6;
+                        _activeRegistryRootPath = Vbe6SettingPath;
                         break;
-                    case DllVersion.Vb98:
-                        _activeRegistryRootPath = Vb6SettingPath;
+                    case DllVersion.Vbe7:
+                        Version = DllVersion.Vbe7;
+                        _activeRegistryRootPath = Vbe7SettingPath;
                         break;
                     default:
                         Version = DllVersion.Unknown;
@@ -65,10 +62,7 @@ namespace Rubberduck.VBEditor.VbeRuntime.Settings
 
         private void WriteAllRegistryPaths(string keyName, bool value)
         {
-            var paths = VbeVersions.Select(version => string.Format(VbeSettingPathTemplate, version))
-                .Union(new[] {Vb6SettingPath});
-
-            foreach (var path in paths)
+            foreach (var path in _registryRootPaths)
             {
                 if (DWordToBooleanConverter(path, keyName) != null)
                 {

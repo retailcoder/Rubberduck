@@ -27,7 +27,7 @@ namespace Rubberduck.Navigation.CodeExplorer
             DeclarationType.UserForm, 
         };
 
-        public CodeExplorerProjectViewModel(FolderHelper folderHelper, Declaration declaration, IEnumerable<Declaration> declarations, IVBE vbe, bool references = false)
+        public CodeExplorerProjectViewModel(FolderHelper folderHelper, Declaration declaration, IEnumerable<Declaration> declarations, IVBE vbe)
         {
             Declaration = declaration;
             _name = Declaration.IdentifierName;
@@ -37,14 +37,8 @@ namespace Rubberduck.Navigation.CodeExplorer
 
             try
             {
-                Items = new List<CodeExplorerItemViewModel>();
-                if (references)
-                {
-                    Items.Add(new CodeExplorerReferenceFolderViewModel(this));
-                }
-
                 FillFolders(declarations.ToList());
-                Items.AddRange(_folderTree.Items);
+                Items = _folderTree.Items.ToList();
 
                 _icon = Declaration.Project?.Protection == ProjectProtection.Locked
                     ? GetImageSource(resx.lock__exclamation)

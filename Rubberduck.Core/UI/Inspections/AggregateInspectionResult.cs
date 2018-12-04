@@ -27,7 +27,7 @@ namespace Rubberduck.UI.Inspections
 
         public ParserRuleContext Context => _result.Context;
 
-        public dynamic Properties => throw new InvalidOperationException();
+        public dynamic Properties => throw new NotImplementedException();
 
         public int CompareTo(IInspectionResult other)
         {

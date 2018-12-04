@@ -11,23 +11,23 @@ using Rubberduck.Parsing.VBA.Extensions;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
-    public sealed class SpecifyExplicitByRefModifierQuickFix : QuickFixBase
+    public class SpecifyExplicitByRefModifierQuickFix : QuickFixBase
     {
-        private readonly IDeclarationFinderProvider _declarationFinderProvider;
+        private readonly RubberduckParserState _state;
 
-        public SpecifyExplicitByRefModifierQuickFix(IDeclarationFinderProvider declarationFinderProvider)
+        public SpecifyExplicitByRefModifierQuickFix(RubberduckParserState state)
             : base(typeof(ImplicitByRefModifierInspection))
         {
-            _declarationFinderProvider = declarationFinderProvider;
+            _state = state;
         }
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public override void Fix(IInspectionResult result)
         {
             var context = (VBAParser.ArgContext)result.Context;
 
-            AddByRefIdentifier(rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName), context);
+            AddByRefIdentifier(_state.GetRewriter(result.QualifiedSelection.QualifiedName), context);
 
-            var interfaceMembers = _declarationFinderProvider.DeclarationFinder.FindAllInterfaceMembers().ToArray();
+            var interfaceMembers = _state.DeclarationFinder.FindAllInterfaceMembers().ToArray();
 
             var matchingInterfaceMemberContext = interfaceMembers.Select(member => member.Context).FirstOrDefault(c => c == context.Parent.Parent);
 
@@ -39,11 +39,11 @@ namespace Rubberduck.Inspections.QuickFixes
             var interfaceParameterIndex = GetParameterIndex(context);
 
             var implementationMembers =
-                _declarationFinderProvider.DeclarationFinder.FindInterfaceImplementationMembers(interfaceMembers.First(
+                _state.DeclarationFinder.FindInterfaceImplementationMembers(interfaceMembers.First(
                     member => member.Context == matchingInterfaceMemberContext)).ToHashSet();
 
             var parameters =
-                _declarationFinderProvider.DeclarationFinder.UserDeclarations(DeclarationType.Parameter)
+                _state.DeclarationFinder.UserDeclarations(DeclarationType.Parameter)
                     .Where(p => implementationMembers.Contains(p.ParentDeclaration))
                     .Cast<ParameterDeclaration>()
                     .ToArray();
@@ -55,7 +55,7 @@ namespace Rubberduck.Inspections.QuickFixes
 
                 if (parameterIndex == interfaceParameterIndex)
                 {
-                    AddByRefIdentifier(rewriteSession.CheckOutModuleRewriter(parameter.QualifiedModuleName), parameterContext);
+                    AddByRefIdentifier(_state.GetRewriter(parameter), parameterContext);
                 }
             }
             

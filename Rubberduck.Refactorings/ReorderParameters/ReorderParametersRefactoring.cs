@@ -3,9 +3,10 @@ using Rubberduck.Interaction;
 using Rubberduck.Parsing;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Symbols;
-using Rubberduck.Resources;
+ using Rubberduck.Resources;
 using Rubberduck.VBEditor;
 using Rubberduck.Parsing.Rewriter;
+using Rubberduck.VBEditor.ComManagement;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 ﻿using System;
 using System.Collections.Generic;
@@ -19,15 +20,15 @@ namespace Rubberduck.Refactorings.ReorderParameters
         private readonly IRefactoringPresenterFactory<IReorderParametersPresenter> _factory;
         private ReorderParametersModel _model;
         private readonly IMessageBox _messageBox;
-        private readonly IRewritingManager _rewritingManager;
+        private readonly HashSet<IModuleRewriter> _rewriters = new HashSet<IModuleRewriter>();
+        private readonly IProjectsProvider _projectsProvider;
 
-        public ReorderParametersRefactoring(IVBE vbe, IRefactoringPresenterFactory<IReorderParametersPresenter> factory,
-            IMessageBox messageBox, IRewritingManager rewritingManager)
+        public ReorderParametersRefactoring(IVBE vbe, IRefactoringPresenterFactory<IReorderParametersPresenter> factory, IMessageBox messageBox, IProjectsProvider projectsProvider)
         {
             _vbe = vbe;
             _factory = factory;
             _messageBox = messageBox;
-            _rewritingManager = rewritingManager;
+            _projectsProvider = projectsProvider;
         }
 
         public void Refactor()
@@ -53,16 +54,21 @@ namespace Rubberduck.Refactorings.ReorderParameters
 
                 var oldSelection = pane.GetQualifiedSelection();
 
-                var rewriteSession = _rewritingManager.CheckOutCodePaneSession();
-                AdjustReferences(_model.TargetDeclaration.References, rewriteSession);
-                AdjustSignatures(rewriteSession);
-                rewriteSession.TryRewrite();
+                AdjustReferences(_model.TargetDeclaration.References);
+                AdjustSignatures();
 
                 if (oldSelection.HasValue && !pane.IsWrappingNullReference)
                 {
                     pane.Selection = oldSelection.Value.Selection;
                 } 
             }
+
+            foreach (var rewriter in _rewriters)
+            {
+                rewriter.Rewrite();
+            }
+
+            _model.State.OnParseRequested(this);
         }
 
         public void Refactor(QualifiedSelection target)
@@ -122,7 +128,7 @@ namespace Rubberduck.Refactorings.ReorderParameters
             return false;
         }
 
-        private void AdjustReferences(IEnumerable<IdentifierReference> references, IRewriteSession rewriteSession)
+        private void AdjustReferences(IEnumerable<IdentifierReference> references)
         {
             foreach (var reference in references.Where(item => item.Context != _model.TargetDeclaration.Context))
             {
@@ -147,14 +153,17 @@ namespace Rubberduck.Refactorings.ReorderParameters
                     continue; 
                 }
 
-                var module = reference.QualifiedModuleName;
-                RewriteCall(argumentList, module, rewriteSession);
+                var component = _projectsProvider.Component(reference.QualifiedModuleName);
+                using (var module = component.CodeModule)
+                {
+                    RewriteCall(argumentList, module);
+                }
             }
         }
 
-        private void RewriteCall(VBAParser.ArgumentListContext argList, QualifiedModuleName module, IRewriteSession rewriteSession)
+        private void RewriteCall(VBAParser.ArgumentListContext argList, ICodeModule module)
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(module);
+            var rewriter = _model.State.GetRewriter(module.Parent);
 
             var args = argList.argument().Select((s, i) => new { Index = i, Text = s.GetText() }).ToList();
             for (var i = 0; i < _model.Parameters.Count; i++)
@@ -167,9 +176,11 @@ namespace Rubberduck.Refactorings.ReorderParameters
                 var arg = argList.argument()[i];
                 rewriter.Replace(arg, args.Single(s => s.Index == _model.Parameters[i].Index).Text);
             }
+
+            _rewriters.Add(rewriter);
         }
 
-        private void AdjustSignatures(IRewriteSession rewriteSession)
+        private void AdjustSignatures()
         {
             var proc = (dynamic)_model.TargetDeclaration.Context;
             var paramList = (VBAParser.ArgListContext)proc.argList();
@@ -183,8 +194,8 @@ namespace Rubberduck.Refactorings.ReorderParameters
 
                 if (setter != null)
                 {
-                    AdjustSignatures(setter, rewriteSession);
-                    AdjustReferences(setter.References, rewriteSession);
+                    AdjustSignatures(setter);
+                    AdjustReferences(setter.References);
                 }
 
                 var letter = _model.Declarations.FirstOrDefault(item => item.ParentScope == _model.TargetDeclaration.ParentScope &&
@@ -193,19 +204,19 @@ namespace Rubberduck.Refactorings.ReorderParameters
 
                 if (letter != null)
                 {
-                    AdjustSignatures(letter, rewriteSession);
-                    AdjustReferences(letter.References, rewriteSession);
+                    AdjustSignatures(letter);
+                    AdjustReferences(letter.References);
                 }
             }
 
-            RewriteSignature(_model.TargetDeclaration, paramList, rewriteSession);
+            RewriteSignature(_model.TargetDeclaration, paramList);
 
             foreach (var withEvents in _model.Declarations.Where(item => item.IsWithEvents && item.AsTypeName == _model.TargetDeclaration.ComponentName))
             {
                 foreach (var reference in _model.Declarations.FindEventProcedures(withEvents))
                 {
-                    AdjustReferences(reference.References, rewriteSession);
-                    AdjustSignatures(reference, rewriteSession);
+                    AdjustReferences(reference.References);
+                    AdjustSignatures(reference);
                 }
             }
 
@@ -222,12 +233,12 @@ namespace Rubberduck.Refactorings.ReorderParameters
 
             foreach (var interfaceImplentation in implementations)
             {
-                AdjustReferences(interfaceImplentation.References, rewriteSession);
-                AdjustSignatures(interfaceImplentation, rewriteSession);
+                AdjustReferences(interfaceImplentation.References);
+                AdjustSignatures(interfaceImplentation);
             }
         }
 
-        private void AdjustSignatures(Declaration declaration, IRewriteSession rewriteSession)
+        private void AdjustSignatures(Declaration declaration)
         {
             var proc = (dynamic) declaration.Context.Parent;
             VBAParser.ArgListContext paramList;
@@ -242,12 +253,12 @@ namespace Rubberduck.Refactorings.ReorderParameters
                 paramList = (VBAParser.ArgListContext) proc.subStmt().argList();
             }
 
-            RewriteSignature(declaration, paramList, rewriteSession);
+            RewriteSignature(declaration, paramList);
         }
 
-        private void RewriteSignature(Declaration target, VBAParser.ArgListContext paramList, IRewriteSession rewriteSession)
+        private void RewriteSignature(Declaration target, VBAParser.ArgListContext paramList)
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(target.QualifiedModuleName);
+            var rewriter = _model.State.GetRewriter(target);
 
             var parameters = paramList.arg().Select((s, i) => new { Index = i, Text = s.GetText() }).ToList();
             for (var i = 0; i < _model.Parameters.Count; i++)
@@ -255,6 +266,8 @@ namespace Rubberduck.Refactorings.ReorderParameters
                 var param = paramList.arg()[i];
                 rewriter.Replace(param, parameters.SingleOrDefault(s => s.Index == _model.Parameters[i].Index)?.Text);
             }
+
+            _rewriters.Add(rewriter);
         }
     }
 }

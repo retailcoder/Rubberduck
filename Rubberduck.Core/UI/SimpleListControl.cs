@@ -6,7 +6,7 @@ using Rubberduck.Resources;
 
 namespace Rubberduck.UI
 {
-    public sealed partial class SimpleListControl : UserControl, IDockableUserControl
+    public partial class SimpleListControl : UserControl, IDockableUserControl
     {
         public SimpleListControl(Declaration target)
             : this(string.Format(RubberduckUI.AllReferences_Caption, target.IdentifierName))

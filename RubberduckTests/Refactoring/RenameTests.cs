@@ -14,7 +14,6 @@ using Rubberduck.Parsing.VBA;
 using Rubberduck.UI.Refactorings.Rename;
 using Rubberduck.Interaction;
 using Rubberduck.Common;
-using Rubberduck.Parsing.Rewriter;
 
 namespace RubberduckTests.Refactoring
 {
@@ -521,6 +520,7 @@ End Function"
                     @"Private Function Fo|o() As Boolean
     Foo = True
 End Function
+
 Private Sub Goo()
     Dim var1 As Boolean
     var1 = Foo()
@@ -529,45 +529,12 @@ End Sub",
                     @"Private Function Hoo() As Boolean
     Hoo = True
 End Function
+
 Private Sub Goo()
     Dim var1 As Boolean
     var1 = Hoo()
 End Sub"
             };
-            PerformExpectedVersusActualRenameTests(tdo, inputOutput);
-        }
-
-        [Test]
-        [Category("Refactorings")]
-        [Category("Rename")]
-        public void RenameVariableWithBracketedExpressionInModule()
-        {
-            var tdo = new RenameTestsDataObject(selection: "Foo", newName: "Hoo");
-            var inputOutput = new RenameTestModuleDefinition("TestModule1", ComponentType.Document)
-            {
-                Input =
-                    @"Private Fo|o() As Long
-
-Public Sub Derp()
-  [Something].Clear
-End Sub",
-                Expected =
-                    @"Private Hoo() As Long
-
-Public Sub Derp()
-  [Something].Clear
-End Sub"
-            };
-
-            tdo.UseLibraries = true;
-            tdo.AdditionalSetup = t =>
-            {
-                var hostApp = new Mock<IHostApplication>();
-                hostApp.Setup(x => x.ApplicationName).Returns("EXCEL");
-                var mock = Mock.Get(tdo.VBE);
-                mock.Setup(x => x.HostApplication()).Returns(hostApp.Object);
-            };
-
             PerformExpectedVersusActualRenameTests(tdo, inputOutput);
         }
 
@@ -1890,8 +1857,7 @@ End Sub";
 
             IVBComponent component;
             var vbe = MockVbeBuilder.BuildFromSingleModule(inputCode, "Class1", ComponentType.ClassModule, out component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
@@ -1905,7 +1871,7 @@ End Sub";
 
                 var factory = SetupFactory(model);
 
-                var refactoring = new RenameRefactoring(vbeWrapper, factory.Object, msgbox.Object, state, state.ProjectsProvider, rewritingManager);
+                var refactoring = new RenameRefactoring(vbeWrapper, factory.Object, msgbox.Object, state);
                 refactoring.Refactor(model.Target);
 
                 Assert.AreSame(newName, component.CodeModule.Name);
@@ -1929,8 +1895,7 @@ End Sub";
                 .AddProjectToVbeBuilder()
                 .Build();
 
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var msgbox = new Mock<IMessageBox>();
@@ -1942,7 +1907,7 @@ End Sub";
 
                 var factory = SetupFactory(model);
 
-                var refactoring = new RenameRefactoring(vbeWrapper, factory.Object, msgbox.Object, state, state.ProjectsProvider, rewritingManager);
+                var refactoring = new RenameRefactoring(vbeWrapper, factory.Object, msgbox.Object, state);
                 refactoring.Refactor(model.Target);
 
                 Assert.AreEqual(newName, vbe.Object.VBProjects[0].Name);
@@ -2399,7 +2364,7 @@ End Sub
             var builder = new MockVbeBuilder();
             var projectName = "Test";
             var vbe = builder.ProjectBuilder(projectName, ProjectProtection.Unprotected)
-                .AddReference("VBA", MockVbeBuilder.LibraryPathVBA, major: 4, minor: 2, isBuiltIn: true)
+                .AddReference("VBA", MockVbeBuilder.LibraryPathVBA, major: 4, minor: 1, isBuiltIn: true)
                 .AddComponent("MyClass", ComponentType.ClassModule, classInputOutput.Input)
                 .AddComponent("Usage", ComponentType.StandardModule, usageInputOutput.Input)
                 .AddProjectToVbeBuilder()
@@ -2416,40 +2381,39 @@ End Sub
             tdo.MsgBox.Verify(m => m.NotifyWarn(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
-        //Issue: https://github.com/rubberduck-vba/Rubberduck/issues/4349
         [Test]
         [Category("Refactorings")]
         [Category("Rename")]
-        public void RenameRefactoring_DoesNotWarnForUDTMember()
+        public void RenameRefactoring_DoesNotWarnForUDTMember_Issue4349()
         {
-            var tdo = new RenameTestsDataObject(selection: "VS", newName: "VerySatisfiedResponses");
+            var tdo = new RenameTestsDataObject(selection: "VS", newName: "verySatisfiedResponses");
             var inputOutput = new RenameTestModuleDefinition("Module1", ComponentType.StandardModule)
             {
                 Input =
 @"Private Type TMonthScoreInfo
-            VerySatisfiedResponses As Long
+            verySatisfiedResponses As Long
         End Type
 
         Private monthScoreInfo As TMonthScoreInfo
 
         Public Property Get V|S() As Long
-            VS = monthScoreInfo.VerySatisfiedResponses
+            VS = monthScoreInfo.verySatisfiedResponses
         End Property
         Public Property Let VS(ByVal theVal As Long)
-            monthScoreInfo.VerySatisfiedResponses = theVal
+            monthScoreInfo.verySatisfiedResponses = theVal
         End Property",
                 Expected =
 @"Private Type TMonthScoreInfo
-            VerySatisfiedResponses As Long
+            verySatisfiedResponses As Long
         End Type
 
         Private monthScoreInfo As TMonthScoreInfo
 
-        Public Property Get VerySatisfiedResponses() As Long
-            VerySatisfiedResponses = monthScoreInfo.VerySatisfiedResponses
+        Public Property Get verySatisfiedResponses() As Long
+            verySatisfiedResponses = monthScoreInfo.verySatisfiedResponses
         End Property
-        Public Property Let VerySatisfiedResponses(ByVal theVal As Long)
-            monthScoreInfo.VerySatisfiedResponses = theVal
+        Public Property Let verySatisfiedResponses(ByVal theVal As Long)
+            monthScoreInfo.verySatisfiedResponses = theVal
         End Property"
             };
 
@@ -2457,11 +2421,10 @@ End Sub
             tdo.MsgBox.Verify(m => m.ConfirmYesNo(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
         }
 
-        //Issue: https://github.com/rubberduck-vba/Rubberduck/issues/4349
         [Test]
         [Category("Refactorings")]
         [Category("Rename")]
-        public void RenameRefactoring_DoesNotWarnForEnumMember()
+        public void RenameRefactoring_DoesNotWarnForEnumMember_Issue4349()
         {
             var tdo = new RenameTestsDataObject(selection: "VerySatisfiedID", newName: "VerySatisfiedResponse");
             var inputOutput = new RenameTestModuleDefinition("Module1", ComponentType.StandardModule)
@@ -2473,7 +2436,7 @@ End Sub
         End Enum
 
         Public Property Get V|erySatisfiedID() As Long
-            VerySatisfiedID = MonthScoreTypes.VerySatisfiedResponse
+            VS = MonthScoreTypes.VerySatisfiedResponse
         End Property",
                 Expected =
 @"Private Enum MonthScoreTypes
@@ -2482,40 +2445,7 @@ End Sub
         End Enum
 
         Public Property Get VerySatisfiedResponse() As Long
-            VerySatisfiedResponse = MonthScoreTypes.VerySatisfiedResponse
-        End Property",
-            };
-
-            PerformExpectedVersusActualRenameTests(tdo, inputOutput);
-            tdo.MsgBox.Verify(m => m.ConfirmYesNo(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
-        }
-
-        //Issue: https://github.com/rubberduck-vba/Rubberduck/issues/4349
-        [Test]
-        [Category("Refactorings")]
-        [Category("Rename")]
-        public void RenameRefactoring_DoesNotWarnForMember()
-        {
-            var tdo = new RenameTestsDataObject(selection: "VerySatisfiedResponse", newName: "VerySatisfiedID");
-            var inputOutput = new RenameTestModuleDefinition("Module1", ComponentType.StandardModule)
-            {
-                Input =
-@"Private Enum MonthScoreTypes
-            VerySa|tisfiedResponse
-            VeryDissatisfiedResponse
-        End Enum
-
-        Public Property Get VerySatisfiedID() As Long
-            VerySatisfiedID = MonthScoreTypes.VerySatisfiedResponse
-        End Property",
-                Expected =
-@"Private Enum MonthScoreTypes
-            VerySatisfiedID
-            VeryDissatisfiedResponse
-        End Enum
-
-        Public Property Get VerySatisfiedID() As Long
-            VerySatisfiedID = MonthScoreTypes.VerySatisfiedID
+            VS = MonthScoreTypes.VerySatisfiedResponse
         End Property",
             };
 
@@ -2564,8 +2494,7 @@ End Sub";
 
             IVBComponent component;
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out component);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var codePaneMock = new Mock<ICodePane>();
@@ -2576,11 +2505,11 @@ End Sub";
                 var vbeWrapper = vbe.Object;
                 var factory = new RenamePresenterFactory(vbeWrapper, null, state);
 
-                var refactoring = new RenameRefactoring(vbeWrapper, factory, null, state, state.ProjectsProvider, rewritingManager);
+                var refactoring = new RenameRefactoring(vbeWrapper, factory, null, state);
                 refactoring.Refactor();
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(inputCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(inputCode, rewriter.GetText());
             }
         }
 
@@ -2712,8 +2641,7 @@ End Property";
 
             IVBComponent component;
             var vbe = MockVbeBuilder.BuildFromSingleModule(inputCode, "ClassModule1", ComponentType.ClassModule, out component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
@@ -2727,7 +2655,7 @@ End Property";
 
                 var factory = SetupFactory(model);
 
-                var refactoring = new RenameRefactoring(vbeWrapper, factory.Object, msgbox.Object, state, state.ProjectsProvider, rewritingManager);
+                var refactoring = new RenameRefactoring(vbeWrapper, factory.Object, msgbox.Object, state);
                 refactoring.Refactor(model.Target);
 
                 Assert.AreSame(newName, component.CodeModule.Name);
@@ -2798,9 +2726,8 @@ End Property";
             tdo.MsgBox = new Mock<IMessageBox>();
             tdo.MsgBox.Setup(m => m.ConfirmYesNo(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>())).Returns(tdo.MsgBoxReturn == ConfirmationOutcome.Yes);
 
-            tdo.VBE = tdo.VBE ?? BuildProject(tdo.ProjectName, tdo.ModuleTestSetupDefs, tdo.UseLibraries);
-            tdo.AdditionalSetup?.Invoke(tdo);
-            (tdo.ParserState, tdo.RewritingManager) = MockParser.CreateAndParseWithRewritingManager(tdo.VBE);
+            tdo.VBE = tdo.VBE ?? BuildProject(tdo.ProjectName, tdo.ModuleTestSetupDefs);
+            tdo.ParserState = MockParser.CreateAndParse(tdo.VBE);
 
             CreateQualifiedSelectionForTestCase(tdo);
             tdo.RenameModel = new RenameModel(tdo.VBE, tdo.ParserState, tdo.QualifiedSelection) { NewName = tdo.NewName };
@@ -2808,7 +2735,8 @@ End Property";
                 , $"Target aquired ({tdo.RenameModel.Target.IdentifierName} does not equal name specified ({tdo.OriginalName}) in the test");
 
             var factory = SetupFactory(tdo.RenameModel);
-            tdo.RenameRefactoringUnderTest = new RenameRefactoring(tdo.VBE, factory.Object, tdo.MsgBox.Object, tdo.ParserState, tdo.ParserState.ProjectsProvider, tdo.RewritingManager);
+
+            tdo.RenameRefactoringUnderTest = new RenameRefactoring(tdo.VBE, factory.Object, tdo.MsgBox.Object, tdo.ParserState);
         }
 
         private static void AddTestModuleDefinition(RenameTestsDataObject tdo, RenameTestModuleDefinition inputOutput)
@@ -2855,9 +2783,9 @@ End Property";
             {
                 if (inputOutput.CheckExpectedEqualsActual)
                 {
-                    var codeModule = RetrieveComponent(tdo, inputOutput.ModuleName).CodeModule;
+                    var rewriter = tdo.ParserState.GetRewriter(RetrieveComponent(tdo, inputOutput.ModuleName).CodeModule.Parent);
                     var expected = inputOutput.Expected;
-                    var actual = codeModule.Content();
+                    var actual = rewriter.GetText();
                     Assert.AreEqual(expected, actual);
                 }
             }
@@ -2886,17 +2814,10 @@ End Property";
             Assert.Inconclusive($"Unable to find target '{FAUX_CURSOR}' in { tdo.SelectionModuleName} content.");
         }
 
-        private static IVBE BuildProject(string projectName, List<RenameTestModuleDefinition> testComponents, bool useLibraries = false)
+        private static IVBE BuildProject(string projectName, List<RenameTestModuleDefinition> testComponents)
         {
             var builder = new MockVbeBuilder();
             var enclosingProjectBuilder = builder.ProjectBuilder(projectName, ProjectProtection.Unprotected);
-
-            if (useLibraries)
-            {
-                enclosingProjectBuilder.AddReference("VBA", MockVbeBuilder.LibraryPathVBA, 4, 2, true);
-                enclosingProjectBuilder.AddReference("Excel", MockVbeBuilder.LibraryPathMsExcel, 1, 8, true);
-            }
-            
             foreach (var comp in testComponents)
             {
                 if (comp.ModuleType == ComponentType.UserForm)
@@ -3000,12 +2921,10 @@ End Property";
                 OriginalName = selection;
                 ModuleTestSetupDefs = new List<RenameTestModuleDefinition>();
                 RenameRefactoringUnderTest = null;
-                UseLibraries = false;
             }
 
             public IVBE VBE { get; set; }
             public RubberduckParserState ParserState { get; set; }
-            public IRewritingManager RewritingManager { get; set; }
             public string ProjectName { get; set; }
             public string NewName { get; set; }
             public string SelectionModuleName { get; set; }
@@ -3018,8 +2937,6 @@ End Property";
             public List<RenameTestModuleDefinition> ModuleTestSetupDefs { get; set; }
             public string OriginalName { get; set; }
             public RenameRefactoring RenameRefactoringUnderTest { get; set; }
-            public Action<RenameTestsDataObject> AdditionalSetup { get; set; }
-            public bool UseLibraries { get; set; }
         }
         #endregion
     }

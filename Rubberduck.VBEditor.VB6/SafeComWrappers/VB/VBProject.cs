@@ -129,19 +129,7 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
 
         public IReadOnlyList<string> ComponentNames()
         {
-            var names = new List<string>();
-            using (var components = VBComponents)
-            {
-                foreach (var component in components)
-                {
-                    using (component)
-                    {
-                        names.Add(component.Name);
-                    }
-                }
-
-                return names.ToArray();
-            }
+            return VBComponents.Select(component => component.Name).ToArray();
         }
 
         public void AssignProjectId()
@@ -215,8 +203,6 @@ namespace Rubberduck.VBEditor.SafeComWrappers.VB6
                 }
             }
         }
-
-        protected override void Dispose(bool disposing) => base.Dispose(disposing);
 
         private const string DllName = "vba6.dll";
         [DllImport(DllName)]

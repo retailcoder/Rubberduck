@@ -2,19 +2,23 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class ReplaceObsoleteCommentMarkerQuickFix : QuickFixBase
     {
-        public ReplaceObsoleteCommentMarkerQuickFix()
-            : base(typeof(ObsoleteCommentSyntaxInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public ReplaceObsoleteCommentMarkerQuickFix(RubberduckParserState state)
+            : base(typeof(ObsoleteCommentSyntaxInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
             var context = (VBAParser.RemCommentContext) result.Context;
 
             rewriter.Replace(context.REM(), "'");

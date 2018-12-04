@@ -33,12 +33,12 @@ End Sub";
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("VBAProject", ProjectProtection.Unprotected)
                 .AddComponent("MyClass", ComponentType.ClassModule, inputCode)
-                .AddReference("VBA", MockVbeBuilder.LibraryPathVBA, 4, 2, true)
+                .AddReference("VBA", MockVbeBuilder.LibraryPathVBA, 4, 1, true)
                 .Build();
             var vbe = builder.AddProject(project).Build();
 
             var component = project.Object.VBComponents[0];
-            var (parser, rewriteManager) = MockParser.CreateWithRewriteManager(vbe.Object);
+            var parser = MockParser.Create(vbe.Object);
             using (var state = parser.State)
             {
                 // FIXME reinstate and unignore tests
@@ -54,13 +54,11 @@ End Sub";
                 var inspection = new UntypedFunctionUsageInspection(state);
                 var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
 
-                var rewriteSession = rewriteManager.CheckOutCodePaneSession();
+                new UntypedFunctionUsageQuickFix(state).Fix(inspectionResults.First());
 
-                new UntypedFunctionUsageQuickFix().Fix(inspectionResults.First(), rewriteSession);
-
-                var actualCode = rewriteSession.CheckOutModuleRewriter(component.QualifiedModuleName).GetText();
-                Assert.AreEqual(expectedCode, actualCode);
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
             }
         }
+
     }
 }

@@ -1,13 +1,15 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using System.Threading;
+using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
+using RubberduckTests.Mocks;
+using RubberduckTests.Inspections;
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class ReplaceObsoleteCommentMarkerQuickFixTests : QuickFixTestBase
+    public class ReplaceObsoleteCommentMarkerQuickFixTests
     {
         [Test]
         [Category("QuickFixes")]
@@ -19,8 +21,17 @@ namespace RubberduckTests.QuickFixes
             const string expectedCode =
                 @"' test1";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ObsoleteCommentSyntaxInspection(state));
-            Assert.AreEqual(expectedCode, actualCode); 
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteCommentSyntaxInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ReplaceObsoleteCommentMarkerQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -35,8 +46,17 @@ a comment";
                 @"' this is _
 a comment";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ObsoleteCommentSyntaxInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteCommentSyntaxInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ReplaceObsoleteCommentMarkerQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
 
@@ -50,8 +70,17 @@ a comment";
             const string expectedCode =
                 @"Dim Foo As Integer: ' This is a comment";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ObsoleteCommentSyntaxInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteCommentSyntaxInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
+
+                new ReplaceObsoleteCommentMarkerQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -66,14 +95,17 @@ a comment";
                 @"Dim Foo As Integer: ' This is _
 a comment";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ObsoleteCommentSyntaxInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
-        }
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
+                var inspection = new ObsoleteCommentSyntaxInspection(state);
+                var inspector = InspectionsHelper.GetInspector(inspection);
+                var inspectionResults = inspector.FindIssuesAsync(state, CancellationToken.None).Result;
 
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new ReplaceObsoleteCommentMarkerQuickFix();
+                new ReplaceObsoleteCommentMarkerQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
     }
 }

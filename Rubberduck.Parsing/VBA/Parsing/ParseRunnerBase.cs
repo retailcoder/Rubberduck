@@ -1,8 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
+using Antlr4.Runtime;
+using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.VBA.Parsing.ParsingExceptions;
 using Rubberduck.VBEditor;
+using Rubberduck.VBEditor.SourceCodeHandling;
 
 namespace Rubberduck.Parsing.VBA.Parsing
 {
@@ -77,8 +81,8 @@ namespace Rubberduck.Parsing.VBA.Parsing
                 _state.SetModuleAnnotations(module, results.Annotations);
                 _state.SetModuleAttributes(module, results.Attributes);
                 _state.SetMembersAllowingAttributes(module, results.MembersAllowingAttributes);
-                _state.SetCodePaneTokenStream(module, results.CodePaneTokenStream);
-                _state.SetAttributesTokenStream(module, results.AttributesTokenStream);
+                _state.SetCodePaneRewriter(module, results.CodePaneRewriter);
+                _state.AddAttributesRewriter(module, results.AttributesRewriter);
 
                 // This really needs to go last
                 //It does not reevaluate the overall parer state to avoid concurrent evaluation of all module states and for performance reasons.

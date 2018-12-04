@@ -1,31 +1,24 @@
 using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
-using Rubberduck.Parsing;
-using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class UseSetKeywordForObjectAssignmentQuickFix : QuickFixBase
     {
-        public UseSetKeywordForObjectAssignmentQuickFix()
-            : base(typeof(ObjectVariableNotSetInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public UseSetKeywordForObjectAssignmentQuickFix(RubberduckParserState state)
+            : base(typeof(ObjectVariableNotSetInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
-            var letStmt = result.Context.GetAncestor<VBAParser.LetStmtContext>();
-            var letToken = letStmt.LET();
-            if (letToken != null)
-            {
-                rewriter.Replace(letToken, "Set");
-            }
-            else
-            {
-                rewriter.InsertBefore(letStmt.Start.TokenIndex, "Set ");
-            }
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
+            rewriter.InsertBefore(result.Context.Start.TokenIndex, "Set ");
         }
 
         public override string Description(IInspectionResult result) => Resources.Inspections.QuickFixes.SetObjectVariableQuickFix;

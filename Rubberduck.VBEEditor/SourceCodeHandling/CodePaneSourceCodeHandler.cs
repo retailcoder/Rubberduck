@@ -99,19 +99,14 @@ namespace Rubberduck.VBEditor.SourceCodeHandling
         {
             var originalCode = original.Code.Replace("\r", string.Empty).Split('\n');
             var originalPosition = original.CaretPosition.StartColumn;
-            var isAtLastCharacter = originalPosition == original.CaretLine.Length;
-
             var originalNonWhitespaceCharacters = 0;
-            var isAllWhitespace = !isAtLastCharacter;
-            if (!isAtLastCharacter)
+            var isAllWhitespace = true;
+            for (var i = 0; i <= Math.Min(originalPosition - 1, originalCode[original.CaretPosition.StartLine].Length - 1); i++)
             {
-                for (var i = 0; i <= Math.Min(originalPosition - 1, original.CaretLine.Length - 1); i++)
+                if (originalCode[original.CaretPosition.StartLine][i] != ' ')
                 {
-                    if (originalCode[original.CaretPosition.StartLine][i] != ' ')
-                    {
-                        originalNonWhitespaceCharacters++;
-                        isAllWhitespace = false;
-                    }
+                    originalNonWhitespaceCharacters++;
+                    isAllWhitespace = false;
                 }
             }
 
@@ -126,25 +121,18 @@ namespace Rubberduck.VBEditor.SourceCodeHandling
 
             var prettifiedNonWhitespaceCharacters = 0;
             var prettifiedCaretCharIndex = 0;
-            if (!isAtLastCharacter)
+            for (var i = 0; i < prettifiedCode[original.CaretPosition.StartLine].Length; i++)
             {
-                for (var i = 0; i < prettifiedCode[original.CaretPosition.StartLine].Length; i++)
+                if (prettifiedCode[original.CaretPosition.StartLine][i] != ' ')
                 {
-                    if (prettifiedCode[original.CaretPosition.StartLine][i] != ' ')
+                    prettifiedNonWhitespaceCharacters++;
+                    if (prettifiedNonWhitespaceCharacters == originalNonWhitespaceCharacters 
+                        || i == prettifiedCode[original.CaretPosition.StartLine].Length - 1)
                     {
-                        prettifiedNonWhitespaceCharacters++;
-                        if (prettifiedNonWhitespaceCharacters == originalNonWhitespaceCharacters
-                            || i == prettifiedCode[original.CaretPosition.StartLine].Length - 1)
-                        {
-                            prettifiedCaretCharIndex = i;
-                            break;
-                        }
+                        prettifiedCaretCharIndex = i;
+                        break;
                     }
                 }
-            }
-            else
-            {
-                prettifiedCaretCharIndex = prettifiedCode[original.CaretPosition.StartLine].Length;
             }
 
             var prettifiedPosition = new Selection(
@@ -283,8 +271,7 @@ namespace Rubberduck.VBEditor.SourceCodeHandling
 
         public Selection GetSelection(QualifiedModuleName module)
         {
-            var component = _projectsProvider.Component(module);
-
+            using (var component = _projectsProvider.Component(module))
             using (var codeModule = component.CodeModule)
             using (var pane = codeModule.CodePane)
             {

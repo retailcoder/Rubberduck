@@ -1,14 +1,14 @@
-﻿using System;
+﻿using System.Linq;
+using System.Threading;
 using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
+using RubberduckTests.Mocks;
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class RemoveUnassignedIdentifierQuickFixTests : QuickFixTestBase
+    public class RemoveUnassignedIdentifierQuickFixTests
     {
         [Test]
         [Category("QuickFixes")]
@@ -23,8 +23,15 @@ End Sub";
                 @"Sub Foo()
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new VariableNotAssignedInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new VariableNotAssignedInspection(state);
+                new RemoveUnassignedIdentifierQuickFix(state).Fix(inspection.GetInspectionResults(CancellationToken.None).First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -43,8 +50,15 @@ End Sub";
                 @"Sub Foo()
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new VariableNotAssignedInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new VariableNotAssignedInspection(state);
+                new RemoveUnassignedIdentifierQuickFix(state).Fix(inspection.GetInspectionResults(CancellationToken.None).First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -60,9 +74,17 @@ End Sub";
                 @"Sub Foo()
 Dim var1 As Integer
 End Sub";
-            Func<IInspectionResult, bool> conditionToFix = s => s.Target.IdentifierName == "var2";
-            var actualCode = ApplyQuickFixToFirstInspectionResultSatisfyingPredicate(inputCode, state => new VariableNotAssignedInspection(state), conditionToFix);
-            Assert.AreEqual(expectedCode, actualCode);
+
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new VariableNotAssignedInspection(state);
+                new RemoveUnassignedIdentifierQuickFix(state).Fix(
+                    inspection.GetInspectionResults(CancellationToken.None).Single(s => s.Target.IdentifierName == "var2"));
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -80,15 +102,16 @@ End Sub";
 Dim var1 As Integer
 End Sub";
 
-            Func<IInspectionResult, bool> conditionToFix = result => result.Target.IdentifierName == "var2";
-            var actualCode = ApplyQuickFixToFirstInspectionResultSatisfyingPredicate(inputCode, state => new VariableNotAssignedInspection(state), conditionToFix);
-            Assert.AreEqual(expectedCode, actualCode);
-        }
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
+                var inspection = new VariableNotAssignedInspection(state);
+                new RemoveUnassignedIdentifierQuickFix(state).Fix(
+                    inspection.GetInspectionResults(CancellationToken.None).Single(s => s.Target.IdentifierName == "var2"));
 
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new RemoveUnassignedIdentifierQuickFix();
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
     }
 }

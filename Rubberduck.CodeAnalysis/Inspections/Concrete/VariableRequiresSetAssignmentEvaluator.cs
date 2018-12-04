@@ -13,8 +13,8 @@ namespace Rubberduck.Inspections
         /// Determines whether the 'Set' keyword is required (whether it's present or not) for the specified identifier reference.
         /// </summary>
         /// <param name="reference">The identifier reference to analyze</param>
-        /// <param name="declarationFinderProvider">The parser state</param>
-        public static bool RequiresSetAssignment(IdentifierReference reference, IDeclarationFinderProvider declarationFinderProvider)
+        /// <param name="state">The parser state</param>
+        public static bool RequiresSetAssignment(IdentifierReference reference, RubberduckParserState state)
         {
             if (!reference.IsAssignment)
             {
@@ -72,7 +72,6 @@ namespace Rubberduck.Inspections
             if (expression == null)
             {
                 Debug.Assert(false, "RHS expression is empty? What's going on here?");
-                return false;
             }
 
             if (expression is VBAParser.NewExprContext)
@@ -87,24 +86,25 @@ namespace Rubberduck.Inspections
                 // RHS is a 'Nothing' token - LHS needs a 'Set' keyword:
                 return true;
             }
-            if (literalExpression != null)
-            {
-                return false; // any other literal expression definitely isn't an object.
-            }
 
             // todo resolve expression return type
-            var project = Declaration.GetProjectParent(reference.ParentScoping);
-            var module = Declaration.GetModuleParent(reference.ParentScoping);
 
-            var simpleName = expression.GetDescendent<VBAParser.SimpleNameExprContext>();
-            if (simpleName != null)
+            var memberRefs = state.DeclarationFinder.IdentifierReferences(reference.ParentScoping.QualifiedName);
+            var lastRef = memberRefs.LastOrDefault(r => !Equals(r, reference) && r.Context.GetAncestor<VBAParser.LetStmtContext>() == letStmtContext);
+            if (lastRef?.Declaration.AsTypeDeclaration?.DeclarationType.HasFlag(DeclarationType.ClassModule) ?? false)
             {
-                return declarationFinderProvider.DeclarationFinder.MatchName(simpleName.identifier().GetText())
-                    .Any(d => AccessibilityCheck.IsAccessible(project, module, reference.ParentScoping, d) && d.IsObject);
+                // the last reference in the expression is referring to an object type
+                return true;
+            }
+            if (lastRef?.Declaration.AsTypeName == Tokens.Object)
+            {
+                return true;
             }
 
             // is the reference referring to something else in scope that's a object?
-            return declarationFinderProvider.DeclarationFinder.MatchName(expression.GetText())
+            var project = Declaration.GetProjectParent(reference.ParentScoping);
+            var module = Declaration.GetModuleParent(reference.ParentScoping);
+            return state.DeclarationFinder.MatchName(expression.GetText().ToLowerInvariant())
                 .Any(decl => (decl.DeclarationType.HasFlag(DeclarationType.ClassModule) || Tokens.Object.Equals(decl.AsTypeName))
                 && AccessibilityCheck.IsAccessible(project, module, reference.ParentScoping, decl));
         }

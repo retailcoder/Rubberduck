@@ -1,40 +1,31 @@
-using System;
 using System.Text;
-using Antlr4.Runtime;
 using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class SplitMultipleDeclarationsQuickFix : QuickFixBase
     {
-        public SplitMultipleDeclarationsQuickFix()
+        private readonly RubberduckParserState _state;
+
+        public SplitMultipleDeclarationsQuickFix(RubberduckParserState state)
             : base(typeof(MultipleDeclarationsInspection))
-        {}
-
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
         {
-            var context = result.Context is VBAParser.ConstStmtContext
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            dynamic context = result.Context is VBAParser.ConstStmtContext
                 ? result.Context
-                : (ParserRuleContext)result.Context.Parent;
+                : result.Context.Parent;
 
-            string declarationsText;
-            switch (context)
-            {
-                case VBAParser.ConstStmtContext consts:
-                    declarationsText = GetDeclarationsText(consts);
-                    break;
-                case VBAParser.VariableStmtContext variables:
-                    declarationsText = GetDeclarationsText(variables);
-                    break;
-                default:
-                    throw new NotSupportedException();
-            }
+            var declarationsText = GetDeclarationsText(context);
 
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
             rewriter.Replace(context, declarationsText);
         }
 

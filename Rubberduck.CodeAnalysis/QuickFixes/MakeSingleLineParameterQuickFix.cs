@@ -1,20 +1,24 @@
 using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 using Rubberduck.Parsing.VBA.Extensions;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class MakeSingleLineParameterQuickFix : QuickFixBase
     {
-        public MakeSingleLineParameterQuickFix()
-            : base(typeof(MultilineParameterInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public MakeSingleLineParameterQuickFix(RubberduckParserState state)
+            : base(typeof(MultilineParameterInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
 
             var parameter = result.Context.GetText()
                 .Replace("_", "")

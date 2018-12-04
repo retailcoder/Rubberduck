@@ -2,19 +2,23 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class ReplaceObsoleteErrorStatementQuickFix : QuickFixBase
     {
-        public ReplaceObsoleteErrorStatementQuickFix()
-            : base(typeof(ObsoleteErrorSyntaxInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public ReplaceObsoleteErrorStatementQuickFix(RubberduckParserState state)
+            : base(typeof(ObsoleteErrorSyntaxInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
             var context = (VBAParser.ErrorStmtContext) result.Context;
 
             rewriter.Replace(context.ERROR(), "Err.Raise");

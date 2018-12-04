@@ -172,7 +172,7 @@ namespace Rubberduck.Common
             var processed = false;
             try
             {
-                var hook = Hooks.OfType<Hotkey>().SingleOrDefault(k => k.HotkeyInfo.HookId == (ushort)wParam);
+                var hook = Hooks.OfType<Hotkey>().SingleOrDefault(k => k.HotkeyInfo.HookId == wParam);
                 if (hook != null)
                 {
                     hook.OnMessageReceived();

@@ -186,21 +186,8 @@ namespace Rubberduck.UI
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private bool _isDisposed;
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_isDisposed || !disposing)
-            {
-                return;
-            }
-
             VbeNativeServices.SelectionChanged -= OnVbeSelectionChanged;
             VbeNativeServices.WindowFocusChange -= OnVbeFocusChanged;
-            _isDisposed = true;
         }
     }
 

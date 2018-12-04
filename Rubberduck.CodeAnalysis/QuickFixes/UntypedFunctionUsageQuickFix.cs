@@ -5,19 +5,23 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class UntypedFunctionUsageQuickFix : QuickFixBase
     {
-        public UntypedFunctionUsageQuickFix()
-            : base(typeof(UntypedFunctionUsageInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public UntypedFunctionUsageQuickFix(RubberduckParserState state)
+            : base(typeof(UntypedFunctionUsageInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
             rewriter.InsertAfter(result.Context.Stop.TokenIndex, "$");
         }
 

@@ -1,15 +1,14 @@
-﻿using NUnit.Framework;
+﻿using System.Threading;
+using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
 using RubberduckTests.Mocks;
 
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class RemoveTypeHintsQuickFixTests : QuickFixTestBase
+    public class RemoveTypeHintsQuickFixTests
     {
 
         [Test]
@@ -22,8 +21,21 @@ namespace RubberduckTests.QuickFixes
             const string expectedCode =
                 @"Public Foo As Long";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -36,8 +48,21 @@ namespace RubberduckTests.QuickFixes
             const string expectedCode =
                 @"Public Foo As Integer";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -50,8 +75,21 @@ namespace RubberduckTests.QuickFixes
             const string expectedCode =
                 @"Public Foo As Double";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -64,8 +102,21 @@ namespace RubberduckTests.QuickFixes
             const string expectedCode =
                 @"Public Foo As Single";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -78,8 +129,21 @@ namespace RubberduckTests.QuickFixes
             const string expectedCode =
                 @"Public Foo As Currency";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -92,8 +156,21 @@ namespace RubberduckTests.QuickFixes
             const string expectedCode =
                 @"Public Foo As String";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -110,8 +187,21 @@ End Function";
     Foo = ""test""
 End Function";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -128,8 +218,21 @@ End Property";
     Foo = ""test""
 End Property";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -146,8 +249,21 @@ End Sub";
     Foo = ""test""
 End Sub";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -164,8 +280,21 @@ End Sub";
     Dim buzz As String
 End Sub";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -182,14 +311,22 @@ End Sub";
     Const buzz As String = """"
 End Sub";
 
-            var actualCode = ApplyQuickFixToAllInspectionResults(inputCode, state => new ObsoleteTypeHintInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ObsoleteTypeHintInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                var fix = new RemoveTypeHintsQuickFix(state);
+                foreach (var result in inspectionResults)
+                {
+                    fix.Fix(result);
+                }
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
-
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new RemoveTypeHintsQuickFix();
-        }
     }
 }

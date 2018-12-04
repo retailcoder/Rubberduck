@@ -121,20 +121,10 @@ namespace Rubberduck.UI.CodeExplorer.Commands
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private bool _isDisposed;
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_isDisposed || !disposing)
+            if (_openFileDialog != null)
             {
-                return;
+                _openFileDialog.Dispose();
             }
-
-            _openFileDialog?.Dispose();
-            _isDisposed = true;
         }
     }
 }

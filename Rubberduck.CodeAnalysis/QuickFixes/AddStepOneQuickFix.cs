@@ -2,16 +2,21 @@
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Inspections.Abstract;
 using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 using System;
 using static Rubberduck.Parsing.Grammar.VBAParser;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
-    public sealed class AddStepOneQuickFix : QuickFixBase
+    public class AddStepOneQuickFix : QuickFixBase
     {
-        public AddStepOneQuickFix()
+        private readonly RubberduckParserState _state;
+
+        public AddStepOneQuickFix(RubberduckParserState state)
             : base(typeof(StepIsNotSpecifiedInspection))
-        {}
+        {
+            _state = state;
+        }
 
         public override bool CanFixInProcedure => true;
 
@@ -24,20 +29,20 @@ namespace Rubberduck.Inspections.QuickFixes
             return Resources.Inspections.QuickFixes.AddStepOneQuickFix;
         }
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public override void Fix(IInspectionResult result)
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
-            var context = result.Context as ForNextStmtContext;
+            IModuleRewriter rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
+            ForNextStmtContext context = result.Context as ForNextStmtContext;
 
-            var toExpressionEnd = GetToExpressionEnd(context);
+            int toExpressionEnd = this.GetToExpressionEnd(context);
             rewriter.InsertAfter(toExpressionEnd, " Step 1");
         }
 
-        private static int GetToExpressionEnd(ForNextStmtContext context)
+        private int GetToExpressionEnd(ForNextStmtContext context)
         {
-            var toNodeIndex = context.TO().Symbol.TokenIndex;
+            int toNodeIndex = context.TO().Symbol.TokenIndex;
 
-            foreach(var expressionChild in context.expression())
+            foreach(ExpressionContext expressionChild in context.expression())
             {
                 if (expressionChild.Stop.TokenIndex > toNodeIndex)
                 {

@@ -13,19 +13,19 @@ using Rubberduck.Parsing.VBA.Extensions;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
-    public sealed class ChangeIntegerToLongQuickFix : QuickFixBase
+    public class ChangeIntegerToLongQuickFix : QuickFixBase
     {
-        private readonly IDeclarationFinderProvider _declarationFinderProvider;
+        private readonly RubberduckParserState _state;
 
-        public ChangeIntegerToLongQuickFix(IDeclarationFinderProvider declarationFinderProvider)
+        public ChangeIntegerToLongQuickFix(RubberduckParserState state)
             : base(typeof(IntegerDataTypeInspection))
         {
-            _declarationFinderProvider = declarationFinderProvider;
+            _state = state;
         }
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public override void Fix(IInspectionResult result)
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.Target.QualifiedModuleName);
+            var rewriter = _state.GetRewriter(result.Target);
 
             if (result.Target.HasTypeHint)
             {
@@ -66,7 +66,7 @@ namespace Rubberduck.Inspections.QuickFixes
                 }
             }
 
-            var interfaceMembers = _declarationFinderProvider.DeclarationFinder.FindAllInterfaceMembers().ToArray();
+            var interfaceMembers = _state.DeclarationFinder.FindAllInterfaceMembers().ToArray();
 
             ParserRuleContext matchingInterfaceMemberContext;
 
@@ -80,11 +80,11 @@ namespace Rubberduck.Inspections.QuickFixes
                         var interfaceParameterIndex = GetParameterIndex((VBAParser.ArgContext)result.Context);
 
                         var implementationMembers =
-                            _declarationFinderProvider.DeclarationFinder.FindInterfaceImplementationMembers(interfaceMembers.First(
+                            _state.DeclarationFinder.FindInterfaceImplementationMembers(interfaceMembers.First(
                                 member => member.Context == matchingInterfaceMemberContext)).ToHashSet();
 
                         var parameterDeclarations =
-                            _declarationFinderProvider.DeclarationFinder.UserDeclarations(DeclarationType.Parameter)
+                            _state.DeclarationFinder.UserDeclarations(DeclarationType.Parameter)
                                 .Where(p => implementationMembers.Contains(p.ParentDeclaration))
                                 .Cast<ParameterDeclaration>()
                                 .ToArray();
@@ -96,7 +96,7 @@ namespace Rubberduck.Inspections.QuickFixes
 
                             if (parameterIndex == interfaceParameterIndex)
                             {
-                                var parameterRewriter = rewriteSession.CheckOutModuleRewriter(parameter.QualifiedModuleName);
+                                var parameterRewriter = _state.GetRewriter(parameter);
 
                                 if (parameter.HasTypeHint)
                                 {
@@ -116,14 +116,14 @@ namespace Rubberduck.Inspections.QuickFixes
                     if (matchingInterfaceMemberContext != null)
                     {
                         var functionDeclarations =
-                            _declarationFinderProvider.DeclarationFinder.FindInterfaceImplementationMembers(
+                            _state.DeclarationFinder.FindInterfaceImplementationMembers(
                                     interfaceMembers.First(member => member.Context == matchingInterfaceMemberContext))
                                 .Cast<FunctionDeclaration>()
                                 .ToHashSet();
 
                         foreach (var function in functionDeclarations)
                         {
-                            var functionRewriter = rewriteSession.CheckOutModuleRewriter(function.QualifiedModuleName);
+                            var functionRewriter = _state.GetRewriter(function);
 
                             if (function.HasTypeHint)
                             {
@@ -143,14 +143,14 @@ namespace Rubberduck.Inspections.QuickFixes
                     if (matchingInterfaceMemberContext != null)
                     {
                         var propertyGetDeclarations =
-                            _declarationFinderProvider.DeclarationFinder.FindInterfaceImplementationMembers(
+                            _state.DeclarationFinder.FindInterfaceImplementationMembers(
                                     interfaceMembers.First(member => member.Context == matchingInterfaceMemberContext))
                                 .Cast<PropertyGetDeclaration>()
                                 .ToHashSet();
 
                         foreach (var propertyGet in propertyGetDeclarations)
                         {
-                            var propertyGetRewriter = rewriteSession.CheckOutModuleRewriter(propertyGet.QualifiedModuleName);
+                            var propertyGetRewriter = _state.GetRewriter(propertyGet);
 
                             if (propertyGet.HasTypeHint)
                             {

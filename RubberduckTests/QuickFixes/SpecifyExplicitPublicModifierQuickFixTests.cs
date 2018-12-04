@@ -1,14 +1,15 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using System.Threading;
+using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
+using RubberduckTests.Mocks;
 
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class SpecifyExplicitPublicModifierQuickFixTests : QuickFixTestBase
+    public class SpecifyExplicitPublicModifierQuickFixTests
     {
         [Test]
         [Category("QuickFixes")]
@@ -26,14 +27,16 @@ End Sub";
 
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ImplicitPublicMemberInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+                var inspection = new ImplicitPublicMemberInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new SpecifyExplicitPublicModifierQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
-
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new SpecifyExplicitPublicModifierQuickFix();
-        }
     }
 }

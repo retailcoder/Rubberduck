@@ -1,8 +1,9 @@
-﻿using Moq;
+﻿using System.Linq;
+using System.Threading;
+using Moq;
 using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.VBEditor.SafeComWrappers;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
@@ -11,7 +12,7 @@ using RubberduckTests.Mocks;
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class AccessSheetUsingCodeNameQuickFixTests : QuickFixTestBase 
+    public class AccessSheetUsingCodeNameQuickFixTests
     {
         [Test]
         [Category("QuickFixes")]
@@ -27,8 +28,14 @@ Public Sub Foo()
     Sheet1.Range(""A1"") = ""foo""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -45,8 +52,14 @@ Public Sub Foo()
     Sheet1.Range(""A1"") = ""foo""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -63,8 +76,14 @@ Public Sub Foo()
     Sheet1.Range(""A1"") = ""foo""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -92,9 +111,15 @@ End Sub
 
 Public Sub Bar(ws As Worksheet)
 End Sub";
+            
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -113,8 +138,14 @@ Public Sub Foo()
     
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -135,8 +166,14 @@ Public Sub Foo()
     Sheet1.Cells(1, 1) = ""foo""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -157,8 +194,14 @@ Public Sub Foo()
     Sheet1.Cells(1, 1) = ""foo""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -187,8 +230,14 @@ Public Sub ws()
     Dim ws As Worksheet
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -217,10 +266,16 @@ Public Sub ws()
     Dim ws As Worksheet
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
-        
+
         [Test]
         [Category("QuickFixes")]
         public void SheetAccessedUsingString_QuickFixWorks_TransientReferenceSetStatement()
@@ -239,8 +294,14 @@ Sub Test()
     Debug.Print ws.Name
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -261,8 +322,14 @@ Sub Test()
     End If
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -281,20 +348,21 @@ Sub Test()
     Sheet1.Name = ""Foo""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new SheetAccessedUsingStringInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            using (var state = ArrangeParserAndParse(inputCode, out var component))
+            {
+                var inspection = new SheetAccessedUsingStringInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new AccessSheetUsingCodeNameQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new AccessSheetUsingCodeNameQuickFix(state);
-        }
-
-        protected override IVBE TestVbe(string code, out IVBComponent component)
+        private static RubberduckParserState ArrangeParserAndParse(string inputCode, out IVBComponent component)
         {
             var builder = new MockVbeBuilder();
             var project = builder.ProjectBuilder("VBAProject", ProjectProtection.Unprotected)
-                .AddComponent("Module1", ComponentType.StandardModule, code)
+                .AddComponent("Module1", ComponentType.StandardModule, inputCode)
                 .AddComponent("Sheet1", ComponentType.Document, "",
                     properties: new[]
                     {
@@ -312,7 +380,9 @@ End Sub";
 
             component = project.Object.VBComponents[0];
 
-            return builder.AddProject(project).Build().Object;
+            var vbe = builder.AddProject(project).Build();
+
+            return MockParser.CreateAndParse(vbe.Object);
         }
 
         private static Mock<IProperty> CreateVBComponentPropertyMock(string propertyName, string propertyValue)

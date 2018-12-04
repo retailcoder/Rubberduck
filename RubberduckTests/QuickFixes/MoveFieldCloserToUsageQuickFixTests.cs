@@ -4,6 +4,7 @@ using NUnit.Framework;
 using Moq;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
+using Rubberduck.UI;
 using RubberduckTests.Mocks;
 using Rubberduck.Interaction;
 
@@ -28,8 +29,15 @@ End Sub";
     bar = ""test""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode);
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+                var inspection = new MoveFieldCloserToUsageInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new MoveFieldCloserToUsageQuickFix(vbe.Object, state, new Mock<IMessageBox>().Object).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, component.CodeModule.Content());
+            }
         }
 
         [Test]
@@ -64,13 +72,20 @@ Private Sub FooBar()
 End Sub
 ";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode);
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+                var inspection = new MoveFieldCloserToUsageInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new MoveFieldCloserToUsageQuickFix(vbe.Object, state, new Mock<IMessageBox>().Object).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, component.CodeModule.Content());
+            }
         }
 
         [Test]
         [Category("QuickFixes")]
-        public void MoveFieldCloserToUsage_QuickFixWorks_SingleLineThenStatement()
+        public void MoveFieldCloserToUsage_QuickFixWorks_SingleLineThenStatemente()
         {
             const string inputCode =
                 @"Private bar As String
@@ -86,8 +101,15 @@ Public Sub Foo()
     If True Then bar = ""test""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode);
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+                var inspection = new MoveFieldCloserToUsageInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new MoveFieldCloserToUsageQuickFix(vbe.Object, state, new Mock<IMessageBox>().Object).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, component.CodeModule.Content());
+            }
         }
 
         [Test]
@@ -108,25 +130,14 @@ Public Sub Foo()
     If True Then Else bar = ""test""
 End Sub";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode);
-            Assert.AreEqual(expectedCode, actualCode);
-        }
-
-        private string ApplyQuickFixToFirstInspectionResult(string inputCode)
-        {
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
                 var inspection = new MoveFieldCloserToUsageInspection(state);
                 var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
-                var resultToFix = inspectionResults.First();
-                var rewriteSession = rewritingManager.CheckOutCodePaneSession(); 
-                var quickFix = new MoveFieldCloserToUsageQuickFix(vbe.Object, state, new Mock<IMessageBox>().Object, rewritingManager);
 
-                quickFix.Fix(resultToFix, rewriteSession);
-
-                return component.CodeModule.Content();
+                new MoveFieldCloserToUsageQuickFix(vbe.Object, state, new Mock<IMessageBox>().Object).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, component.CodeModule.Content());
             }
         }
     }

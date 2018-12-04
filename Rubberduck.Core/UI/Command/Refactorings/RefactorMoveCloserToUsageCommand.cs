@@ -1,6 +1,5 @@
 ﻿using System.Linq;
 using Rubberduck.Interaction;
-using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Refactorings.MoveCloserToUsage;
@@ -11,14 +10,12 @@ namespace Rubberduck.UI.Command.Refactorings
     public class RefactorMoveCloserToUsageCommand : RefactorCommandBase
     {
         private readonly RubberduckParserState _state;
-        private readonly IRewritingManager _rewritingManager;
         private readonly IMessageBox _msgbox;
 
-        public RefactorMoveCloserToUsageCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgbox, IRewritingManager rewritingManager)
+        public RefactorMoveCloserToUsageCommand(IVBE vbe, RubberduckParserState state, IMessageBox msgbox)
             :base(vbe)
         {
             _state = state;
-            _rewritingManager = rewritingManager;
             _msgbox = msgbox;
         }
 
@@ -46,7 +43,7 @@ namespace Rubberduck.UI.Command.Refactorings
 
             if (selection.HasValue)
             {
-                var refactoring = new MoveCloserToUsageRefactoring(Vbe, _state, _msgbox, _rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(Vbe, _state, _msgbox);
                 refactoring.Refactor(selection.Value);
             }
         }

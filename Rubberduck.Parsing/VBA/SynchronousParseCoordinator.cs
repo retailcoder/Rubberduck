@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading;
-using Rubberduck.Parsing.Rewriter;
 
 namespace Rubberduck.Parsing.VBA
 {
@@ -11,16 +10,13 @@ namespace Rubberduck.Parsing.VBA
             IParsingStageService parsingStageService,
             IParsingCacheService parsingCacheService,
             IProjectManager projectManager,
-            IParserStateManager parserStateManager,
-            IRewritingManager rewritingManager = null) 
-        :base(
-            state,
-            parsingStageService,
-            parsingCacheService,
-            projectManager,
-            parserStateManager,
-            rewritingManager)
-        {}
+            IParserStateManager parserStateManager) : base(
+                state,
+                parsingStageService,
+                parsingCacheService,
+                projectManager,
+                parserStateManager)
+        { }
 
         public override void BeginParse(object sender)
         {

@@ -66,11 +66,11 @@ namespace Rubberduck.AutoComplete.Service
                         break;
                     }
                 }
-            }
 
-            if (result == null)
-            {
-                return false;
+                if (result == null)
+                {
+                    return false;
+                }
             }
 
             var snippetPosition = new Selection(result.SnippetPosition.StartLine, 1, result.SnippetPosition.EndLine, 1);
@@ -109,28 +109,21 @@ namespace Rubberduck.AutoComplete.Service
                 return false;
             }
 
-            var reprettified = CodePaneHandler.Prettify(e.Module, result);
-            if (pair.OpeningChar == '(' && e.Character == pair.OpeningChar && !reprettified.Equals(result))
-            {
-                // VBE eats it. bail out but don't swallow the keypress.
-                e.Handled = false;
-                result = null;
-                return false;
-            }
+            result = CodePaneHandler.Prettify(e.Module, result);
 
-            var currentLine = reprettified.Lines[reprettified.CaretPosition.StartLine];
+            var currentLine = result.Lines[result.CaretPosition.StartLine];
             if (!string.IsNullOrWhiteSpace(currentLine) &&
                 currentLine.EndsWith(" ") &&
-                reprettified.CaretPosition.StartColumn == currentLine.Length)
+                result.CaretPosition.StartColumn == currentLine.Length)
             {
-                result = reprettified.ReplaceLine(reprettified.CaretPosition.StartLine, currentLine.TrimEnd());
+                result = result.ReplaceLine(result.CaretPosition.StartLine, currentLine.TrimEnd());
             }
 
             if (pair.OpeningChar == '(' && 
                 e.Character == pair.OpeningChar &&
                 !result.CaretLine.EndsWith($"{pair.OpeningChar}{pair.ClosingChar}"))
             {
-                // VBE eats it. bail out but still swallow the keypress.
+                // VBE eats it. bail out but still swallow the keypress, since we've already re-prettified.
                 e.Handled = true;
                 result = null;
                 return false;

@@ -213,7 +213,5 @@ namespace Rubberduck.VBEditor.SafeComWrappers.Office12
 
             return _hashCode;
         }
-
-        protected override void Dispose(bool disposing) => base.Dispose(disposing);
     }
 }

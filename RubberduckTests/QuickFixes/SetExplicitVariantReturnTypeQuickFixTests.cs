@@ -1,13 +1,14 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using System.Threading;
+using NUnit.Framework;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Inspections.QuickFixes;
-using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.VBA;
+using RubberduckTests.Mocks;
 
 namespace RubberduckTests.QuickFixes
 {
     [TestFixture]
-    public class SetExplicitVariantReturnTypeQuickFixTests : QuickFixTestBase
+    public class SetExplicitVariantReturnTypeQuickFixTests
     {
         [Test]
         [Category("QuickFixes")]
@@ -21,8 +22,16 @@ End Function";
                 @"Function Foo() As Variant
 End Function";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ImplicitVariantReturnTypeInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ImplicitVariantReturnTypeInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new SetExplicitVariantReturnTypeQuickFix(state).Fix(inspectionResults.First());
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -37,8 +46,17 @@ End Property";
                 @"Property Get Foo() As Variant
 End Property";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ImplicitVariantReturnTypeInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ImplicitVariantReturnTypeInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new SetExplicitVariantReturnTypeQuickFix(state).Fix(inspectionResults.First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -71,8 +89,17 @@ End Property";
                                                            lpStartupInfo As STARTUPINFO, _
                                                            lpProcessInformation As PROCESS_INFORMATION) As Variant";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ImplicitVariantReturnTypeInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
+
+                var inspection = new ImplicitVariantReturnTypeInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
+
+                new SetExplicitVariantReturnTypeQuickFix(state).Fix(inspectionResults.First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
 
         [Test]
@@ -87,14 +114,17 @@ End Function";
                 @"Function Foo() As Variant    ' comment
 End Function";
 
-            var actualCode = ApplyQuickFixToFirstInspectionResult(inputCode, state => new ImplicitVariantReturnTypeInspection(state));
-            Assert.AreEqual(expectedCode, actualCode);
-        }
+            var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
+            using (var state = MockParser.CreateAndParse(vbe.Object))
+            {
 
+                var inspection = new ImplicitVariantReturnTypeInspection(state);
+                var inspectionResults = inspection.GetInspectionResults(CancellationToken.None);
 
-        protected override IQuickFix QuickFix(RubberduckParserState state)
-        {
-            return new SetExplicitVariantReturnTypeQuickFix();
+                new SetExplicitVariantReturnTypeQuickFix(state).Fix(inspectionResults.First());
+
+                Assert.AreEqual(expectedCode, state.GetRewriter(component).GetText());
+            }
         }
     }
 }

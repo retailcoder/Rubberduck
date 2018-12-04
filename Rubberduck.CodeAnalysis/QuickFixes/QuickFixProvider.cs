@@ -4,21 +4,19 @@ using System.Diagnostics;
 using System.Linq;
 using Microsoft.CSharp.RuntimeBinder;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.VBA;
-using Rubberduck.Parsing.VBA.Parsing;
 using Rubberduck.VBEditor;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public class QuickFixProvider : IQuickFixProvider
     {
-        private readonly IRewritingManager _rewritingManager;
+        private readonly RubberduckParserState _state;
         private readonly Dictionary<Type, HashSet<IQuickFix>> _quickFixes = new Dictionary<Type, HashSet<IQuickFix>>();
 
-        public QuickFixProvider(IRewritingManager rewritingManager, IEnumerable<IQuickFix> quickFixes)
+        public QuickFixProvider(RubberduckParserState state, IEnumerable<IQuickFix> quickFixes)
         {
-            _rewritingManager = rewritingManager;
+            _state = state;
             foreach (var quickFix in quickFixes)
             {
                 foreach (var supportedInspection in quickFix.SupportedInspections)
@@ -76,22 +74,9 @@ namespace Rubberduck.Inspections.QuickFixes
                 return;
             }
 
-            var rewriteSession = RewriteSession(fix.TargetCodeKind);
-            fix.Fix(result, rewriteSession);
-            rewriteSession.TryRewrite();
-        }
-
-        private IRewriteSession RewriteSession(CodeKind targetCodeKind)
-        {
-            switch (targetCodeKind)
-            {
-                case CodeKind.CodePaneCode:
-                    return _rewritingManager.CheckOutCodePaneSession();
-                case CodeKind.AttributesCode:
-                    return _rewritingManager.CheckOutAttributesSession();
-                default:
-                    throw new NotSupportedException(nameof(targetCodeKind));
-            }
+            fix.Fix(result);
+            _state.RewriteAllModules();
+            _state.OnParseRequested(this);
         }
 
         public void FixInProcedure(IQuickFix fix, QualifiedMemberName? qualifiedMember, Type inspectionType, IEnumerable<IInspectionResult> results)
@@ -100,12 +85,6 @@ namespace Rubberduck.Inspections.QuickFixes
 
             var filteredResults = results.Where(result => result.Inspection.GetType() == inspectionType && result.QualifiedMemberName == qualifiedMember).ToList();
 
-            if (!filteredResults.Any())
-            {
-                return;
-            }
-
-            var rewriteSession = RewriteSession(fix.TargetCodeKind);
             foreach (var result in filteredResults)
             {
                 if (!CanFix(fix, result))
@@ -113,21 +92,20 @@ namespace Rubberduck.Inspections.QuickFixes
                     continue;
                 }
 
-                fix.Fix(result, rewriteSession);
+                fix.Fix(result);
             }
-            rewriteSession.TryRewrite();
+
+            if (filteredResults.Any())
+            {
+                _state.RewriteAllModules();
+                _state.OnParseRequested(this);
+            }
         }
 
         public void FixInModule(IQuickFix fix, QualifiedSelection selection, Type inspectionType, IEnumerable<IInspectionResult> results)
         {
             var filteredResults = results.Where(result => result.Inspection.GetType() == inspectionType && result.QualifiedSelection.QualifiedName == selection.QualifiedName).ToList();
 
-            if (!filteredResults.Any())
-            {
-                return;
-            }
-
-            var rewriteSession = RewriteSession(fix.TargetCodeKind);
             foreach (var result in filteredResults)
             {
                 if (!CanFix(fix, result))
@@ -135,21 +113,20 @@ namespace Rubberduck.Inspections.QuickFixes
                     continue;
                 }
 
-                fix.Fix(result, rewriteSession);
+                fix.Fix(result);
             }
-            rewriteSession.TryRewrite();
+
+            if (filteredResults.Any())
+            {
+                _state.RewriteAllModules();
+                _state.OnParseRequested(this);
+            }
         }
 
         public void FixInProject(IQuickFix fix, QualifiedSelection selection, Type inspectionType, IEnumerable<IInspectionResult> results)
         {
             var filteredResults = results.Where(result => result.Inspection.GetType() == inspectionType && result.QualifiedSelection.QualifiedName.ProjectId == selection.QualifiedName.ProjectId).ToList();
 
-            if (!filteredResults.Any())
-            {
-                return;
-            }
-
-            var rewriteSession = RewriteSession(fix.TargetCodeKind);
             foreach (var result in filteredResults)
             {
                 if (!CanFix(fix, result))
@@ -157,21 +134,20 @@ namespace Rubberduck.Inspections.QuickFixes
                     continue;
                 }
 
-                fix.Fix(result, rewriteSession);
+                fix.Fix(result);
             }
-            rewriteSession.TryRewrite();
+
+            if (filteredResults.Any())
+            {
+                _state.RewriteAllModules();
+                _state.OnParseRequested(this);
+            }
         }
 
         public void FixAll(IQuickFix fix, Type inspectionType, IEnumerable<IInspectionResult> results)
         {
             var filteredResults = results.Where(result => result.Inspection.GetType() == inspectionType).ToArray();
 
-            if (!filteredResults.Any())
-            {
-                return;
-            }
-
-            var rewriteSession = RewriteSession(fix.TargetCodeKind);
             foreach (var result in filteredResults)
             {
                 if (!CanFix(fix, result))
@@ -179,9 +155,14 @@ namespace Rubberduck.Inspections.QuickFixes
                     continue;
                 }
 
-                fix.Fix(result, rewriteSession);
+                fix.Fix(result);
             }
-            rewriteSession.TryRewrite();
+
+            if (filteredResults.Any())
+            {
+                _state.RewriteAllModules();
+                _state.OnParseRequested(this);
+            }
         }
 
         public bool HasQuickFixes(IInspectionResult inspectionResult)

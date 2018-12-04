@@ -1,11 +1,14 @@
 using System;
 using System.Linq;
+using System.Windows.Forms;
 using NUnit.Framework;
 using Moq;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Refactorings.MoveCloserToUsage;
+using Rubberduck.UI;
 using Rubberduck.VBEditor;
 using Rubberduck.VBEditor.SafeComWrappers;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using RubberduckTests.Mocks;
 using Rubberduck.Interaction;
 
@@ -35,17 +38,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -70,17 +72,16 @@ Dim bar As Boolean
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -108,17 +109,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -154,22 +154,21 @@ End Sub";
                 .Build();
             var vbe = builder.AddProject(project).Build();
 
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(project.Object.VBComponents[0]), selection);
                 var module1 = project.Object.VBComponents[0];
                 var module2 = project.Object.VBComponents[1];
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode1 = module1.CodeModule.Content();
-                Assert.AreEqual(expectedCode1, actualCode1);
+                var rewriter1 = state.GetRewriter(module1);
+                Assert.AreEqual(expectedCode1, rewriter1.GetText());
 
-                var actualCode2 = module2.CodeModule.Content();
-                Assert.AreEqual(expectedCode2, actualCode2);
+                var rewriter2 = state.GetRewriter(module2);
+                Assert.AreEqual(expectedCode2, rewriter2.GetText());
             }
         }
 
@@ -196,17 +195,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -234,17 +232,16 @@ Dim bar As Boolean
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -274,17 +271,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -315,17 +311,16 @@ Private Sub Foo()
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -356,17 +351,16 @@ Private Sub Foo()
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -397,17 +391,16 @@ Private Sub Foo()
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -438,17 +431,16 @@ Private Sub Foo()
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -481,17 +473,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -524,17 +515,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -567,17 +557,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -594,21 +583,20 @@ End Sub";
             var selection = new Selection(1, 1);
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
                 var messageBox = new Mock<IMessageBox>();
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object);
                 refactoring.Refactor(qualifiedSelection);
 
                 messageBox.Verify(m => m.NotifyWarn(It.IsAny<string>(), It.IsAny<string>()), Times.Once());
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(inputCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(inputCode, rewriter.GetText());
             }
         }
 
@@ -629,20 +617,19 @@ End Sub";
             var selection = new Selection(1, 1);
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
                 var messageBox = new Mock<IMessageBox>();
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object);
                 refactoring.Refactor(qualifiedSelection);
 
                 messageBox.Verify(m => m.NotifyWarn(It.IsAny<string>(), It.IsAny<string>()), Times.Once());
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(inputCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(inputCode, rewriter.GetText());
             }
         }
 
@@ -666,17 +653,16 @@ End Sub";
             var selection = new Selection(1, 1);
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -704,17 +690,16 @@ End Sub";
             var selection = new Selection(1, 1);
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -744,19 +729,18 @@ End Sub
 Sub Baz(ByVal bat As Boolean, ByVal bas As Boolean, ByVal bac As Boolean)
 End Sub";
             var selection = new Selection(1, 1);
-            
+
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -780,17 +764,16 @@ Baz True, True, bar: End Sub
 Private Sub Baz(ByVal bat As Boolean, ByVal bas As Boolean, ByVal bac As Boolean): End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -826,17 +809,16 @@ Public Sub SomeSub(ByVal someParam As Long)
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -866,17 +848,16 @@ Public Sub SomeSub(ByVal someParam As Long)
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -893,16 +874,15 @@ Private Sub Foo()
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var messageBox = new Mock<IMessageBox>();
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object);
                 refactoring.Refactor(state.AllUserDeclarations.First(d => d.DeclarationType != DeclarationType.Variable));
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(inputCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(inputCode, rewriter.GetText());
 
                 messageBox.Verify(m => m.NotifyWarn(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
             }
@@ -922,21 +902,20 @@ End Sub";
             var selection = new Selection(2, 15);
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var messageBox = new Mock<IMessageBox>();
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object);
                 refactoring.Refactor(qualifiedSelection);
 
                 messageBox.Verify(m => m.NotifyWarn(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(inputCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(inputCode, rewriter.GetText());
             }
         }
 
@@ -976,19 +955,19 @@ Public Sub foo()
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
                 var qualifiedSelection = state.DeclarationFinder
                     .UserDeclarations(DeclarationType.Variable)
                     .Where(d => d.IdentifierName == "count")
                     .Single().QualifiedSelection;
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.NotNull(rewriter);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -1035,7 +1014,7 @@ End Sub";
 
             var selection = new Selection(1, 1);
 
-            const string expectedCode = @"
+            const string expected = @"
 
 Public Sub Test()
     Debug.Print ""Some statements between""
@@ -1053,17 +1032,17 @@ End Sub";
             builder = builder.AddProject(project.Build());
             var vbe = builder.Build();
 
-            var component = project.MockComponents.Find(mc => mc.Object.Name.Equals("Module1")).Object;
-            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
+            var testComponent = project.MockComponents.Find(mc => mc.Object.Name.Equals("Module1"));
+            var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(testComponent.Object), selection);
 
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using(state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
                 var messageBox = new Mock<IMessageBox>();
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, messageBox.Object);
                 refactoring.Refactor(qualifiedSelection);
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(testComponent.Object);
+                var actual = rewriter.GetText();
+                Assert.AreEqual(expected, actual);
             }
         }
 
@@ -1090,17 +1069,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -1125,17 +1103,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -1160,17 +1137,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -1195,17 +1171,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
 
@@ -1230,17 +1205,16 @@ End Sub";
 End Sub";
 
             var vbe = MockVbeBuilder.BuildFromSingleStandardModule(inputCode, out var component, selection);
-            var (state, rewritingManager) = MockParser.CreateAndParseWithRewritingManager(vbe.Object);
-            using (state)
+            using (var state = MockParser.CreateAndParse(vbe.Object))
             {
 
                 var qualifiedSelection = new QualifiedSelection(new QualifiedModuleName(component), selection);
 
-                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null, rewritingManager);
+                var refactoring = new MoveCloserToUsageRefactoring(vbe.Object, state, null);
                 refactoring.Refactor(qualifiedSelection);
 
-                var actualCode = component.CodeModule.Content();
-                Assert.AreEqual(expectedCode, actualCode);
+                var rewriter = state.GetRewriter(component);
+                Assert.AreEqual(expectedCode, rewriter.GetText());
             }
         }
     }

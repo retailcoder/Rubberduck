@@ -4,7 +4,6 @@ using Rubberduck.Inspections.Abstract;
 using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
 using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.VBEditor;
@@ -13,7 +12,6 @@ namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class PassParameterByValueQuickFix : QuickFixBase
     {
-        //TODO: Change this to IDeclarationFinderProvider once the FIXME below is handled.
         private readonly RubberduckParserState _state;
 
         public PassParameterByValueQuickFix(RubberduckParserState state)
@@ -22,26 +20,26 @@ namespace Rubberduck.Inspections.QuickFixes
             _state = state;
         }
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public override void Fix(IInspectionResult result)
         {
             if (result.Target.ParentDeclaration.DeclarationType == DeclarationType.Event ||
                 _state.DeclarationFinder.FindAllInterfaceMembers().Contains(result.Target.ParentDeclaration))
             {
-                FixMethods(result.Target, rewriteSession);
+                FixMethods(result.Target);
             }
             else
             {
-                FixMethod((VBAParser.ArgContext)result.Target.Context, result.QualifiedSelection, rewriteSession);
+                FixMethod((VBAParser.ArgContext)result.Target.Context, result.QualifiedSelection);
             }
         }
 
         public override string Description(IInspectionResult result) => Resources.Inspections.QuickFixes.PassParameterByValueQuickFix;
 
-        private void FixMethods(Declaration target, IRewriteSession rewriteSession)
+        private void FixMethods(Declaration target)
         {
             var declarationParameters =
-                _state.DeclarationFinder.UserDeclarations(DeclarationType.Parameter)
-                    .Where(declaration => Equals(declaration.ParentDeclaration, target.ParentDeclaration))
+                _state.AllUserDeclarations.Where(declaration => declaration.DeclarationType == DeclarationType.Parameter &&
+                                                                Equals(declaration.ParentDeclaration, target.ParentDeclaration))
                     .OrderBy(o => o.Selection.StartLine)
                     .ThenBy(t => t.Selection.StartColumn)
                     .ToList();
@@ -52,7 +50,6 @@ namespace Rubberduck.Inspections.QuickFixes
                 return; // should only happen if the parse results are stale; prevents a crash in that case
             }
 
-            //FIXME: Make this use the DeclarationFinder.
             var members = target.ParentDeclaration.DeclarationType == DeclarationType.Event
                 ? _state.AllUserDeclarations.FindHandlersForEvent(target.ParentDeclaration)
                     .Select(s => s.Item2)
@@ -62,23 +59,23 @@ namespace Rubberduck.Inspections.QuickFixes
             foreach (var member in members)
             {
                 var parameters =
-                    _state.DeclarationFinder.UserDeclarations(DeclarationType.Parameter)
-                        .Where(declaration => Equals(declaration.ParentDeclaration, member))
+                    _state.AllUserDeclarations.Where(declaration => declaration.DeclarationType == DeclarationType.Parameter &&
+                                                                    Equals(declaration.ParentDeclaration, member))
                         .OrderBy(o => o.Selection.StartLine)
                         .ThenBy(t => t.Selection.StartColumn)
                         .ToList();
 
                 FixMethod((VBAParser.ArgContext)parameters[parameterIndex].Context,
-                    parameters[parameterIndex].QualifiedSelection, rewriteSession);
+                    parameters[parameterIndex].QualifiedSelection);
             }
 
             FixMethod((VBAParser.ArgContext)declarationParameters[parameterIndex].Context,
-                declarationParameters[parameterIndex].QualifiedSelection, rewriteSession);
+                declarationParameters[parameterIndex].QualifiedSelection);
         }
 
-        private void FixMethod(VBAParser.ArgContext context, QualifiedSelection qualifiedSelection, IRewriteSession rewriteSession)
+        private void FixMethod(VBAParser.ArgContext context, QualifiedSelection qualifiedSelection)
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(qualifiedSelection.QualifiedName);
+            var rewriter = _state.GetRewriter(qualifiedSelection.QualifiedName);
             if (context.BYREF() != null)
             {
                 rewriter.Replace(context.BYREF(), Tokens.ByVal);

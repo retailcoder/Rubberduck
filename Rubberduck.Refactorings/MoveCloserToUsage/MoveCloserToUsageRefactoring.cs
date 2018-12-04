@@ -22,17 +22,16 @@ namespace Rubberduck.Refactorings.MoveCloserToUsage
         private readonly List<Declaration> _declarations;
         private readonly IVBE _vbe;
         private readonly RubberduckParserState _state;
-        private readonly IRewritingManager _rewritingManager;
         private readonly IMessageBox _messageBox;
         private Declaration _target;
+        
+        private readonly HashSet<IModuleRewriter> _rewriters = new HashSet<IModuleRewriter>();
 
-        public MoveCloserToUsageRefactoring(IVBE vbe, RubberduckParserState state, IMessageBox messageBox, IRewritingManager rewritingManager)
+        public MoveCloserToUsageRefactoring(IVBE vbe, RubberduckParserState state, IMessageBox messageBox)
         {
-            //TODO: Use the DeclarationFinder instead and inject an IDeclarationFinderProvider instead of the RubberduckParserState. (Callers are not affected.) 
             _declarations = state.AllUserDeclarations.ToList();
             _vbe = vbe;
             _state = state;
-            _rewritingManager = rewritingManager;
             _messageBox = messageBox;
         }
 
@@ -108,20 +107,23 @@ namespace Rubberduck.Refactorings.MoveCloserToUsage
                     oldSelection = pane.GetQualifiedSelection();
                 }
 
-                var rewriteSession = _rewritingManager.CheckOutCodePaneSession();
-                InsertNewDeclaration(rewriteSession);
-                RemoveOldDeclaration(rewriteSession);
-                UpdateOtherModules(rewriteSession);
-                rewriteSession.TryRewrite();
+                InsertNewDeclaration();
+                RemoveOldDeclaration();
+                UpdateOtherModules();
 
                 if (oldSelection.HasValue && !pane.IsWrappingNullReference)
                 {
                     pane.Selection = oldSelection.Value.Selection;
                 }
             }
+            foreach (var rewriter in _rewriters)
+            {
+                rewriter.Rewrite();
+            }
+            Reparse();
         }
 
-        private void UpdateOtherModules(IRewriteSession rewriteSession)
+        private void UpdateOtherModules()
         {
             QualifiedSelection? oldSelection = null;
             using (var pane = _vbe.ActiveCodePane)
@@ -139,7 +141,7 @@ namespace Rubberduck.Refactorings.MoveCloserToUsage
 
                 if (newTarget != null)
                 {
-                    UpdateCallsToOtherModule(newTarget.References.ToList(), rewriteSession);
+                    UpdateCallsToOtherModule(newTarget.References.ToList());
                 }
 
                 if (oldSelection.HasValue)
@@ -149,7 +151,7 @@ namespace Rubberduck.Refactorings.MoveCloserToUsage
             }
         }
 
-        private void InsertNewDeclaration(IRewriteSession rewriteSession)
+        private void InsertNewDeclaration()
         {
             var subscripts = _target.Context.GetDescendent<VBAParser.SubscriptsContext>()?.GetText() ?? string.Empty;
             var identifier = _target.IsArray ? $"{_target.IdentifierName}({subscripts})" : _target.IdentifierName;
@@ -178,17 +180,21 @@ namespace Rubberduck.Refactorings.MoveCloserToUsage
             }
             var padding = new string(' ', indentLength);
 
-            var rewriter = rewriteSession.CheckOutModuleRewriter(firstReference.QualifiedModuleName);
+            var rewriter = _state.GetRewriter(firstReference.QualifiedModuleName);
             rewriter.InsertBefore(insertionIndex, newVariable + padding);
+
+            _rewriters.Add(rewriter);
         }
 
-        private void RemoveOldDeclaration(IRewriteSession rewriteSession)
+        private void RemoveOldDeclaration()
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(_target.QualifiedModuleName);
+            var rewriter = _state.GetRewriter(_target);
             rewriter.Remove(_target);
+
+            _rewriters.Add(rewriter);
         }
 
-        private void UpdateCallsToOtherModule(IEnumerable<IdentifierReference> references, IRewriteSession rewriteSession)
+        private void UpdateCallsToOtherModule(IEnumerable<IdentifierReference> references)
         {
             foreach (var reference in references.OrderByDescending(o => o.Selection.StartLine).ThenByDescending(t => t.Selection.StartColumn))
             {
@@ -212,10 +218,17 @@ namespace Rubberduck.Refactorings.MoveCloserToUsage
                     continue;
                 }
 
-                var rewriter = rewriteSession.CheckOutModuleRewriter(reference.QualifiedModuleName);
+                var rewriter = _state.GetRewriter(reference.QualifiedModuleName);
                 var tokenInterval = Interval.Of(parent.SourceInterval.a, reference.Context.SourceInterval.b);
                 rewriter.Replace(tokenInterval, reference.IdentifierName);
+
+                _rewriters.Add(rewriter);
             }
+        }
+
+        private void Reparse()
+        {
+            _state.OnParseRequested(this);
         }
     }
 }

@@ -13,35 +13,35 @@ namespace Rubberduck.Refactorings.EncapsulateField
     {
         private readonly IVBE _vbe;
         private readonly IIndenter _indenter;
-        private readonly IRewritingManager _rewritingManager;
         private readonly IRefactoringPresenterFactory<IEncapsulateFieldPresenter> _factory;
         private EncapsulateFieldModel _model;
 
-        public EncapsulateFieldRefactoring(IVBE vbe, IIndenter indenter, IRefactoringPresenterFactory<IEncapsulateFieldPresenter> factory, IRewritingManager rewritingManager)
+        private readonly HashSet<IModuleRewriter> _referenceRewriters = new HashSet<IModuleRewriter>();
+
+        public EncapsulateFieldRefactoring(IVBE vbe, IIndenter indenter, IRefactoringPresenterFactory<IEncapsulateFieldPresenter> factory)
         {
             _vbe = vbe;
             _indenter = indenter;
             _factory = factory;
-            _rewritingManager = rewritingManager;
         }
 
         public void Refactor()
         {
             var presenter = _factory.Create();
-            if (presenter == null)
-            {
-                return;
-            }
+            if (presenter == null) { return; }
 
             _model = presenter.Show();
-            if (_model == null)
-            {
-                return;
-            }
+            if (_model == null) { return; }
 
-            var rewriteSession = _rewritingManager.CheckOutCodePaneSession();
-            AddProperty(rewriteSession);
-            rewriteSession.TryRewrite();
+            var target = _model.TargetDeclaration;
+            var rewriter = _model.State.GetRewriter(target);
+            AddProperty(rewriter);
+
+            rewriter.Rewrite();
+            foreach (var referenceRewriter in _referenceRewriters)
+            {
+                referenceRewriter.Rewrite();
+            }
         }
 
         public void Refactor(QualifiedSelection target)
@@ -71,11 +71,9 @@ namespace Rubberduck.Refactorings.EncapsulateField
             Refactor();
         }
 
-        private void AddProperty(IRewriteSession rewriteSession)
+        private void AddProperty(IModuleRewriter rewriter)
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(_model.TargetDeclaration.QualifiedModuleName);
-
-            UpdateReferences(rewriteSession);
+            UpdateReferences();
             SetFieldToPrivate(rewriter);
 
             var members = _model.State.DeclarationFinder
@@ -111,12 +109,14 @@ namespace Rubberduck.Refactorings.EncapsulateField
             }
         }
 
-        private void UpdateReferences(IRewriteSession rewriteSession)
+        private void UpdateReferences()
         {
             foreach (var reference in _model.TargetDeclaration.References)
             {
-                var rewriter = rewriteSession.CheckOutModuleRewriter(reference.QualifiedModuleName);
+                var rewriter = _model.State.GetRewriter(reference.QualifiedModuleName);
                 rewriter.Replace(reference.Context, _model.PropertyName);
+
+                _referenceRewriters.Add(rewriter);
             }
         }
 

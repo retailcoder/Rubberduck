@@ -7,19 +7,23 @@ using Rubberduck.Inspections.Concrete;
 using Rubberduck.Parsing;
 using Rubberduck.Parsing.Grammar;
 using Rubberduck.Parsing.Inspections.Abstract;
-using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.VBA;
 
 namespace Rubberduck.Inspections.QuickFixes
 {
     public sealed class RemoveUnassignedVariableUsageQuickFix : QuickFixBase
     {
-        public RemoveUnassignedVariableUsageQuickFix()
-            : base(typeof(UnassignedVariableUsageInspection))
-        {}
+        private readonly RubberduckParserState _state;
 
-        public override void Fix(IInspectionResult result, IRewriteSession rewriteSession)
+        public RemoveUnassignedVariableUsageQuickFix(RubberduckParserState state)
+            : base(typeof(UnassignedVariableUsageInspection))
         {
-            var rewriter = rewriteSession.CheckOutModuleRewriter(result.QualifiedSelection.QualifiedName);
+            _state = state;
+        }
+
+        public override void Fix(IInspectionResult result)
+        {
+            var rewriter = _state.GetRewriter(result.QualifiedSelection.QualifiedName);
 
             if (result.Context.Parent.Parent is VBAParser.WithStmtContext withContext)
             {

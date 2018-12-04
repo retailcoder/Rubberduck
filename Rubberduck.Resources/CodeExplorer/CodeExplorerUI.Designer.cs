@@ -115,6 +115,15 @@ namespace Rubberduck.Resources.CodeExplorer {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Predeclared Class module (.cls).
+        /// </summary>
+        public static string CodeExplorer_AddPredeclaredClassModuleText {
+            get {
+                return ResourceManager.GetString("CodeExplorer_AddPredeclaredClassModuleText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Standard module (.bas).
         /// </summary>
         public static string CodeExplorer_AddStdModuleText {
@@ -473,7 +482,17 @@ namespace Rubberduck.Resources.CodeExplorer {
                 return ResourceManager.GetString("CodeExplorerDockablePresenter_ParseStarted", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap BrokenReference {
+            get {
+                object obj = ResourceManager.GetObject("BrokenReference", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
@@ -581,7 +600,17 @@ namespace Rubberduck.Resources.CodeExplorer {
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap LockedReference {
+            get {
+                object obj = ResourceManager.GetObject("LockedReference", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
@@ -591,7 +620,17 @@ namespace Rubberduck.Resources.CodeExplorer {
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap ObjectAssembly {
+            get {
+                object obj = ResourceManager.GetObject("ObjectAssembly", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
@@ -822,6 +861,18 @@ namespace Rubberduck.Resources.CodeExplorer {
             }
         }
         
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        public static System.Drawing.Bitmap Reference
+        {
+            get
+            {
+                object obj = ResourceManager.GetObject("Reference", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>

@@ -9,6 +9,7 @@ using Castle.MicroKernel.Registration;
 using Castle.MicroKernel.Resolvers.SpecializedResolvers;
 using Castle.MicroKernel.SubSystems.Configuration;
 using Castle.Windsor;
+using Rubberduck.AddRemoveReferences;
 using Rubberduck.ComClientLibrary.UnitTesting;
 using Rubberduck.Common;
 using Rubberduck.Common.Hotkeys;
@@ -52,6 +53,7 @@ using Rubberduck.VBEditor.ComManagement.TypeLibs;
 using Rubberduck.VBEditor.SourceCodeHandling;
 using Rubberduck.Parsing.VBA.DeclarationCaching;
 using Rubberduck.Parsing.VBA.Parsing.ParsingExceptions;
+using Rubberduck.UI.AddRemoveReferences;
 
 namespace Rubberduck.Root
 {
@@ -89,11 +91,10 @@ namespace Rubberduck.Root
             container.Register(Component.For<Version>()
                      .UsingFactoryMethod(() => Assembly.GetExecutingAssembly().GetName().Version)
                      .LifestyleSingleton());
-
             container.Register(Component.For<IProjectsProvider, IProjectsRepository>()
                 .ImplementedBy<ProjectsRepository>()
                 .LifestyleSingleton());
-            container.Register(Component.For<RubberduckParserState, IParseTreeProvider, IDeclarationFinderProvider>()
+            container.Register(Component.For<RubberduckParserState, IParseTreeProvider, IDeclarationFinderProvider, IParseManager>()
                 .ImplementedBy<RubberduckParserState>()
                 .LifestyleSingleton());
             container.Register(Component.For<ISelectionChangeService>()
@@ -113,10 +114,21 @@ namespace Rubberduck.Root
             RegisterParsingEngine(container);
             RegisterTypeLibApi(container);
 
+            container.Register(Component.For<IRewritingManager>()
+                .ImplementedBy<RewritingManager>()
+                .LifestyleSingleton());
+
             container.Register(Component.For<TestExplorerModel>()
                 .LifestyleSingleton());
             container.Register(Component.For<IVBEInteraction>()
                 .ImplementedBy<VBEInteraction>()
+                .LifestyleSingleton());
+
+            container.Register(Component.For<IAddRemoveReferencesPresenterFactory>()
+                .ImplementedBy<AddRemoveReferencesPresenterFactory>()
+                .LifestyleSingleton());
+            container.Register(Component.For<IRegisteredLibraryFinderService>()
+                .ImplementedBy<RegisteredLibraryFinderService>()
                 .LifestyleSingleton());
 
             RegisterRefactoringDialogs(container);
@@ -281,6 +293,9 @@ namespace Rubberduck.Root
                 .LifestyleSingleton());
             container.Register(Component.For<PreprocessingParseErrorListenerFactory>()
                 .ImplementedBy<PreprocessingParseErrorListenerFactory>()
+                .LifestyleSingleton());
+            container.Register(Component.For<IRewriteSessionFactory>()
+                .ImplementedBy<RewriteSessionFactory>()
                 .LifestyleSingleton());
         }
 

@@ -363,4 +363,7 @@
   <data name="MissingModuleAnnotationInspection" xml:space="preserve">
     <value>Annotation manquante (module)</value>
   </data>
+  <data name="PublicControlFieldAccessInspection" xml:space="preserve">
+    <value>Un contrôle est utilisé ailleurs que dans formulaire qui le définit</value>
+  </data>
 </root>

@@ -379,4 +379,7 @@ If the parameter can be null, ignore this inspection result; passing a null valu
   <data name="OnErrorGoToMinusOneInspection" xml:space="preserve">
     <value>While this is legal, this is poorly documented "feature" that means something different -- the error state is also cleared in addition to disabling any error handling. However, this can be ambiguous as a negative line label of -1 may end up as a target and excessively complex error handling usually indicates a need of refactoring the procedure.</value>
   </data>
+  <data name="PublicControlFieldAccessInspection" xml:space="preserve">
+    <value>Controls should be treated like private fields, and their values should be encapsulated - a get-only property can expose the control's value without exposing the entire control, or a dedicated class can encapsulate the entire state of the form, decoupling the client code from the form's controls.</value>
+  </data>
 </root>

@@ -379,4 +379,8 @@ Si le paramètre peut être nul, ignorer ce résultat; passer une valeur nulle �
   <data name="OnErrorGoToMinusOneInspection" xml:space="preserve">
     <value>Bien que légale, cette syntaxe a un effet peu documentée -- toute erreur courante est supprimée, en plus de désactiver la gestion d'erreurs. L'instruction peut également être ambiguë, si la procédure contient effectivement une ligne -1. La stratégie de gestion d'erreurs semble plus complexe que nécessaire et pourrait être à revoir.</value>
   </data>
+  <data name="PublicControlFieldAccessInspection" xml:space="preserve">
+    <value>Les contrôles devraient être traités comme des champs privés, et leurs valeurs encapsulées. Une propriété 'Get' peut exposer la valeur d'un contrôle sans exposer celui-ci, ou encore une classe dédiée peut encapsuler toutes les données du formulaire. Ceci découple le code appellant des contrôles d'un formulaire.</value>
+    <comment>s</comment>
+  </data>
 </root>

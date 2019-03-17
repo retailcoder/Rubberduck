@@ -383,4 +383,7 @@
     <value>ThunderCode 101</value>
     <comment>meta easter egg; do not translate</comment>
   </data>
+  <data name="PublicControlFieldAccessInspection" xml:space="preserve">
+    <value>UserForm control is accessed from outside the form</value>
+  </data>
 </root>

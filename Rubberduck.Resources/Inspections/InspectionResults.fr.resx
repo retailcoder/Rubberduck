@@ -402,4 +402,7 @@ In memoriam, 1972-2018</value>
   <data name="KeywordsUsedAsMemberInspection" xml:space="preserve">
     <value>Le nom du membre '{0}' est un mot-clé</value>
   </data>
+  <data name="PublicControlFieldAccessInspection" xml:space="preserve">
+    <value>Le contrôle '{0}' est utilisé à l'extérieur du formulaire qui le définit</value>
+  </data>
 </root>

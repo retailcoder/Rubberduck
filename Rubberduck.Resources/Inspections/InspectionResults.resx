@@ -421,4 +421,7 @@ In memoriam, 1972-2018</value>
   <data name="OnErrorGoToMinusOneInspection" xml:space="preserve">
     <value>On Error GoTo -1 encountered</value>
   </data>
+  <data name="PublicControlFieldAccessInspection" xml:space="preserve">
+    <value>UserForm control '{0}' is accessed outside its parent form.</value>
+  </data>
 </root>

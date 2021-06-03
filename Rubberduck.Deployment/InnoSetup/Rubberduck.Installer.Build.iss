@@ -86,6 +86,7 @@ Name: "French"; MessagesFile: "compiler:Languages\French.isl"
 Name: "German"; MessagesFile: "compiler:Languages\German.isl"
 Name: "Czech"; MessagesFile: "compiler:Languages\Czech.isl"
 Name: "Spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
+Name: "Italian"; MessagesFile: "compiler:Languages\Italian.isl"
 
 [Dirs]
 ; Make folder "readonly" to support icons (it does not actually make folder readonly. A weird Windows quirk)
@@ -127,6 +128,7 @@ Source: "{#SourcePath}\WorkloadConfigs\Legacy\rubberduck.config"; DestDir: "{use
 #include <German.CustomMessages.iss>
 #include <Czech.CustomMessages.iss>
 #include <Spanish.CustomMessages.iss>
+#include <Italian.CustomMessages.iss>
 
 [Icons]
 Name: "{group}\{cm:ProgramOnTheWeb,{#AppName}}"; Filename: "{#AppURL}"
@@ -899,20 +901,9 @@ begin
     InstallForWhoOptionPage.Values[1] := true;
   end;
 
-  RegisterAddInOptionPage :=
+    WorkloadOptionPage :=
     CreateInputOptionPage(
-      wpInstalling,
-      ExpandConstant('{cm:RegisterAddInCaption}'),
-      ExpandConstant('{cm:RegisterAddInMessage}'),
-      ExpandConstant('{cm:RegisterAddInDescription}'),
-      false, false);
-
-  RegisterAddInOptionPage.Add(ExpandConstant('{cm:RegisterAddInButtonCaption}'));
-  RegisterAddInOptionPage.Values[0] := true;
-
-  WorkloadOptionPage :=
-    CreateInputOptionPage(
-        wpInstalling,
+        wpLicense,
         ExpandConstant('{cm:UseLegacyWorkloadCaption}'),
         ExpandConstant('{cm:UseLegacyWorkloadMessage}'),
         ExpandConstant('{cm:UseLegacyWorkloadDescription}'),
@@ -929,6 +920,16 @@ begin
   
   WorkloadOptionPage.Values[0] := false;
 
+  RegisterAddInOptionPage :=
+    CreateInputOptionPage(
+      wpInstalling,
+      ExpandConstant('{cm:RegisterAddInCaption}'),
+      ExpandConstant('{cm:RegisterAddInMessage}'),
+      ExpandConstant('{cm:RegisterAddInDescription}'),
+      false, false);
+
+  RegisterAddInOptionPage.Add(ExpandConstant('{cm:RegisterAddInButtonCaption}'));
+  RegisterAddInOptionPage.Values[0] := true;
 
 end;
 
@@ -1115,11 +1116,14 @@ begin
     if WorkloadOptionPage.Values[0] then
     begin
       Log('Legacy workload initial config was requested and will be copied to the destination folder.');
+      //UseLegacyWorkloadConfig := True;
     end
       else
     begin
       Log('Skipping legacy workload config because the option was left unchecked.');
+      //UseLegacyWorkloadConfig := False;
     end;
+	UseLegacyWorkloadConfig := WorkloadOptionPage.Values[0];
   end;
 
   // Re-enable the button disabled at start of procedure

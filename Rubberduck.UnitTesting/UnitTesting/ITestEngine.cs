@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Rubberduck.UnitTesting
 {
@@ -20,6 +21,7 @@ namespace Rubberduck.UnitTesting
         HeadlessTestOutput RunHeadless(IEnumerable<TestMethod> tests);
 
         void Run(IEnumerable<TestMethod> tests);
+        IEnumerable<TestResult> RunWithResults(IEnumerable<TestMethod> tests);
         void RunByOutcome(TestOutcome outcome);
         void RepeatLastRun();
         void RequestCancellation();

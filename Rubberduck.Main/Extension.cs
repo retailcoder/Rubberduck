@@ -236,10 +236,12 @@ namespace Rubberduck
                 currentDomain.UnhandledException += HandleAppDomainException;
                 currentDomain.AssemblyResolve += LoadFromSameFolder;
 
-                    _container = new WindsorContainer().Install(new RubberduckIoCInstaller(_vbe, _addin, _initialSettings, _vbeNativeApi, _beepInterceptor));
+                _container = new WindsorContainer().Install(new RubberduckIoCInstaller(_vbe, _addin, _initialSettings, _vbeNativeApi, _beepInterceptor));
                 _container.Resolve<InstanceProvider>();
                 _app = _container.Resolve<App>();
                 _app.Startup();
+
+                testEngine = _container.Resolve<ITestEngine>();
 
                 _isInitialized = true;
             }
@@ -348,9 +350,9 @@ namespace Rubberduck
             _testEngine = _extension.testEngine;
         }
 
-        public void GetTestEngine()
+        public ITestEngine GetTestEngine()
         {
-            _testEngine = _extension.testEngine;
+            return _extension.testEngine;
         }
 
         public void RunWithResults()

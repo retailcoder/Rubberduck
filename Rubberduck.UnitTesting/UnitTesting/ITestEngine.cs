@@ -20,7 +20,7 @@ namespace Rubberduck.UnitTesting
         HeadlessTestOutput RunHeadless(IEnumerable<TestMethod> tests);
 
         void Run(IEnumerable<TestMethod> tests);
-        IEnumerable<TestResult> RunWithResults(IEnumerable<TestMethod> tests);
+        string RunWithResults(IEnumerable<TestMethod> tests);
         void RunByOutcome(TestOutcome outcome);
         void RepeatLastRun();
         void RequestCancellation();

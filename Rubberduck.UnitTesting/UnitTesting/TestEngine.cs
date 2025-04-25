@@ -516,7 +516,7 @@ namespace Rubberduck.UnitTesting
             catch (Exception ex)
             {
                 // FIXME somehow notify the user of this mess
-                Log(LogLevel.Error, ex, "Unexpected expection while running unit tests; unit tests will be aborted");
+                Log(LogLevel.Error, ex, "Unexpected exception while running unit tests; unit tests will be aborted");
             }
 
             CancellationRequested = false;

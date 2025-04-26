@@ -14,7 +14,6 @@ using Rubberduck.VBEditor.ComManagement.TypeLibs;
 using Rubberduck.VBEditor.Events;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using Rubberduck.VBEditor.VbeRuntime;
-using Rubberduck.VersionCheck;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;

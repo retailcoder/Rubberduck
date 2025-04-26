@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using NLog;
+﻿using NLog;
 using Rubberduck.InternalApi.Extensions;
 using Rubberduck.Parsing.Annotations.Concrete;
 using Rubberduck.Parsing.Symbols;
@@ -15,13 +9,18 @@ using Rubberduck.Resources.UnitTesting;
 using Rubberduck.VBEditor.ComManagement;
 using Rubberduck.VBEditor.ComManagement.TypeLibs.Abstract;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace Rubberduck.UnitTesting
 {
-    // FIXME litter logging around here
     internal class TestEngine : ITestEngine
     {
-        protected static readonly ParserState[] AllowedRunStates = 
+        protected static readonly ParserState[] AllowedRunStates =
         {
             ParserState.Ready
         };
@@ -46,14 +45,17 @@ namespace Rubberduck.UnitTesting
 
         public bool CanRun => AllowedRunStates.Contains(_state.Status) && _vbe.IsInDesignMode;
         public bool CanRepeatLastRun => _lastRun.Any();
-        
+
         private bool _listening = true;
 
+        private bool _headless = false;
+        private HeadlessTestOutput _headlessOutput;
+
         public TestEngine(
-            RubberduckParserState state, 
-            IFakesFactory fakesFactory, 
-            IVBEInteraction declarationRunner, 
-            ITypeLibWrapperProvider wrapperProvider, 
+            RubberduckParserState state,
+            IFakesFactory fakesFactory,
+            IVBEInteraction declarationRunner,
+            ITypeLibWrapperProvider wrapperProvider,
             IUiDispatcher uiDispatcher,
             IVBE vbe,
             IProjectsProvider projectsProvider)
@@ -120,14 +122,40 @@ namespace Rubberduck.UnitTesting
 
         private void OnTestRunStarted(IReadOnlyList<TestMethod> tests)
         {
+            Log(LogLevel.Trace, $"Starting test run ({tests.Count} tests)...");
+            if (_headless)
+            {
+                return;
+            }
+
             CancellationRequested = false;
             TestRunStarted?.Invoke(this, new TestRunStartedEventArgs(tests));
             // This call is safe - OnTestRunStarted cannot be called from outside RD's context.
-            _uiDispatcher.FlushMessageQueue(); 
+            _uiDispatcher.FlushMessageQueue();
+        }
+
+        private void OnTestRunCompleted(long elapsedMilliseconds)
+        {
+            Log(LogLevel.Trace, $"Test run completed (elapsed: {elapsedMilliseconds}ms). Wrapping up...");
+            if (_headless)
+            {
+                _headlessOutput.MillisecondsElapsed = elapsedMilliseconds;
+                return;
+            }
+
+            TestRunCompleted?.Invoke(this, new TestRunCompletedEventArgs(elapsedMilliseconds));
+            // This call is safe - OnTestRunCompleted cannot be called from outside RD's context.
+            _uiDispatcher.FlushMessageQueue();
         }
 
         private void OnTestStarted(TestMethod test)
-        {           
+        {
+            Log(LogLevel.Trace, $"Running test: {test.Declaration.IdentifierName}...");
+            if (_headless)
+            {
+                return;
+            }
+
             TestStarted?.Invoke(this, new TestStartedEventArgs(test));
             // This call is safe - OnTestStarted cannot be called from outside RD's context.
             _uiDispatcher.FlushMessageQueue();
@@ -135,12 +163,37 @@ namespace Rubberduck.UnitTesting
 
         private void OnTestCompleted(TestMethod test, TestResult result)
         {
+            Log(LogLevel.Trace, $"Test completed: {test.Declaration.IdentifierName} ({result.Outcome})");
+            if (_headless)
+            {
+                _headlessOutput.Results.Add(HeadlessTestInfo.For(test, result));
+                return;
+            }
+
             _lastRun.Add(test);
             _knownOutcomes.Add(test, result.Outcome);
 
             TestCompleted?.Invoke(this, new TestCompletedEventArgs(test, result));
             // This call is safe - OnTestCompleted cannot be called from outside RD's context.
             _uiDispatcher.FlushMessageQueue();
+        }
+
+        public HeadlessTestOutput RunHeadless(IEnumerable<TestMethod> tests)
+        {
+            if (!CanRun)
+            {
+                throw new InvalidOperationException("Cannot run tests in headless mode in the current state.");
+            }
+
+            Log(LogLevel.Trace, $"Headless test run is initializing.");
+
+            _headless = true;
+            _headlessOutput = new HeadlessTestOutput();
+
+            Run(tests);
+
+            _headless = false;
+            return _headlessOutput;
         }
 
         public void Run(IEnumerable<TestMethod> tests)
@@ -193,13 +246,13 @@ namespace Rubberduck.UnitTesting
                     case SuspensionOutcome.Completed:
                         return;
                     case SuspensionOutcome.Canceled:
-                        Logger.Debug("Test execution canceled.");
+                        Log(LogLevel.Debug, "Test execution canceled.");
                         return;
                     default:
-                        Logger.Warn($"Test execution failed with suspension outcome {suspensionResult.Outcome}.");
+                        Log(LogLevel.Warn, $"Test execution failed with suspension outcome {suspensionResult.Outcome}.");
                         if (suspensionResult.EncounteredException != null)
                         {
-                            Logger.Error(suspensionResult.EncounteredException);
+                            Log(LogLevel.Error, suspensionResult.EncounteredException);
                         }
 
                         return;
@@ -210,8 +263,7 @@ namespace Rubberduck.UnitTesting
         private void EnsureRubberduckIsReferencedForEarlyBoundTests()
         {
             var projectIdsOfMembersUsingAddInLibrary = _state.DeclarationFinder.AllUserDeclarations
-                .Where(member => member.AsTypeName == "Rubberduck.PermissiveAssertClass"
-                                 || member.AsTypeName == "Rubberduck.AssertClass")
+                .Where(member => member.AsTypeName == "Rubberduck.PermissiveAssertClass" || member.AsTypeName == "Rubberduck.AssertClass")
                 .Select(member => member.ProjectId)
                 .Distinct();
 
@@ -249,7 +301,7 @@ namespace Rubberduck.UnitTesting
             }
             catch (InvalidOperationException e)
             {
-                Logger.Warn(e);
+                Log(LogLevel.Warn, e);
                 foreach (var test in testMethods)
                 {
                     OnTestCompleted(test, new TestResult(TestOutcome.Failed, AssertMessages.Prerequisite_EarlyBindingReferenceMissing));
@@ -263,12 +315,12 @@ namespace Rubberduck.UnitTesting
             {
                 var testsByModule = testMethods.GroupBy(test => test.Declaration.QualifiedName.QualifiedModuleName)
                     .ToDictionary(grouping => grouping.Key, grouping => grouping.ToList());
-                
+
                 foreach (var moduleName in testsByModule.Keys)
                 {
                     var testInitialize = TestDiscovery.FindTestInitializeMethods(moduleName, _state).ToList();
                     var testCleanup = TestDiscovery.FindTestCleanupMethods(moduleName, _state).ToList();
-                    
+
                     var moduleTestMethods = testsByModule[moduleName];
 
                     var fakes = _fakesFactory.Create();
@@ -280,7 +332,7 @@ namespace Rubberduck.UnitTesting
                         }
                         catch (COMException ex)
                         {
-                            Logger.Error(ex, "Unexpected COM exception while initializing tests for module {0}. The module will be skipped.", moduleName.Name);
+                            Log(LogLevel.Error, ex, $"Unexpected COM exception while initializing tests for module {moduleName.Name}. The module will be skipped.");
                             foreach (var method in moduleTestMethods)
                             {
                                 OnTestCompleted(method, new TestResult(TestOutcome.Unknown, AssertMessages.TestRunner_ModuleInitializeFailure));
@@ -288,7 +340,7 @@ namespace Rubberduck.UnitTesting
                             continue;
                         }
                         foreach (var test in moduleTestMethods)
-                        {                             
+                        {
                             OnTestStarted(test);
 
                             // no need to run setup/teardown for ignored tests
@@ -308,7 +360,7 @@ namespace Rubberduck.UnitTesting
                                 catch (COMException trace)
                                 {
                                     OnTestCompleted(test, new TestResult(TestOutcome.Inconclusive, AssertMessages.TestRunner_TestInitializeFailure));
-                                    Logger.Trace(trace, "Unexpected COMException when running TestInitialize");
+                                    Log(LogLevel.Trace, trace, "Unexpected COMException when running TestInitialize");
                                     continue;
                                 }
 
@@ -333,7 +385,7 @@ namespace Rubberduck.UnitTesting
                             }
                             finally
                             {
-                                fakes.StopTest();                               
+                                fakes.StopTest();
                             }
                         }
                         try
@@ -343,9 +395,7 @@ namespace Rubberduck.UnitTesting
                         catch (COMException ex)
                         {
                             // FIXME somehow notify the user of this mess
-                            Logger.Error(ex,
-                                "Unexpected COM exception while cleaning up tests for module {0}. Aborting any further unit tests",
-                                moduleName.Name);
+                            Log(LogLevel.Error, ex, $"Unexpected COM exception while cleaning up tests for module {moduleName.Name}. Aborting any further unit tests");
                             break;
                         }
                     }
@@ -354,13 +404,13 @@ namespace Rubberduck.UnitTesting
             catch (Exception ex)
             {
                 // FIXME somehow notify the user of this mess
-                Logger.Error(ex, "Unexpected expection while running unit tests; unit tests will be aborted");
+                Log(LogLevel.Error, ex, "Unexpected expection while running unit tests; unit tests will be aborted");
             }
 
             CancellationRequested = false;
             overallTime.Stop();
 
-            TestRunCompleted?.Invoke(this, new TestRunCompletedEventArgs(overallTime.ElapsedMilliseconds));
+            OnTestRunCompleted(overallTime.ElapsedMilliseconds);
         }
 
         private void RunTestCleanup(ITypeLibWrapper wrapper, List<Declaration> cleanupMethods)
@@ -372,7 +422,7 @@ namespace Rubberduck.UnitTesting
             catch (COMException cleanupFail)
             {
                 // Apparently the user doesn't need to know when test results for subsequent tests could be incorrect
-                Logger.Trace(cleanupFail, "Unexpected COMException when running TestCleanup");
+                Log(LogLevel.Trace, cleanupFail, "Unexpected COMException when running TestCleanup");
             }
         }
 
@@ -387,12 +437,12 @@ namespace Rubberduck.UnitTesting
             }
             catch (COMException e)
             {
-                Logger.Info(e, "Unexpected COM exception while running test method.");
+                Log(LogLevel.Info, e, "Unexpected COM exception while running test method.");
                 return new TestResult(TestOutcome.Inconclusive, AssertMessages.TestRunner_ComException, duration);
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Unexpected exceptino while running test method.");
+                Log(LogLevel.Error, e, "Unexpected exceptino while running test method.");
                 return new TestResult(TestOutcome.Inconclusive, AssertMessages.TestRunner_ExceptionDuringRun, duration);
             }
         }
@@ -408,6 +458,75 @@ namespace Rubberduck.UnitTesting
             }
 
             return new TestResult(result.Outcome, result.Message, duration);
+        }
+
+        private void Log(LogLevel level, string message)
+        {
+            if (_headless)
+            {
+                _headlessOutput.Logs.Add($"{DateTime.UtcNow.ToShortTimeString()} \t{level.Name.ToUpperInvariant()} \t{message}");
+            }
+
+            if (level == LogLevel.Trace)
+            {
+                Logger.Trace(message);
+                return;
+            }
+
+            if (level == LogLevel.Debug)
+            {
+                Logger.Debug(message);
+                return;
+            }
+
+            if (level == LogLevel.Info)
+            {
+                Logger.Info(message);
+                return;
+            }
+
+            if (level == LogLevel.Warn)
+            {
+                Logger.Warn(message);
+                return;
+            }
+
+            if (level == LogLevel.Error)
+            {
+                Logger.Error(message);
+                return;
+            }
+        }
+        private void Log(LogLevel level, Exception exception, string message = null)
+        {
+            if (_headless)
+            {
+                _headlessOutput.Logs.Add($"{DateTime.UtcNow.ToShortTimeString()} \t{level.Name.ToUpperInvariant()} \t{exception.GetType().Name} was thrown. Message: {message ?? exception.Message}\n\t{exception}");
+            }
+
+            if (level == LogLevel.Trace)
+            {
+                Logger.Trace(exception);
+                return;
+            }
+
+            if (level == LogLevel.Warn)
+            {
+                Logger.Warn(exception);
+                return;
+            }
+
+            if (level == LogLevel.Error)
+            {
+                Logger.Error(exception);
+                return;
+            }
+
+            if (level == LogLevel.Fatal)
+            {
+                Logger.Fatal(exception);
+                return;
+            }
         }
     }
 }

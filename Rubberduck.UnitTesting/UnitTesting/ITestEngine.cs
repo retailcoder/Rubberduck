@@ -16,6 +16,9 @@ namespace Rubberduck.UnitTesting
         IReadOnlyList<TestMethod> LastRunTests { get; }
         bool CanRun { get; }
         bool CanRepeatLastRun { get; }
+
+        HeadlessTestOutput RunHeadless(IEnumerable<TestMethod> tests);
+
         void Run(IEnumerable<TestMethod> tests);
         void RunByOutcome(TestOutcome outcome);
         void RepeatLastRun();

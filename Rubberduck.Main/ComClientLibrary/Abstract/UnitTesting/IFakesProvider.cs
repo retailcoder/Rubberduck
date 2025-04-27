@@ -1,6 +1,6 @@
-﻿using System.ComponentModel;
+﻿using Rubberduck.Resources.Registration;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
-using Rubberduck.Resources.Registration;
 
 namespace Rubberduck.UnitTesting
 {

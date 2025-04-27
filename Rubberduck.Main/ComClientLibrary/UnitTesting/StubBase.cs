@@ -1,7 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using EasyHook;
+﻿using EasyHook;
 using Rubberduck.Parsing.ComReflection;
+using System;
+using System.Collections.Generic;
 
 namespace Rubberduck.UnitTesting
 {
@@ -47,8 +47,13 @@ namespace Rubberduck.UnitTesting
                 Verifier.AddUsage(string.Empty, null, string.Empty, InvocationCount);
             }
 
-            if (Throws)
+            if (Throws || IsHeadless)
             {
+                if (IsHeadless)
+                {
+                    ErrorNumber = 1999;
+                    ErrorDescription = "Invocation is invalid in headless mode without an overriding setup.";
+                }
                 AssertHandler.RaiseVbaError(ErrorNumber, ErrorDescription);
             }
         }
@@ -93,6 +98,8 @@ namespace Rubberduck.UnitTesting
             ErrorNumber = number;
             ErrorDescription = description;
         }
+
+        public bool IsHeadless { get; set; }
 
         public virtual bool PassThrough { get; set; }
 

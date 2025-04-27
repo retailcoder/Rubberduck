@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Rubberduck.Resources.Registration;
+using Rubberduck.UnitTesting.Fakes;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using Rubberduck.Resources.Registration;
-using Rubberduck.UnitTesting.Fakes;
 
 namespace Rubberduck.UnitTesting
 {
@@ -14,15 +14,15 @@ namespace Rubberduck.UnitTesting
         ClassInterface(ClassInterfaceType.None),
         ComDefaultInterface(typeof(IFakesProvider)),
         EditorBrowsable(EditorBrowsableState.Always)
-    ]   
+    ]
     public class FakesProvider : IFakesProvider, IFakes
-        // IFakesProvider is COM side, exposed to the VBA User
-        // IFakes is Rubberduck side and we inject the FakesProvider back into Core
+    // IFakesProvider is COM side, exposed to the VBA User
+    // IFakes is Rubberduck side and we inject the FakesProvider back into Core
     {
         internal const int AllInvocations = -1;
         // ReSharper disable once InconsistentNaming - respects COM naming conventions
         [Description("A value indicating that specified configuration applies to all invocations.")]
-        public const int rdAllInvocations = AllInvocations;     
+        public const int rdAllInvocations = AllInvocations;
 
         private static Dictionary<Type, StubBase> ActiveFakes { get; } = new Dictionary<Type, StubBase>();
 
@@ -62,13 +62,58 @@ namespace Rubberduck.UnitTesting
         }
 
         public void StopTest()
-        {           
+        {
             foreach (var fake in ActiveFakes.Values)
             {
                 fake.Dispose();
             }
             ActiveFakes.Clear();
             CodeIsUnderTest = false;
+        }
+
+        public void StartHeadlessTest()
+        {
+            if (CodeIsUnderTest)
+            {
+                return;
+            }
+
+            var headlessFakes = new object[]
+            {
+                CreateThrowingActiveFake<MsgBox>(),
+                CreateThrowingActiveFake<InputBox>(),
+                CreateThrowingActiveFake<SendKeys>(),
+                CreateThrowingActiveFake<Shell>(),
+                CreateThrowingActiveFake<DeleteSetting>(),
+                CreateThrowingActiveFake<SaveSetting>(),
+                CreateThrowingActiveFake<GetSetting>(),
+                CreateThrowingActiveFake<GetAllSettings>(),
+                CreateThrowingActiveFake<Kill>(),
+                CreateThrowingActiveFake<Dir>(),
+                CreateThrowingActiveFake<MkDir>(),
+                CreateThrowingActiveFake<RmDir>(),
+                CreateThrowingActiveFake<ChDir>(),
+                CreateThrowingActiveFake<ChDrive>(),
+                CreateThrowingActiveFake<CurDir>(),
+                CreateThrowingActiveFake<FreeFile>(),
+                CreateThrowingActiveFake<SetAttr>(),
+                CreateThrowingActiveFake<GetAttr>(),
+                CreateThrowingActiveFake<FileLen>(),
+                CreateThrowingActiveFake<FileDateTime>(),
+                CreateThrowingActiveFake<IMEStatus>(),
+                CreateThrowingActiveFake<FileCopy>(),
+            };
+
+            CodeIsUnderTest = true;
+        }
+
+        private T CreateThrowingActiveFake<T>()
+            where T : StubBase, new()
+        {
+            var fake = RetrieveOrCreateFunction<T>();
+            fake.RaisesError(19997, $"Intercepted invocation: '{typeof(T).Name}' fake was not configured for headless run.");
+
+            return fake;
         }
 
         private T RetrieveOrCreateFunction<T>()
@@ -88,7 +133,8 @@ namespace Rubberduck.UnitTesting
                 ActiveFakes.Add(type, factory.Invoke());
             }
 
-            return ActiveFakes[type] as T;
+            var fake = ActiveFakes[type] as T;
+            return fake;
         }
 
         #region Function Overrides

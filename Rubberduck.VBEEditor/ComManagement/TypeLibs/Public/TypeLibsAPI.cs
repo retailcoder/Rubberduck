@@ -1,13 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.InteropServices;
-using Rubberduck.InternalApi.Common;
+﻿using Rubberduck.InternalApi.Common;
 using Rubberduck.Resources.Registration;
 using Rubberduck.VBEditor.ComManagement.TypeLibs.Abstract;
 using Rubberduck.VBEditor.ComManagement.TypeLibs.Unmanaged;
 using Rubberduck.VBEditor.ComManagement.TypeLibs.Utility;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using ComTypes = System.Runtime.InteropServices.ComTypes;
 
 // ReSharper disable once CheckNamespace

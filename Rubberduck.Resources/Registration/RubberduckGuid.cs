@@ -99,5 +99,8 @@
         private const string DebugGuidspace = "69E101";
         public const string DebugAddinObjectInterfaceGuid = DebugGuidspace + "23" + GuidSuffix;
         public const string DebugAddinObjectClassGuid = DebugGuidspace + "24" + GuidSuffix;
+
+        public const string RubberduckCIInterfaceGuid = DebugGuidspace + "25" + GuidSuffix;
+        public const string RubberduckCIClassGuid = DebugGuidspace + "26" + GuidSuffix;
     }
 }

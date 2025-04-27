@@ -4,6 +4,8 @@
     {
         void StartTest();
         void StopTest();
+
+        void StartHeadlessTest();
     }
 
     public interface IFakesFactory

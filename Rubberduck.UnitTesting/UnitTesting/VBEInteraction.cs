@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Rubberduck.UnitTesting
-{ 
+{
     // FIXME litter some logging around here
     internal class VBEInteraction : IVBEInteraction
     {
@@ -29,8 +29,7 @@ namespace Rubberduck.UnitTesting
         {
             foreach (var declaration in declarations)
             {
-                _typeLibsApi.ExecuteCode(typeLib, declaration.QualifiedModuleName.ComponentName,
-                    declaration.QualifiedName.MemberName);
+                _typeLibsApi.ExecuteCode(typeLib, declaration.QualifiedModuleName.ComponentName, declaration.QualifiedName.MemberName);
             }
         }
 
@@ -59,7 +58,7 @@ namespace Rubberduck.UnitTesting
                 AssertHandler.OnAssertCompleted -= assertCompletionHandler;
             }
         }
-            
+
 
         public void EnsureProjectReferencesUnitTesting(IVBProject project)
         {
@@ -80,7 +79,7 @@ namespace Rubberduck.UnitTesting
                         Registry.ClassesRoot.OpenSubKey(
                             $@"TypeLib\{{{libGuid}}}\{_rubberduckVersion.Major}.{_rubberduckVersion.Minor}");
 
-                    if(tlbKey != null)
+                    if (tlbKey != null)
                     {
                         name = tlbKey.GetValue(string.Empty, string.Empty) as string;
                         tlbKey.Dispose();

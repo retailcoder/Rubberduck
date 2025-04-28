@@ -23,7 +23,7 @@ namespace Rubberduck.UnitTesting
         void Parse();
     }
 
-    public class BlockingParseService
+    public class BlockingParseService : IBlockingParseService
     {
         private readonly RubberduckParserState _state;
         public BlockingParseService(RubberduckParserState state)

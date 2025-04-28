@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
-using Castle.Facilities.TypedFactory;
+﻿using Castle.Facilities.TypedFactory;
 using Castle.MicroKernel.ModelBuilder.Inspectors;
 using Castle.MicroKernel.Registration;
-using Component = Castle.MicroKernel.Registration.Component;
 using Castle.MicroKernel.Resolvers.SpecializedResolvers;
 using Castle.MicroKernel.SubSystems.Configuration;
 using Castle.Windsor;
@@ -19,13 +12,15 @@ using Rubberduck.CodeAnalysis.QuickFixes;
 using Rubberduck.ComClientLibrary.UnitTesting;
 using Rubberduck.Common;
 using Rubberduck.Common.Hotkeys;
+using Rubberduck.Navigation.CodeExplorer;
 using Rubberduck.Parsing;
+using Rubberduck.Parsing.Annotations;
 using Rubberduck.Parsing.Common;
 using Rubberduck.Parsing.ComReflection;
 using Rubberduck.Parsing.ComReflection.TypeLibReflection;
 using Rubberduck.Parsing.PreProcessing;
-using Rubberduck.Parsing.Symbols.DeclarationLoaders;
 using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.Symbols.DeclarationLoaders;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.Parsing.VBA.ComReferenceLoading;
 using Rubberduck.Parsing.VBA.DeclarationCaching;
@@ -33,13 +28,12 @@ using Rubberduck.Parsing.VBA.DeclarationResolving;
 using Rubberduck.Parsing.VBA.Parsing;
 using Rubberduck.Parsing.VBA.Parsing.ParsingExceptions;
 using Rubberduck.Parsing.VBA.ReferenceManagement;
+using Rubberduck.Refactoring.ParseTreeValue;
 using Rubberduck.Refactorings;
 using Rubberduck.Runtime;
 using Rubberduck.Settings;
-using GeneralSettings = Rubberduck.Settings.GeneralSettings;
 using Rubberduck.SettingsProvider;
 using Rubberduck.SmartIndenter;
-using IndenterSettings = Rubberduck.SmartIndenter.IndenterSettings;
 using Rubberduck.UI;
 using Rubberduck.UI.AddRemoveReferences;
 using Rubberduck.UI.Command;
@@ -47,25 +41,30 @@ using Rubberduck.UI.Command.MenuItems;
 using Rubberduck.UI.Command.MenuItems.CommandBars;
 using Rubberduck.UI.Command.MenuItems.ParentMenus;
 using Rubberduck.UI.Controls;
+using Rubberduck.UI.Refactorings.AnnotateDeclaration;
 using Rubberduck.UI.Settings;
 using Rubberduck.UI.UnitTesting;
 using Rubberduck.UnitTesting;
 using Rubberduck.VBEditor;
 using Rubberduck.VBEditor.ComManagement;
+using Rubberduck.VBEditor.ComManagement.NonDisposalDecorators;
 using Rubberduck.VBEditor.ComManagement.TypeLibs;
 using Rubberduck.VBEditor.ComManagement.TypeLibs.Abstract;
 using Rubberduck.VBEditor.Events;
-using Rubberduck.VBEditor.Utility;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using Rubberduck.VBEditor.SourceCodeHandling;
+using Rubberduck.VBEditor.Utility;
 using Rubberduck.VBEditor.VbeRuntime;
-using Rubberduck.Parsing.Annotations;
-using Rubberduck.UI.Refactorings.AnnotateDeclaration;
-using Rubberduck.Refactoring.ParseTreeValue;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO.Abstractions;
-using Rubberduck.Navigation.CodeExplorer;
-using Rubberduck.UI.Command.ComCommands;
-using Rubberduck.VBEditor.ComManagement.NonDisposalDecorators;
+using System.Linq;
+using System.Reflection;
+using Component = Castle.MicroKernel.Registration.Component;
+using GeneralSettings = Rubberduck.Settings.GeneralSettings;
+using IndenterSettings = Rubberduck.SmartIndenter.IndenterSettings;
 
 namespace Rubberduck.Root
 {
@@ -171,7 +170,7 @@ namespace Rubberduck.Root
                 .LifestyleSingleton());
             container.Register(Component.For<SearchResultPresenterInstanceManager>()
                 .LifestyleSingleton());
-            
+
             RegisterDockablePresenters(container);
             RegisterDockableUserControls(container);
 
@@ -277,7 +276,7 @@ namespace Rubberduck.Root
                     .WithServiceSelect((type, hierarchy) =>
                     {
                         // select closed generic interface
-                        return type.GetInterfaces().Where(iface => iface.IsGenericType 
+                        return type.GetInterfaces().Where(iface => iface.IsGenericType
                             && iface.GetGenericTypeDefinition() == typeof(IConfigurationService<>));
                     })
                     .LifestyleSingleton());
@@ -341,8 +340,8 @@ namespace Rubberduck.Root
             {
                 container.Register(Types.FromAssembly(assembly)
                     .IncludeNonPublicTypes()
-                    .Where(type => type.IsInterface 
-                                   && type.Name.EndsWith("Factory") 
+                    .Where(type => type.IsInterface
+                                   && type.Name.EndsWith("Factory")
                                    && !type.Name.Equals("IFakesFactory")
                                    && !type.Name.Equals("IAnnotationFactory")
                                    && type.NotDisabledOrExperimental(_initialSettings))
@@ -469,7 +468,7 @@ namespace Rubberduck.Root
                     .IncludeNonPublicTypes()
                     .BasedOn<IQuickFix>()
                     .If(type => type.NotDisabledOrExperimental(_initialSettings))
-                    .WithService.Base() 
+                    .WithService.Base()
                     .LifestyleSingleton());
             }
         }
@@ -823,7 +822,7 @@ namespace Rubberduck.Root
                 typeof(ExportAllCommandMenuItem),
                 typeof(ToolMenuAddRemoveReferencesCommandMenuItem)
             };
-            
+
             return items.ToArray();
         }
 
@@ -900,7 +899,7 @@ namespace Rubberduck.Root
                     var face = type.GetInterfaces().FirstOrDefault(i =>
                         i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IRefactoringViewModel<>));
 
-                    return face == null ? new[] { type } : new[] {type, face};
+                    return face == null ? new[] { type } : new[] { type, face };
                 })
             );
             container.Register(Types
@@ -928,14 +927,14 @@ namespace Rubberduck.Root
                     {
                         return new[] { type };
                     }
-                    
+
                     var viewModel = face.GenericTypeArguments[2];
                     var interfaceViewModel = viewModel.GetInterfaces().FirstOrDefault(i =>
                         i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IRefactoringViewModel<>));
 
                     if (interfaceViewModel == null)
                     {
-                        return new[] {type};
+                        return new[] { type };
                     }
 
                     var closedFace = typeof(IRefactoringDialog<,,>).MakeGenericType(model, interfaceView, interfaceViewModel);
@@ -995,7 +994,7 @@ namespace Rubberduck.Root
                     .LifestyleSingleton());
             }
         }
-        
+
         private void RegisterDockableUserControls(IWindsorContainer container)
         {
             container.Register(Classes.FromAssemblyContaining<IDockableUserControl>()
@@ -1044,7 +1043,7 @@ namespace Rubberduck.Root
 
             container.Register(Component.For<ICompilationArgumentsProvider, ICompilationArgumentsCache>()
                 .ImplementedBy<CompilationArgumentsCache>()
-                .DependsOn(Dependency.OnComponent<ICompilationArgumentsProvider,CompilationArgumentsProvider>())
+                .DependsOn(Dependency.OnComponent<ICompilationArgumentsProvider, CompilationArgumentsProvider>())
                 .LifestyleSingleton());
             container.Register(Component.For<ICOMReferenceSynchronizer, IProjectReferencesProvider>()
                 .ImplementedBy<COMReferenceSynchronizer>()
@@ -1170,7 +1169,7 @@ namespace Rubberduck.Root
         {
             return GetDistinctTransitivelyReferencedAssemblies(Assembly.GetExecutingAssembly(), name => name.FullName.StartsWith("Rubberduck"))
                 //For some reason the inspections assembly is not referenced transitively.
-                .Concat(new [] { Assembly.GetAssembly(typeof(Inspector)) })
+                .Concat(new[] { Assembly.GetAssembly(typeof(Inspector)) })
                 //Theoretically we shouldn't have anything to register here, but better safe than sorry.
                 .Concat(new[] { Assembly.GetExecutingAssembly() })
                 .Distinct();

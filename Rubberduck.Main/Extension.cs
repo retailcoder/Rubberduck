@@ -211,9 +211,6 @@ namespace Rubberduck
                     splash.Refresh();
                 }
 
-#if DEBUG
-                SetAddInObject();
-#endif
                 Startup();
             }
             catch (Win32Exception)
@@ -250,6 +247,8 @@ namespace Rubberduck
                 currentDomain.AssemblyResolve += LoadFromSameFolder;
 
                 _container = new WindsorContainer().Install(new RubberduckIoCInstaller(_vbe, _addin, _initialSettings, _vbeNativeApi, _beepInterceptor));
+                SetAddInObject();
+
                 _container.Resolve<InstanceProvider>();
                 _app = _container.Resolve<App>();
                 _app.Startup();

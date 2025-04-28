@@ -17,10 +17,9 @@ namespace Rubberduck.UnitTesting
         bool CanRun { get; }
         bool CanRepeatLastRun { get; }
 
-        HeadlessTestOutput RunHeadless(IEnumerable<TestMethod> tests);
+        HeadlessTestOutput RunHeadless();
 
         void Run(IEnumerable<TestMethod> tests);
-        string RunWithResults(IEnumerable<TestMethod> tests);
         void RunByOutcome(TestOutcome outcome);
         void RepeatLastRun();
         void RequestCancellation();

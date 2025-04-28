@@ -1,6 +1,7 @@
 ﻿using Castle.Windsor;
 using Extensibility;
 using NLog;
+using Rubberduck.ComClientLibrary.CI;
 using Rubberduck.Common.WinAPI;
 using Rubberduck.Resources;
 using Rubberduck.Resources.Registration;
@@ -75,8 +76,6 @@ namespace Rubberduck
                 VbeProvider.Initialize(_vbe, _vbeNativeApi, _beepInterceptor);
                 VbeNativeServices.HookEvents(_vbe);
 
-                SetAddInObject();
-
                 switch (ConnectMode)
                 {
                     case ext_ConnectMode.ext_cm_Startup:
@@ -93,10 +92,23 @@ namespace Rubberduck
                 Console.WriteLine(e);
             }
         }
+
         private void SetAddInObject()
         {
-            // FOR DEBUGGING/DEVELOPMENT/CI PURPOSES, ALLOW ACCESS TO SOME VBETypeLibsAPI FEATURES FROM VBA
-            _addin.Object = new VBETypeLibsAPI_Object(_vbe, new TestEngineProvider(this));
+            //SetTypeLibsAddInObject();
+            SetRubberduckCIAddInObject();
+        }
+
+        private void SetTypeLibsAddInObject()
+        {
+            // FOR DEBUGGING/DEVELOPMENT PURPOSES, ALLOW ACCESS TO SOME VBETypeLibsAPI FEATURES FROM VBA
+            _addin.Object = new VBETypeLibsAPI_Object(_vbe);
+
+        }
+
+        private void SetRubberduckCIAddInObject()
+        {
+            _addin.Object = _container.Resolve<IRubberduckCI>();
         }
 
         private Assembly LoadFromSameFolder(object sender, ResolveEventArgs args)
@@ -199,6 +211,9 @@ namespace Rubberduck
                     splash.Refresh();
                 }
 
+#if DEBUG
+                SetAddInObject();
+#endif
                 Startup();
             }
             catch (Win32Exception)

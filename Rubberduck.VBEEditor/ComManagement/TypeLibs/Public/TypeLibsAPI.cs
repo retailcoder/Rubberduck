@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using ComTypes = System.Runtime.InteropServices.ComTypes;
 
 // ReSharper disable once CheckNamespace
@@ -54,8 +55,6 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
         void DocumentAllSaveAs(string filePath);
         [DispId(11)]
         string TestGetCLRTypeFromVBAComponent(string projectName, string componentName, int inheritenceLevel = 0);
-        [DispId(12)]
-        string RunAllTestsAndGetResults(string filePath);
     }
 
     [
@@ -70,13 +69,11 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
     {
         private IVBE _ide;
         private readonly VBETypeLibsAPI _api;
-        private object _testEngineProvider;
 
-        public VBETypeLibsAPI_Object(IVBE ide, object testEngineProvider)
+        public VBETypeLibsAPI_Object(IVBE ide)
         {
             _ide = ide;
             _api = new VBETypeLibsAPI();
-            _testEngineProvider = testEngineProvider;
         }
 
         public bool CompileProject(string projectName)
@@ -103,8 +100,6 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
             => _api.DocumentAllSaveAs(_ide, filePath);
         public string TestGetCLRTypeFromVBAComponent(string projectName, string componentName, int inheritenceLevel = 0)
             => _api.TestGetCLRTypeFromVBAComponent(_ide, projectName, componentName, inheritenceLevel);
-        public string RunAllTestsAndGetResults(string filePath)
-            => _api.RunAllTestsAndGetResults(_testEngineProvider, filePath);
     }
 
     /// <summary>
@@ -1130,11 +1125,7 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
             }
         }
 
-        /// <summary>
-        /// Runs all unit tests and returns the results as a formatted string.
-        /// </summary>
-        /// <returns>A string containing the test results.</returns>
-        public string RunAllTestsAndGetResults(dynamic testEngineProvider, string logPath)
+        public Task RunAllTestsAsync(dynamic testEngineProvider, string logPath)
         {
             testEngineProvider.SetTestEngine();
             // We the test engine from the provider dynamically, since we can't get the type at compile time due to cyclic references
@@ -1146,24 +1137,23 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
             var runWithResultsMethod = testEngine.GetType().GetMethod("RunWithResults");
             if (runWithResultsMethod == null)
             {
-                return "Test engine does not support running tests with results.";
+                throw new InvalidOperationException("Test engine does not support running tests with results.");
             }
 
             var testsProperty = testEngine.GetType().GetProperty("Tests");
             if (testsProperty == null)
             {
-                return "Test engine does not have a Tests property.";
+                throw new InvalidOperationException("Test engine does not have a Tests property.");
             }
 
-            var task = Task.Run(() => {
+            return Task.Run(() =>
+            {
                 var output = runWithResultsMethod.Invoke(testEngine, new object[] { testsProperty.GetValue(testEngine) });
                 if (!string.IsNullOrEmpty(logPath))
                 {
                     FileSystemProvider.FileSystem.File.WriteAllText(logPath, output.ToString());
                 }
             });
-
-            return "Task started to run tests asynchronously. Check the log file for results.";
 
         }
 

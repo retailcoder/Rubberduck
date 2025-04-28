@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Path = System.IO.Path;
-using System.Runtime.ExceptionServices;
-using System.Windows.Forms;
 using Rubberduck.Interaction;
 using Rubberduck.InternalApi.Extensions;
 using Rubberduck.Navigation.CodeExplorer;
@@ -17,7 +11,12 @@ using Rubberduck.VBEditor.Extensions;
 using Rubberduck.VBEditor.SafeComWrappers;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using Rubberduck.VBEditor.Utility;
+using System;
+using System.Collections.Generic;
 using System.IO.Abstractions;
+using System.Linq;
+using System.Runtime.ExceptionServices;
+using System.Windows.Forms;
 
 namespace Rubberduck.UI.CodeExplorer.Commands
 {
@@ -106,7 +105,7 @@ namespace Rubberduck.UI.CodeExplorer.Commands
         private IVBProject TargetProjectFromParameter(object parameter)
         {
             var declaration = (parameter as CodeExplorerItemViewModel)?.Declaration;
-            return declaration != null 
+            return declaration != null
                 ? _projectsProvider.Project(declaration.ProjectId)
                 : null;
         }
@@ -133,7 +132,7 @@ namespace Rubberduck.UI.CodeExplorer.Commands
             foreach (var extractor in extractors)
             {
                 foreach (var componentType in extractor.SupportedComponentTypes)
-                { 
+                {
                     if (!dict.ContainsKey(componentType))
                     {
                         dict.Add(componentType, new List<IRequiredBinaryFilesFromFileNameExtractor>());
@@ -145,6 +144,8 @@ namespace Rubberduck.UI.CodeExplorer.Commands
 
             return dict;
         }
+
+        private IPath Path => _fileSystem.Path;
 
         protected virtual ICollection<string> FilesToImport(object parameter)
         {
@@ -191,7 +192,7 @@ namespace Rubberduck.UI.CodeExplorer.Commands
 
         private void ImportFilesWithSuspension(ICollection<string> filesToImport, IVBProject targetProject)
         {
-            var suspendResult = _parseManager.OnSuspendParser(this, new[] {ParserState.Ready}, () => ImportFiles(filesToImport, targetProject));
+            var suspendResult = _parseManager.OnSuspendParser(this, new[] { ParserState.Ready }, () => ImportFiles(filesToImport, targetProject));
             var suspendOutcome = suspendResult.Outcome;
             if (suspendOutcome != SuspensionOutcome.Completed)
             {
@@ -212,7 +213,7 @@ namespace Rubberduck.UI.CodeExplorer.Commands
 
             var moduleNames = ModuleNames(filesToImport);
 
-             if (!ValuesAreUnique(moduleNames))
+            if (!ValuesAreUnique(moduleNames))
             {
                 NotifyUserAboutAbortDueToDuplicateComponent(moduleNames);
                 return;
@@ -239,7 +240,7 @@ namespace Rubberduck.UI.CodeExplorer.Commands
                 return;
             }
 
-            if (!filesWithoutRequiredBinaryButWithPossibilityToImportToExistingComponent.All(filename => existingModules.ContainsKey(filename) 
+            if (!filesWithoutRequiredBinaryButWithPossibilityToImportToExistingComponent.All(filename => existingModules.ContainsKey(filename)
                                                                                                          && HasMatchingFileExtension(filename, existingModules[filename])))
             {
                 NotifyUserAboutAbortDueToNonExistingBinaryFileAndComponent(

@@ -9,7 +9,6 @@ using Rubberduck.Resources.UnitTesting;
 using Rubberduck.VBEditor.ComManagement;
 using Rubberduck.VBEditor.ComManagement.TypeLibs.Abstract;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
-using Rubberduck.InternalApi.Common;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -19,6 +18,47 @@ using System.Threading.Tasks;
 
 namespace Rubberduck.UnitTesting
 {
+    public interface IBlockingParseService
+    {
+        void Parse();
+    }
+
+    public class BlockingParseService
+    {
+        private readonly RubberduckParserState _state;
+        public BlockingParseService(RubberduckParserState state)
+        {
+            _state = state;
+        }
+
+        private TaskCompletionSource<bool> _parseCompletion = null;
+        public void Parse()
+        {
+            if (_parseCompletion != null)
+            {
+                throw new InvalidOperationException("Parse run already in progress.");
+            }
+
+            _parseCompletion = new TaskCompletionSource<bool>();
+
+            _state.StateChanged += HandleHeadlessParseCompletion;
+            _state.OnParseRequested(this);
+
+            _parseCompletion.Task.Wait();
+            _parseCompletion = null;
+        }
+
+        private void HandleHeadlessParseCompletion(object sender, ParserStateEventArgs args)
+        {
+            if (args.State == ParserState.Ready)
+            {
+                _state.StateChanged -= HandleHeadlessParseCompletion;
+                _parseCompletion.SetResult(true); // Signal that parsing is complete
+            }
+        }
+
+    }
+
     internal class TestEngine : ITestEngine
     {
         protected static readonly ParserState[] AllowedRunStates =
@@ -34,6 +74,7 @@ namespace Rubberduck.UnitTesting
         private readonly ITypeLibWrapperProvider _wrapperProvider;
         private readonly IUiDispatcher _uiDispatcher;
         private readonly IVBE _vbe;
+        private readonly IBlockingParseService _parser;
         private readonly IProjectsProvider _projectsProvider;
 
         private Dictionary<TestMethod, TestOutcome> _knownOutcomes = new Dictionary<TestMethod, TestOutcome>();
@@ -54,6 +95,7 @@ namespace Rubberduck.UnitTesting
 
         public TestEngine(
             RubberduckParserState state,
+            IBlockingParseService parser,
             IFakesFactory fakesFactory,
             IVBEInteraction declarationRunner,
             ITypeLibWrapperProvider wrapperProvider,
@@ -63,6 +105,7 @@ namespace Rubberduck.UnitTesting
         {
             Debug.WriteLine("TestEngine created.");
             _state = state;
+            _parser = parser;
             _fakesFactory = fakesFactory;
             _declarationRunner = declarationRunner;
             _wrapperProvider = wrapperProvider;
@@ -167,7 +210,7 @@ namespace Rubberduck.UnitTesting
             Log(LogLevel.Trace, $"Test completed: {test.Declaration.IdentifierName} ({result.Outcome})");
             if (_headless)
             {
-                _headlessOutput.Results.Add(HeadlessTestInfo.For(test, result));
+                _headlessOutput.Add(HeadlessTestInfo.For(test, result));
                 return;
             }
 
@@ -177,24 +220,6 @@ namespace Rubberduck.UnitTesting
             TestCompleted?.Invoke(this, new TestCompletedEventArgs(test, result));
             // This call is safe - OnTestCompleted cannot be called from outside RD's context.
             _uiDispatcher.FlushMessageQueue();
-        }
-
-        public HeadlessTestOutput RunHeadless(IEnumerable<TestMethod> tests)
-        {
-            if (!CanRun)
-            {
-                throw new InvalidOperationException("Cannot run tests in headless mode in the current state.");
-            }
-
-            Log(LogLevel.Trace, $"Headless test run is initializing.");
-
-            _headless = true;
-            _headlessOutput = new HeadlessTestOutput();
-
-            Run(tests);
-
-            _headless = false;
-            return _headlessOutput;
         }
 
         public void Run(IEnumerable<TestMethod> tests)
@@ -212,101 +237,57 @@ namespace Rubberduck.UnitTesting
                 RunInternal(queued);
             });
         }
-        public string RunWithResults(IEnumerable<TestMethod> tests)
+
+        public HeadlessTestOutput RunHeadless()
         {
-            if (tests == null)
+            Log(LogLevel.Trace, $"Headless test run is initializing.");
+
+            _headless = true;
+            _headlessOutput = new HeadlessTestOutput();
+
+            var tests = DiscoverTests();
+            RunHeadless(tests);
+
+            _headless = false;
+            return _headlessOutput;
+        }
+
+        private IEnumerable<TestMethod> DiscoverTests()
+        {
+            _parser.Parse();
+            return Tests;
+        }
+
+
+        private void RunHeadless(IEnumerable<TestMethod> tests)
+        {
+            if (!tests.Any())
             {
-                // Trigger the ParseRequest programmatically to make the Tests property available.
-                var parseCompletion = new TaskCompletionSource<bool>();
-                EventHandler<ParserStateEventArgs> parseCompletedHandler = null;
-
-                parseCompletedHandler = (sender, args) =>
-                {
-                    if (args.State == ParserState.Ready)
-                    {
-                        _state.StateChanged -= parseCompletedHandler; // Unsubscribe from the event
-                        parseCompletion.SetResult(true); // Signal that parsing is complete
-                    }
-                };
-
-                _state.StateChanged += parseCompletedHandler;
-                _state.OnParseRequested(this);
-
-                parseCompletion.Task.Wait();
-
-                tests = Tests;
+                return;
             }
 
             var queued = tests.ToList();
-            var results = new List<TestInfo>();
 
             foreach (var test in queued.Where(item => _knownOutcomes.ContainsKey(item)))
             {
                 _knownOutcomes.Remove(test);
             }
 
-            Task.Run(() =>
+            var suspensionResult = _state.OnSuspendParser(this, AllowedRunStates, () => RunWhileSuspended(tests));
+            switch (suspensionResult.Outcome)
             {
-                var suspensionResult = _state.OnSuspendParser(this, AllowedRunStates, () =>
-                {
-                    results.AddRange(RunWhileSuspendedWithResults<TestInfo>(tests));
-                });
-
-                switch (suspensionResult.Outcome)
-                {
-                    case SuspensionOutcome.Completed:
-                        break;
-                    case SuspensionOutcome.Canceled:
-                        Logger.Debug("Test execution canceled.");
-                        break;
-                    default:
-                        Logger.Warn($"Test execution failed with suspension outcome {suspensionResult.Outcome}.");
-                        if (suspensionResult.EncounteredException != null)
-                        {
-                            Logger.Error(suspensionResult.EncounteredException);
-                        }
-                        break;
-                }
-            }).GetAwaiter().GetResult(); // Ensure the task completes before returning results.
-
-            var resultBuilder = new StringLineBuilder();
-            foreach (var result in results)
-            {
-                // Get the TestName, but stop at the first \r\n to get only the signature
-                int index = result.TestName.IndexOf("\r\n");
-                var signature = index >= 0 ? result.TestName.Substring(0, index) : result.TestName;
-                resultBuilder.AppendLine($"{result.Result.Outcome}: {signature}");
-            }
-
-            return resultBuilder.ToString();
-        }
-
-        private IEnumerable<T> RunWhileSuspendedWithResults<T>(IEnumerable<TestMethod> tests)
-        {
-            var results = new List<T>();
-
-            var testTask = _uiDispatcher.StartTask(() =>
-            {
-                results.AddRange(RunWhileSuspendedOnUiThread<T>(tests));
-            });
-            testTask.Wait();
-
-            return results;
-        }
-
-        private T TestResultOrTestInfo<T>(TestMethod test, TestResult testResult)
-        {
-            if (typeof(T) == typeof(TestResult))
-            {
-                return (T)(object)testResult;
-            }
-            else if (typeof(T) == typeof(TestInfo))
-            {
-                return (T)(object)new TestInfo(test.TestCode, testResult);
-            }
-            else
-            {
-                throw new InvalidOperationException("Unsupported type for test result.");
+                case SuspensionOutcome.Completed:
+                    break;
+                case SuspensionOutcome.Canceled:
+                    Logger.Debug("Test run was canceled.");
+                    break;
+                default:
+                    Logger.Warn($"Test run failed with suspension outcome {suspensionResult.Outcome}.");
+                    if (suspensionResult.EncounteredException != null)
+                    {
+                        Logger.Error(suspensionResult.EncounteredException);
+                    }
+                    break;
             }
         }
 
@@ -385,16 +366,10 @@ namespace Rubberduck.UnitTesting
 
         private void RunWhileSuspendedOnUiThread(IEnumerable<TestMethod> tests)
         {
-            RunWhileSuspendedOnUiThread<TestInfo>(tests);
-        }
-
-        private IEnumerable<T> RunWhileSuspendedOnUiThread<T>(IEnumerable<TestMethod> tests) 
-        {
-            var results = new List<T>();
             var testMethods = tests as IList<TestMethod> ?? tests.ToList();
             if (!testMethods.Any())
             {
-                return results;
+                return;
             }
 
             _lastRun.Clear();
@@ -409,11 +384,9 @@ namespace Rubberduck.UnitTesting
                 foreach (var test in testMethods)
                 {
                     var testResult = new TestResult(TestOutcome.Failed, AssertMessages.Prerequisite_EarlyBindingReferenceMissing);
-                    var result = TestResultOrTestInfo<T>(test, testResult);
                     OnTestCompleted(test, testResult);
-                    results.Add(result);
                 }
-                return results;
+                return;
             }
 
             var overallTime = new Stopwatch();
@@ -444,7 +417,6 @@ namespace Rubberduck.UnitTesting
                             {
                                 var result = new TestResult(TestOutcome.Unknown, AssertMessages.TestRunner_ModuleInitializeFailure);
                                 OnTestCompleted(method, result);
-                                results.Add(TestResultOrTestInfo<T>(method, result));
                             }
                             continue;
                         }
@@ -457,7 +429,6 @@ namespace Rubberduck.UnitTesting
                             {
                                 var result = new TestResult(TestOutcome.Ignored);
                                 OnTestCompleted(test, result);
-                                results.Add(TestResultOrTestInfo<T>(test, result));
                                 continue;
                             }
 
@@ -491,7 +462,6 @@ namespace Rubberduck.UnitTesting
 
                                 // we can trigger this event, because cleanup can fail without affecting the result
                                 OnTestCompleted(test, result);
-                                results.Add(TestResultOrTestInfo<T>(test, result));
 
                                 RunTestCleanup(typeLibWrapper, testCleanup);
                             }
@@ -576,7 +546,7 @@ namespace Rubberduck.UnitTesting
         {
             if (_headless)
             {
-                _headlessOutput.Logs.Add($"{DateTime.UtcNow.ToShortTimeString()} \t{level.Name.ToUpperInvariant()} \t{message}");
+                _headlessOutput.Log($"{DateTime.UtcNow.ToShortTimeString()} \t{level.Name.ToUpperInvariant()} \t{message}");
             }
 
             if (level == LogLevel.Trace)
@@ -613,7 +583,7 @@ namespace Rubberduck.UnitTesting
         {
             if (_headless)
             {
-                _headlessOutput.Logs.Add($"{DateTime.UtcNow.ToShortTimeString()} \t{level.Name.ToUpperInvariant()} \t{exception.GetType().Name} was thrown. Message: {message ?? exception.Message}\n\t{exception}");
+                _headlessOutput.Log($"{DateTime.UtcNow.ToShortTimeString()} \t{level.Name.ToUpperInvariant()} \t{exception.GetType().Name} was thrown. Message: {message ?? exception.Message}\n\t{exception}");
             }
 
             if (level == LogLevel.Trace)

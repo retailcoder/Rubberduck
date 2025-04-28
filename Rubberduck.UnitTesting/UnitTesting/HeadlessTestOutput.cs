@@ -20,26 +20,32 @@ namespace Rubberduck.UnitTesting
         {
             return new HeadlessTestInfo
             {
-                ProjectName = test.Declaration.ProjectName;
-                ModuleName = test.Declaration.QualifiedModuleName.Name;
-                TestName = test.Declaration.IdentifierName;
+                ProjectName = test.Declaration.ProjectName,
+                ModuleName = test.Declaration.QualifiedModuleName.Name,
+                TestName = test.Declaration.IdentifierName,
 
-                Folder = test.Declaration.ParentDeclaration.CustomFolder;
-                Category = test.Category.Name;
-                IsIgnored = test.IsIgnored;
+                Folder = test.Declaration.ParentDeclaration.CustomFolder,
+                Category = test.Category.Name,
+                IsIgnored = test.IsIgnored,
 
-                MillisecondsElapsed = result.Duration;
-                Outcome = result.Outcome;
-                Message = result.Output;
+                MillisecondsElapsed = result.Duration,
+                Outcome = result.Outcome,
+                Message = result.Output,
             };
         }
     }
 
     public class HeadlessTestOutput
     {
-        public List<HeadlessTestInfo> Results { get; } = new List<HeadlessTestInfo>();
-        public List<string> Logs { get; } = new List<string>();
+        private readonly List<HeadlessTestInfo> _results = new List<HeadlessTestInfo>();
+        public HeadlessTestInfo[] Results => _results.ToArray();
+
+        private readonly List<string> _logs = new List<string>();
+        public string[] Logs => _logs.ToArray();
 
         public long MillisecondsElapsed { get; set; }
+
+        internal void Add(HeadlessTestInfo testInfo) => _results.Add(testInfo);
+        internal void Log(string message) => _logs.Add(message);
     }
 }

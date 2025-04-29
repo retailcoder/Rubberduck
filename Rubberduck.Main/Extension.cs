@@ -1,7 +1,6 @@
 ﻿using Castle.Windsor;
 using Extensibility;
 using NLog;
-using Rubberduck.ComClientLibrary.CI;
 using Rubberduck.Common.WinAPI;
 using Rubberduck.Resources;
 using Rubberduck.Resources.Registration;
@@ -68,7 +67,8 @@ namespace Rubberduck
             {
                 _vbe = RootComWrapperFactory.GetVbeWrapper(Application);
                 _addin = RootComWrapperFactory.GetAddInWrapper(AddInInst);
-                _addin.Object = this;
+                SetAddInObject();
+                //_addin.Object = this;
 
                 _vbeNativeApi = new VbeNativeApiAccessor();
                 _beepInterceptor = new BeepInterceptor(_vbeNativeApi);
@@ -95,20 +95,8 @@ namespace Rubberduck
 
         private void SetAddInObject()
         {
-            //SetTypeLibsAddInObject();
-            SetRubberduckCIAddInObject();
-        }
-
-        private void SetTypeLibsAddInObject()
-        {
             // FOR DEBUGGING/DEVELOPMENT PURPOSES, ALLOW ACCESS TO SOME VBETypeLibsAPI FEATURES FROM VBA
-            _addin.Object = new VBETypeLibsAPI_Object(_vbe);
-
-        }
-
-        private void SetRubberduckCIAddInObject()
-        {
-            _addin.Object = _container.Resolve<IRubberduckCI>();
+            _addin.Object = new VBETypeLibsAPI_Object(_vbe, () => _container.Resolve<IRubberduckCI>());
         }
 
         private Assembly LoadFromSameFolder(object sender, ResolveEventArgs args)
@@ -247,7 +235,6 @@ namespace Rubberduck
                 currentDomain.AssemblyResolve += LoadFromSameFolder;
 
                 _container = new WindsorContainer().Install(new RubberduckIoCInstaller(_vbe, _addin, _initialSettings, _vbeNativeApi, _beepInterceptor));
-                SetAddInObject();
 
                 _container.Resolve<InstanceProvider>();
                 _app = _container.Resolve<App>();

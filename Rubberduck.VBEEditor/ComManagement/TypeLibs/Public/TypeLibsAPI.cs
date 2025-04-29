@@ -14,6 +14,120 @@ using ComTypes = System.Runtime.InteropServices.ComTypes;
 // ReSharper disable once CheckNamespace
 namespace Rubberduck.VBEditor.ComManagement.TypeLibs
 {
+    [
+        ComVisible(true),
+        Guid(RubberduckGuid.RubberduckInspectionResultInterfaceGuid),
+        InterfaceType(ComInterfaceType.InterfaceIsDual),
+        EditorBrowsable(EditorBrowsableState.Always)
+    ]
+    public interface ICodeInspectionResult
+    {
+        [DispId(1)]
+        string Inspection { get; }
+
+        [DispId(2)]
+        string Description { get; }
+
+        [DispId(3)]
+        string ProjectName { get; }
+
+        [DispId(4)]
+        string ModuleName { get; }
+
+        [DispId(5)]
+        string Location { get; }
+    }
+
+
+    [
+        ComVisible(true),
+        Guid(RubberduckGuid.RubberduckInspectionResultsInterfaceGuid),
+        InterfaceType(ComInterfaceType.InterfaceIsDual),
+        EditorBrowsable(EditorBrowsableState.Always)
+    ]
+    public interface ICodeInspectionResults
+    {
+        [DispId(1)]
+        ICodeInspectionResult[] InspectionResults { get; }
+    }
+
+    [
+        ComVisible(true),
+        Guid(RubberduckGuid.RubberduckTestInfoInterfaceGuid),
+        InterfaceType(ComInterfaceType.InterfaceIsDual),
+        EditorBrowsable(EditorBrowsableState.Always)
+    ]
+    public interface ITestInfo
+    {
+
+        [DispId(1)]
+        string ProjectName { get; set; }
+
+        [DispId(2)]
+        string ModuleName { get; set; }
+
+        [DispId(3)]
+        string TestName { get; set; }
+
+
+        [DispId(4)]
+        string Folder { get; set; }
+
+        [DispId(5)]
+        string Category { get; set; }
+
+        [DispId(6)]
+        bool IsIgnored { get; set; }
+
+
+        [DispId(7)]
+        long MillisecondsElapsed { get; set; }
+
+
+        [DispId(8)]
+        string Outcome { get; set; }
+
+        [DispId(9)]
+        string Message { get; set; }
+    }
+
+    [
+        ComVisible(true),
+        Guid(RubberduckGuid.RubberduckTestOutputInterfaceGuid),
+        InterfaceType(ComInterfaceType.InterfaceIsDual),
+        EditorBrowsable(EditorBrowsableState.Always)
+    ]
+    public interface ITestOutput
+    {
+        [DispId(1)]
+        ITestInfo[] Results { get; }
+
+        [DispId(2)]
+        string[] Logs { get; }
+
+        [DispId(3)]
+        long MillisecondsElapsed { get; set; }
+    }
+
+    [
+        ComVisible(true),
+        Guid(RubberduckGuid.RubberduckCIInterfaceGuid),
+        InterfaceType(ComInterfaceType.InterfaceIsDual),
+        EditorBrowsable(EditorBrowsableState.Always)
+    ]
+    public interface IRubberduckCI
+    {
+        [DispId(1)]
+        void ImportSourceFiles(string path);
+
+        [DispId(2)]
+        ITestOutput RunAllTests();
+
+        [DispId(3)]
+        ICodeInspectionResults RunInspections();
+    }
+
+
     /// <summary>
     /// FOR DEBUGGING/DEVELOPMENT/CLI PURPOSES, ALLOW ACCESS TO SOME VBETypeLibsAPI FEATURES FROM VBA
     /// </summary>
@@ -35,8 +149,10 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
         bool CompileProject(string projectName);
         [DispId(2)]
         bool CompileComponent(string projectName, string componentName);
+#if DEBUG
         [DispId(3)]
         object ExecuteCode(string projectName, string standardModuleName, string procName);
+#endif
         [DispId(4)]
         string GetProjectConditionalCompilationArgsRaw(string projectName);
         [DispId(5)]
@@ -55,6 +171,9 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
         void DocumentAllSaveAs(string filePath);
         [DispId(11)]
         string TestGetCLRTypeFromVBAComponent(string projectName, string componentName, int inheritenceLevel = 0);
+
+        [DispId(12)]
+        IRubberduckCI RubberduckCI { get; }
     }
 
     [
@@ -69,11 +188,13 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
     {
         private IVBE _ide;
         private readonly VBETypeLibsAPI _api;
+        private readonly Func<IRubberduckCI> _serviceProvider;
 
-        public VBETypeLibsAPI_Object(IVBE ide)
+        public VBETypeLibsAPI_Object(IVBE ide, Func<IRubberduckCI> serviceProvider)
         {
             _ide = ide;
             _api = new VBETypeLibsAPI();
+            _serviceProvider = serviceProvider;
         }
 
         public bool CompileProject(string projectName)
@@ -100,6 +221,9 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
             => _api.DocumentAllSaveAs(_ide, filePath);
         public string TestGetCLRTypeFromVBAComponent(string projectName, string componentName, int inheritenceLevel = 0)
             => _api.TestGetCLRTypeFromVBAComponent(_ide, projectName, componentName, inheritenceLevel);
+
+        private IRubberduckCI _ci;
+        public IRubberduckCI RubberduckCI => _ci ?? (_ci = _serviceProvider.Invoke());
     }
 
     /// <summary>

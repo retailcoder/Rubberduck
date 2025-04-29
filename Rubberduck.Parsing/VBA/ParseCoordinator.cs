@@ -1,20 +1,25 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Rubberduck.Parsing.Symbols;
-using Rubberduck.VBEditor;
-using System.Diagnostics;
-using System.Linq;
-using NLog;
+﻿using NLog;
 using Rubberduck.InternalApi.Extensions;
 using Rubberduck.Parsing.Rewriter;
+using Rubberduck.Parsing.Symbols;
 using Rubberduck.Parsing.VBA.Extensions;
+using Rubberduck.VBEditor;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rubberduck.Parsing.VBA
 {
+    public class ParseRequestedEventArgs : EventArgs
+    {
+        public Task Task { get; set; }
+    }
+
     /// <remarks>
     /// Note that for unit tests, TestParseCoodrinator is used in its place
     /// to support synchronous parse from BeginParse.
@@ -90,7 +95,7 @@ namespace Rubberduck.Parsing.VBA
         protected readonly object SuspendStackSyncObject = new object();
         protected readonly ReaderWriterLockSlim ParsingSuspendLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
 
-        private void ReparseRequested(object sender, EventArgs e)
+        private void ReparseRequested(object sender, ParseRequestedEventArgs e)
         {
             lock (SuspendStackSyncObject)
             {
@@ -101,7 +106,7 @@ namespace Rubberduck.Parsing.VBA
                 }
             }
 
-            BeginParse(sender);
+            e.Task = BeginParse(sender);
         }
 
         private void ParseCancellationRequested(object requestor, EventArgs e)
@@ -205,9 +210,9 @@ namespace Rubberduck.Parsing.VBA
         /// Overriden in the unit test project to facilicate synchronous unit tests
         /// Refer to TestParserCoordinator class in the unit test project.
         /// </remarks>
-        public virtual void BeginParse(object sender)
+        public virtual Task BeginParse(object sender)
         {
-            Task.Run(() => ParseAll(sender));
+            return Task.Run(() => ParseAll(sender));
         }
 
         private void Cancel(bool createNewTokenSource = true)
@@ -257,7 +262,7 @@ namespace Rubberduck.Parsing.VBA
                 RefreshDeclarationFinder();
             }
             if (_parsingStageService.LastLoadOfBuiltInDeclarationsLoadedDeclarations || newProjectIds.Any())
-            { 
+            {
                 RefreshDeclarationFinder();
             }
             token.ThrowIfCancellationRequested();
@@ -461,10 +466,10 @@ namespace Rubberduck.Parsing.VBA
                     token = CurrentCancellationTokenSource.Token;
                 }
                 Monitor.Enter(ParsingRunSyncObject, ref lockTaken);
-                
+
                 watch = Stopwatch.StartNew();
                 Logger.Debug("Parsing run started on thread {0}.", Thread.CurrentThread.ManagedThreadId);
-                
+
                 ParseAllInternal(requestor, token);
             }
             catch (OperationCanceledException)
@@ -521,14 +526,14 @@ namespace Rubberduck.Parsing.VBA
             toParse.UnionWith(modules.Where(module => _parserStateManager.GetModuleState(module) != ParserState.Ready));
             token.ThrowIfCancellationRequested();
 
-            _parsingCacheService.ReloadCompilationArguments(projectIds);
+            //_parsingCacheService.ReloadCompilationArguments(projectIds);
             token.ThrowIfCancellationRequested();
 
             lock (_changeCacheLockObject)
             {
                 _projectsWithChangedCompilationArguments.UnionWith(_parsingCacheService.ProjectWhoseCompilationArgumentsChanged());
                 toParse.UnionWith(ModulesInProjects(_projectsWithChangedCompilationArguments));
-            }          
+            }
             token.ThrowIfCancellationRequested();
 
             toParse = toParse.Where(module => module.IsParsable).ToHashSet();

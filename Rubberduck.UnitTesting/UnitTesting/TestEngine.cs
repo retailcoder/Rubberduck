@@ -18,47 +18,6 @@ using System.Threading.Tasks;
 
 namespace Rubberduck.UnitTesting
 {
-    public interface IBlockingParseService
-    {
-        void Parse();
-    }
-
-    public class BlockingParseService : IBlockingParseService
-    {
-        private readonly RubberduckParserState _state;
-        public BlockingParseService(RubberduckParserState state)
-        {
-            _state = state;
-        }
-
-        private TaskCompletionSource<bool> _parseCompletion = null;
-        public void Parse()
-        {
-            if (_parseCompletion != null)
-            {
-                throw new InvalidOperationException("Parse run already in progress.");
-            }
-
-            _parseCompletion = new TaskCompletionSource<bool>();
-
-            _state.StateChanged += HandleHeadlessParseCompletion;
-            _state.OnParseRequested(this);
-
-            _parseCompletion.Task.Wait();
-            _parseCompletion = null;
-        }
-
-        private void HandleHeadlessParseCompletion(object sender, ParserStateEventArgs args)
-        {
-            if (args.State == ParserState.Ready)
-            {
-                _state.StateChanged -= HandleHeadlessParseCompletion;
-                _parseCompletion.SetResult(true); // Signal that parsing is complete
-            }
-        }
-
-    }
-
     internal class TestEngine : ITestEngine
     {
         protected static readonly ParserState[] AllowedRunStates =
@@ -74,7 +33,6 @@ namespace Rubberduck.UnitTesting
         private readonly ITypeLibWrapperProvider _wrapperProvider;
         private readonly IUiDispatcher _uiDispatcher;
         private readonly IVBE _vbe;
-        private readonly IBlockingParseService _parser;
         private readonly IProjectsProvider _projectsProvider;
 
         private Dictionary<TestMethod, TestOutcome> _knownOutcomes = new Dictionary<TestMethod, TestOutcome>();
@@ -95,7 +53,6 @@ namespace Rubberduck.UnitTesting
 
         public TestEngine(
             RubberduckParserState state,
-            IBlockingParseService parser,
             IFakesFactory fakesFactory,
             IVBEInteraction declarationRunner,
             ITypeLibWrapperProvider wrapperProvider,
@@ -105,7 +62,6 @@ namespace Rubberduck.UnitTesting
         {
             Debug.WriteLine("TestEngine created.");
             _state = state;
-            _parser = parser;
             _fakesFactory = fakesFactory;
             _declarationRunner = declarationRunner;
             _wrapperProvider = wrapperProvider;
@@ -129,7 +85,8 @@ namespace Rubberduck.UnitTesting
                 _listening = true;
             }
             // CanRun returned true already, only refresh tests if we're not backed off
-            else if (_listening && e.OldState != ParserState.Busy)
+
+            else if (AllowedRunStates.Contains(_state.Status) && _listening && e.OldState != ParserState.Busy)
             {
                 _listening = false;
                 var updates = TestDiscovery.GetAllTests(_state).ToList();
@@ -231,11 +188,19 @@ namespace Rubberduck.UnitTesting
                 _knownOutcomes.Remove(test);
             }
 
-            _uiDispatcher.InvokeAsync(() =>
+            if (_headless)
             {
                 OnTestRunStarted(queued);
                 RunInternal(queued);
-            });
+            }
+            else
+            {
+                _uiDispatcher.InvokeAsync(() =>
+                {
+                    OnTestRunStarted(queued);
+                    RunInternal(queued);
+                });
+            }
         }
 
         public HeadlessTestOutput RunHeadless()
@@ -243,18 +208,22 @@ namespace Rubberduck.UnitTesting
             Log(LogLevel.Trace, $"Headless test run is initializing.");
 
             _headless = true;
+            _uiDispatcher.EnableDispatch = false;
             _headlessOutput = new HeadlessTestOutput();
 
             var tests = DiscoverTests();
             RunHeadless(tests);
 
             _headless = false;
+            _uiDispatcher.EnableDispatch = true;
             return _headlessOutput;
         }
 
         private IEnumerable<TestMethod> DiscoverTests()
         {
-            _parser.Parse();
+            var task = _state.OnParseRequested(this);
+            task.ConfigureAwait(false).GetAwaiter().GetResult(); // .Wait() will absolutely deadlock
+
             return Tests;
         }
 
@@ -263,6 +232,7 @@ namespace Rubberduck.UnitTesting
         {
             if (!tests.Any())
             {
+                Logger.Warn($"Test run has no tests to run.");
                 return;
             }
 
@@ -358,6 +328,7 @@ namespace Rubberduck.UnitTesting
 
         protected void RunWhileSuspended(IEnumerable<TestMethod> tests)
         {
+            _uiDispatcher.EnableDispatch = true;
             //Running the tests has to be done on the UI thread, so we push the task to it from within suspension of the parser.
             //We have to wait for the completion to make sure that the suspension only ends after tests have been completed.
             var testTask = _uiDispatcher.StartTask(() => RunWhileSuspendedOnUiThread(tests));

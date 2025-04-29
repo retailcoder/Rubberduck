@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Rubberduck.VBEditor.Utility;
+using Rubberduck.VBEditor.WindowsApi;
+using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Rubberduck.VBEditor.Utility;
-using Rubberduck.VBEditor.WindowsApi;
 
 namespace Rubberduck.Parsing.UIContext
 {
@@ -18,17 +18,32 @@ namespace Rubberduck.Parsing.UIContext
             _contextProvider = contextProvider;
         }
 
+        private static bool _dispatch = true;
+        public bool EnableDispatch
+        {
+            get { return _dispatch; }
+            set { _dispatch = value; }
+        }
+
         /// <inheritdoc />
         public void InvokeAsync(Action action)
         {
-            CheckInitialization();
+            if (!EnableDispatch)
+            {
+                return;
+            }
 
+            CheckInitialization();
             _contextProvider.UiContext.Post(x => action(), null);
         }
 
         /// <inheritdoc />
         public void Invoke(Action action)
         {
+            if (!EnableDispatch)
+            {
+                return;
+            }
             CheckInitialization();
 
             if (_contextProvider.UiContext == SynchronizationContext.Current)
@@ -124,6 +139,10 @@ namespace Rubberduck.Parsing.UIContext
         /// <inheritdoc />
         public Task StartTask(Action action, CancellationToken token, TaskCreationOptions options = TaskCreationOptions.None)
         {
+            if (!EnableDispatch)
+            {
+                return Task.CompletedTask;
+            }
             CheckInitialization();
 
             if (_contextProvider.UiContext == SynchronizationContext.Current)
@@ -145,6 +164,11 @@ namespace Rubberduck.Parsing.UIContext
         /// <inheritdoc />
         public Task<T> StartTask<T>(Func<T> func, CancellationToken token, TaskCreationOptions options = TaskCreationOptions.None)
         {
+            if (!EnableDispatch)
+            {
+                return Task.FromResult(default(T));
+            }
+
             CheckInitialization();
 
             if (_contextProvider.UiContext == SynchronizationContext.Current)

@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Rubberduck.Parsing.Rewriter;
+using System;
 using System.Threading;
-using Rubberduck.Parsing.Rewriter;
+using System.Threading.Tasks;
 
 namespace Rubberduck.Parsing.VBA
 {
@@ -12,19 +13,20 @@ namespace Rubberduck.Parsing.VBA
             IParsingCacheService parsingCacheService,
             IProjectManager projectManager,
             IParserStateManager parserStateManager,
-            IRewritingManager rewritingManager = null) 
-        :base(
+            IRewritingManager rewritingManager = null)
+        : base(
             state,
             parsingStageService,
             parsingCacheService,
             projectManager,
             parserStateManager,
             rewritingManager)
-        {}
+        { }
 
-        public override void BeginParse(object sender)
+        public override Task BeginParse(object sender)
         {
             ParseInternal(CurrentCancellationTokenSource.Token);
+            return Task.CompletedTask;
         }
 
         public void Parse(CancellationTokenSource token)

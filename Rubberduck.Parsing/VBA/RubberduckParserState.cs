@@ -1,3 +1,18 @@
+using Antlr4.Runtime;
+using Antlr4.Runtime.Tree;
+using NLog;
+using Rubberduck.Parsing.Annotations;
+using Rubberduck.Parsing.Symbols;
+using Rubberduck.Parsing.VBA.DeclarationCaching;
+using Rubberduck.Parsing.VBA.Parsing;
+using Rubberduck.Parsing.VBA.Parsing.ParsingExceptions;
+using Rubberduck.Parsing.VBA.ReferenceManagement;
+using Rubberduck.VBEditor;
+using Rubberduck.VBEditor.ComManagement;
+using Rubberduck.VBEditor.Events;
+using Rubberduck.VBEditor.Extensions;
+using Rubberduck.VBEditor.SafeComWrappers;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -6,21 +21,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Antlr4.Runtime;
-using Antlr4.Runtime.Tree;
-using Rubberduck.Parsing.Symbols;
-using Rubberduck.VBEditor;
-using Rubberduck.Parsing.Annotations;
-using NLog;
-using Rubberduck.Parsing.VBA.Parsing;
-using Rubberduck.VBEditor.ComManagement;
-using Rubberduck.VBEditor.Events;
-using Rubberduck.VBEditor.SafeComWrappers;
-using Rubberduck.VBEditor.SafeComWrappers.Abstract;
-using Rubberduck.Parsing.VBA.DeclarationCaching;
-using Rubberduck.Parsing.VBA.Parsing.ParsingExceptions;
-using Rubberduck.Parsing.VBA.ReferenceManagement;
-using Rubberduck.VBEditor.Extensions;
+using System.Threading.Tasks;
 
 // ReSharper disable LoopCanBeConvertedToQuery
 
@@ -96,7 +97,7 @@ namespace Rubberduck.Parsing.VBA
         private readonly ConcurrentDictionary<QualifiedModuleName, ModuleState> _moduleStates =
             new ConcurrentDictionary<QualifiedModuleName, ModuleState>();
 
-        public event EventHandler<EventArgs> ParseRequest;
+        public event EventHandler<ParseRequestedEventArgs> ParseRequest;
         public event EventHandler<EventArgs> ParseCancellationRequested;
         public event EventHandler<RubberduckStatusSuspendParserEventArgs> SuspendRequest;
         public event EventHandler<RubberduckStatusMessageEventArgs> StatusMessageUpdate;
@@ -123,7 +124,7 @@ namespace Rubberduck.Parsing.VBA
             _projectRepository = projectRepository ?? throw new ArgumentException(nameof(projectRepository));
             _declarationFinderFactory = declarationFinderFactory ?? throw new ArgumentNullException(nameof(declarationFinderFactory));
             _vbeEvents = vbeEvents ?? throw new ArgumentNullException(nameof(vbeEvents));
-            
+
             var values = Enum.GetValues(typeof(ParserState));
             foreach (var value in values)
             {
@@ -140,8 +141,8 @@ namespace Rubberduck.Parsing.VBA
         {
             var oldDeclarationFinder = DeclarationFinder;
             DeclarationFinder = _declarationFinderFactory.Create(
-                AllDeclarationsFromModuleStates, 
-                AllAnnotations, 
+                AllDeclarationsFromModuleStates,
+                AllAnnotations,
                 AllLogicalLines,
                 AllFailedResolutionsFromModuleStates,
                 host);
@@ -189,7 +190,7 @@ namespace Rubberduck.Parsing.VBA
             {
                 return;
             }
-            
+
             Debug.Assert(e.ProjectId != null);
             DisposeProjectDeclarations(e.ProjectId);
 
@@ -303,7 +304,7 @@ namespace Rubberduck.Parsing.VBA
         /// declarations referencing the project by the old ID.
         /// </summary>
         public void RefreshProjects() => _projectRepository.Refresh();
-        
+
 
         private void RefreshProject(string projectId)
         {
@@ -432,7 +433,7 @@ namespace Rubberduck.Parsing.VBA
         }
 
         private IVBProject GetProject(string projectId) => _projectRepository.Project(projectId);
-        
+
 
         public void EvaluateParserState(CancellationToken token)
         {
@@ -529,7 +530,7 @@ namespace Rubberduck.Parsing.VBA
             }
 
             DebugParserState(state, stateCounts);
-            
+
             return result;
         }
 
@@ -540,7 +541,7 @@ namespace Rubberduck.Parsing.VBA
             {
                 for (var i = 0; i < stateCounts.Length; i++)
                 {
-                    if (i == (int) ParserState.Ready || i == (int) ParserState.None)
+                    if (i == (int)ParserState.Ready || i == (int)ParserState.None)
                     {
                         continue;
                     }
@@ -632,7 +633,7 @@ namespace Rubberduck.Parsing.VBA
 
         public void SetModuleComments(QualifiedModuleName module, IEnumerable<CommentNode> comments) =>
             _moduleStates[module].SetComments(new List<CommentNode>(comments));
-        
+
 
         public IReadOnlyCollection<CommentNode> GetModuleComments(QualifiedModuleName module)
         {
@@ -713,7 +714,7 @@ namespace Rubberduck.Parsing.VBA
         }
 
         private bool ThereAreDeclarations() => _moduleStates.Values.Any(state => state.Declarations != null && state.Declarations.Any());
-        
+
 
         /// <summary>
         /// Gets a copy of the failed resolution stores directly from the module states. (Used for refreshing the DeclarationFinder.)
@@ -880,9 +881,9 @@ namespace Rubberduck.Parsing.VBA
             get
             {
                 var parseTrees = new List<KeyValuePair<QualifiedModuleName, IParseTree>>();
-                foreach(var state in _moduleStates)
+                foreach (var state in _moduleStates)
                 {
-                    if(state.Value.AttributesPassParseTree != null)
+                    if (state.Value.AttributesPassParseTree != null)
                     {
                         parseTrees.Add(new KeyValuePair<QualifiedModuleName, IParseTree>(state.Key, state.Value.AttributesPassParseTree));
                     }
@@ -918,13 +919,13 @@ namespace Rubberduck.Parsing.VBA
                     using (var components = project.VBComponents)
                     {
                         foreach (var component in components)
-                        using (component)
-                        {
-                            if (IsNewOrModified(component))
+                            using (component)
                             {
-                                return true;
+                                if (IsNewOrModified(component))
+                                {
+                                    return true;
+                                }
                             }
-                        }
                     }
                 }
                 catch (COMException)
@@ -957,14 +958,18 @@ namespace Rubberduck.Parsing.VBA
         }
 
         /// <inheritdoc />
-        public void OnParseRequested(object requestor)
+        public Task OnParseRequested(object requestor)
         {
             var handler = ParseRequest;
             if (handler != null && IsEnabled)
             {
-                var args = EventArgs.Empty;
+                var args = new ParseRequestedEventArgs();
                 handler.Invoke(requestor, args);
+
+                return args.Task;
             }
+
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc />
@@ -1051,16 +1056,16 @@ namespace Rubberduck.Parsing.VBA
             }
             else
             {
-                Logger.Warn("Could not remove declarations for removed reference '{0}' ({1}).", moduleOrProject.Name, moduleOrProject.ProjectId); 
+                Logger.Warn("Could not remove declarations for removed reference '{0}' ({1}).", moduleOrProject.Name, moduleOrProject.ProjectId);
             }
         }
-        
+
         private void ClearAsTypeDeclarationPointingToReference(QualifiedModuleName referencedProject)
         {
             var toClearAsTypeDeclaration = DeclarationFinder
                                             .FindDeclarationsWithNonBaseAsType()
                                             .Where(decl => decl.QualifiedName.QualifiedModuleName == referencedProject);
-            foreach(var declaration in toClearAsTypeDeclaration)
+            foreach (var declaration in toClearAsTypeDeclaration)
             {
                 declaration.AsTypeDeclaration = null;
             }

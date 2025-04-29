@@ -100,7 +100,22 @@
         public const string DebugAddinObjectInterfaceGuid = DebugGuidspace + "23" + GuidSuffix;
         public const string DebugAddinObjectClassGuid = DebugGuidspace + "24" + GuidSuffix;
 
-        public const string RubberduckCIInterfaceGuid = DebugGuidspace + "25" + GuidSuffix;
-        public const string RubberduckCIClassGuid = DebugGuidspace + "26" + GuidSuffix;
+        // RubberduckCI Guids:
+        private const string RubberduckCIGuidspace = "69C1CD";
+
+        public const string RubberduckCIInterfaceGuid = RubberduckCIGuidspace + "20" + GuidSuffix;
+        public const string RubberduckCIClassGuid = RubberduckCIGuidspace + "21" + GuidSuffix;
+
+        public const string RubberduckTestOutputInterfaceGuid = RubberduckCIGuidspace + "22" + GuidSuffix;
+        public const string RubberduckTestOutputClassGuid = RubberduckCIGuidspace + "23" + GuidSuffix;
+
+        public const string RubberduckTestInfoInterfaceGuid = RubberduckCIGuidspace + "24" + GuidSuffix;
+        public const string RubberduckTestInfoClassGuid = RubberduckCIGuidspace + "25" + GuidSuffix;
+
+        public const string RubberduckInspectionResultsInterfaceGuid = RubberduckCIGuidspace + "26" + GuidSuffix;
+        public const string RubberduckInspectionResultsClassGuid = RubberduckCIGuidspace + "27" + GuidSuffix;
+
+        public const string RubberduckInspectionResultInterfaceGuid = RubberduckCIGuidspace + "28" + GuidSuffix;
+        public const string RubberduckInspectionResultClassGuid = RubberduckCIGuidspace + "29" + GuidSuffix;
     }
 }

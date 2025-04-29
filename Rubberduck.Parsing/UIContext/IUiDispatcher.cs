@@ -7,6 +7,8 @@ namespace Rubberduck.Parsing.UIContext
 {
     public interface IUiDispatcher
     {
+        bool EnableDispatch { get; set; }
+
         /// <summary>
         /// Invokes an action asynchronously on the UI thread.
         /// </summary>

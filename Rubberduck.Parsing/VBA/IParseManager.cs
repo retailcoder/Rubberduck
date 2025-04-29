@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Rubberduck.VBEditor;
+using System;
 using System.Collections.Generic;
-using Rubberduck.VBEditor;
+using System.Threading.Tasks;
 
 namespace Rubberduck.Parsing.VBA
 {
@@ -10,7 +11,7 @@ namespace Rubberduck.Parsing.VBA
         /// Requests reparse.
         /// </summary>
         /// <param name="requestor">The object requesting a reparse.</param>
-        void OnParseRequested(object requestor);
+        Task OnParseRequested(object requestor);
 
         /// <summary>
         /// Requests cancellation of the current parse.

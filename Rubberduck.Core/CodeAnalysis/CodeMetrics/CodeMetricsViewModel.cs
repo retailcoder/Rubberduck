@@ -1,13 +1,13 @@
-﻿using Rubberduck.Parsing.Symbols;
+﻿using Rubberduck.Navigation.CodeExplorer;
+using Rubberduck.Parsing.Symbols;
+using Rubberduck.Parsing.UIContext;
 using Rubberduck.Parsing.VBA;
 using Rubberduck.UI;
+using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using System;
-using System.Linq;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using Rubberduck.Navigation.CodeExplorer;
-using Rubberduck.Parsing.UIContext;
-using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using System.Linq;
 
 namespace Rubberduck.CodeAnalysis.CodeMetrics
 {
@@ -19,8 +19,8 @@ namespace Rubberduck.CodeAnalysis.CodeMetrics
         private readonly IUiDispatcher _uiDispatcher;
 
         public CodeMetricsViewModel(
-            RubberduckParserState state, 
-            ICodeMetricsAnalyst analyst, 
+            RubberduckParserState state,
+            ICodeMetricsAnalyst analyst,
             IVBE vbe,
             IUiDispatcher uiDispatcher)
         {
@@ -84,10 +84,10 @@ namespace Rubberduck.CodeAnalysis.CodeMetrics
 
                 foreach (var project in adding)
                 {
-                    var model = new CodeExplorerProjectViewModel(project, ref updates, _state, _vbe, _state.ProjectsProvider,false);
+                    var model = new CodeExplorerProjectViewModel(project, ref updates, _state, _vbe, _state.ProjectsProvider, false);
                     Projects.Add(model);
                 }
-            }).Wait();
+            }).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         private ICodeExplorerNode _selectedItem;

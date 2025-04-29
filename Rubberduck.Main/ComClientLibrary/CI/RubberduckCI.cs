@@ -1,49 +1,69 @@
 ﻿using Rubberduck.CodeAnalysis.Inspections;
-using Rubberduck.CodeAnalysis.Settings;
+using Rubberduck.Parsing.UIContext;
 using Rubberduck.Parsing.VBA;
+using Rubberduck.Resources.Registration;
 using Rubberduck.UnitTesting;
+using Rubberduck.VBEditor.ComManagement.TypeLibs;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Rubberduck.ComClientLibrary.CI
 {
     public interface IHeadlessInspector
     {
-        HeadlessCodeInspectionResults RunHeadless();
+        HeadlessInspectionResults RunHeadless();
     }
 
     public class HeadlessInspector : IHeadlessInspector
     {
         private readonly RubberduckParserState _state;
-        private readonly IBlockingParseService _parser;
         private readonly IInspector _inspector;
+        private readonly IUiDispatcher _uiDispatcher;
 
-        public HeadlessInspector(RubberduckParserState state, IBlockingParseService parser, IInspector inspector)
+        public HeadlessInspector(RubberduckParserState state, IInspector inspector, IUiDispatcher uiDispatcher)
         {
             _state = state;
-            _parser = parser;
             _inspector = inspector;
+            _uiDispatcher = uiDispatcher;
         }
 
-        public HeadlessCodeInspectionResults RunHeadless()
+        public HeadlessInspectionResults RunHeadless()
         {
-            _parser.Parse();
-            var results = _inspector.FindIssuesAsync(_state, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+            var task = _state.OnParseRequested(this);
+            task.Wait();
 
-            return new HeadlessCodeInspectionResults
+            if (_state.Status == ParserState.Ready)
             {
-                InspectionResults = results.ToArray()
-            };
+                var results = _inspector.FindIssuesAsync(_state, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+
+                return new HeadlessInspectionResults
+                {
+                    InspectionResults = results.Select(e => new HeadlessInspectionResult
+                    {
+                        Description = e.Description,
+                        Inspection = e.Inspection.Name,
+                        Location = e.QualifiedSelection.Selection.ToString(),
+                        ModuleName = e.QualifiedMemberName?.QualifiedModuleName.Name,
+                        ProjectName = e.QualifiedMemberName?.QualifiedModuleName.ProjectName
+                    }).ToArray()
+                };
+            }
+
+            return null;
         }
     }
 
-    public interface IRubberduckCI
-    {
-        void ImportSourceFiles(string path);
-        HeadlessTestOutput RunAllTests();
-        HeadlessCodeInspectionResults RunInspections(ICodeInspectionSettings settings);
-    }
 
+    [
+        ComVisible(true),
+        Guid(RubberduckGuid.RubberduckCIClassGuid),
+        ProgId(RubberduckProgId.RubberduckCIProgId),
+        ClassInterface(ClassInterfaceType.None),
+        ComDefaultInterface(typeof(IRubberduckCI)),
+        EditorBrowsable(EditorBrowsableState.Always)
+    ]
     public class RubberduckCI : IRubberduckCI
     {
         private readonly IHeadlessImportService _importService;
@@ -59,8 +79,8 @@ namespace Rubberduck.ComClientLibrary.CI
 
         public void ImportSourceFiles(string path) => _importService.ImportSourceFiles(path);
 
-        public HeadlessTestOutput RunAllTests() => _testEngine.RunHeadless();
+        public ITestOutput RunAllTests() => _testEngine.RunHeadless();
 
-        public HeadlessCodeInspectionResults RunInspections(ICodeInspectionSettings settings) => _inspector.RunHeadless();
+        public ICodeInspectionResults RunInspections() => _inspector.RunHeadless();
     }
 }

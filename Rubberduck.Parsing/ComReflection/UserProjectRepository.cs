@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using NLog;
+﻿using NLog;
 using Rubberduck.InternalApi.Extensions;
 using Rubberduck.Parsing.Common;
 using Rubberduck.Parsing.UIContext;
@@ -9,6 +7,8 @@ using Rubberduck.VBEditor.ComManagement;
 using Rubberduck.VBEditor.ComManagement.TypeLibs.Abstract;
 using Rubberduck.VBEditor.Extensions;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Rubberduck.Parsing.ComReflection
 {
@@ -50,12 +50,12 @@ namespace Rubberduck.Parsing.ComReflection
 
             RemoveNoLongerExistingProjects();
             RemoveProjects(projectIdsToReload);
-            var loadTask = _uiDispatcher.StartTask(() =>
-            {
-                AddUnprotectedUserProjects(projectIdsToReload);
-                AddLockedProjects();
-            });
-            loadTask.Wait();
+            //var loadTask = _uiDispatcher.StartTask(() =>
+            //{
+            //    AddUnprotectedUserProjects(projectIdsToReload);
+            //    AddLockedProjects();
+            //});
+            //loadTask.ConfigureAwait(false).GetAwaiter().GetResult();
 
             parsingStageTimer.Stop();
             parsingStageTimer.Log("Loaded ComProjects for user projects in {0}ms.");
@@ -90,7 +90,7 @@ namespace Rubberduck.Parsing.ComReflection
                 if (TryLoadProject(projectId, project, out var comProject))
                 {
                     _userComProjects.Add(projectId, comProject);
-                } 
+                }
             }
         }
 
@@ -111,13 +111,13 @@ namespace Rubberduck.Parsing.ComReflection
 
             using (var typeLib = _typeLibWrapperProvider.TypeLibWrapperFromProject(project))
             {
-                comProject = typeLib != null 
-                    ? new ComProject(typeLib, path) 
+                comProject = typeLib != null
+                    ? new ComProject(typeLib, path)
                     : null;
             }
 
             return comProject != null;
-        } 
+        }
 
         private void RemoveProjects(IEnumerable<string> projectIdsToRemove)
         {

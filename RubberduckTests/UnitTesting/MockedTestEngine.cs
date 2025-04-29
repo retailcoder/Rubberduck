@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Threading.Tasks;
-using Moq;
+﻿using Moq;
 using NUnit.Framework;
 using Rubberduck.Parsing.UIContext;
 using Rubberduck.Parsing.VBA;
@@ -13,6 +8,11 @@ using Rubberduck.VBEditor.ComManagement.TypeLibs.Abstract;
 using Rubberduck.VBEditor.SafeComWrappers;
 using Rubberduck.VBEditor.SafeComWrappers.Abstract;
 using RubberduckTests.Mocks;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace RubberduckTests.UnitTesting
 {
@@ -21,7 +21,7 @@ namespace RubberduckTests.UnitTesting
         public delegate void RunTestMethodCallback(ITypeLibWrapper wrapper, TestMethod method, EventHandler<AssertCompletedEventArgs> assertListener, out long duration);
         public delegate (long Duration, TestResult result) ReturnTestResult(ITypeLibWrapper wrapper, TestMethod method, EventHandler<AssertCompletedEventArgs> assertListener, out long duration);
 
-        private const string TestMethodTemplate = 
+        private const string TestMethodTemplate =
 @"'@TestMethod
 Public Sub TestMethod{0}()
 End Sub";
@@ -101,11 +101,11 @@ End Sub";
             TestEngine = new SynchronouslySuspendingTestEngine(ParserState, _fakesFactory.Object, VbeInteraction.Object, WrapperProvider.Object, Dispatcher.Object, Vbe.Object, ParserState.ProjectsProvider);
         }
 
-        public MockedTestEngine(int testMethodCount) 
+        public MockedTestEngine(int testMethodCount)
             : this(string.Join(Environment.NewLine, Enumerable.Range(1, testMethodCount).Select(num => GetTestMethod(num))))
         { }
 
-        public MockedTestEngine(List<(TestOutcome Outcome, string Output, long duration)> results) 
+        public MockedTestEngine(List<(TestOutcome Outcome, string Output, long duration)> results)
             : this(string.Join(Environment.NewLine, Enumerable.Range(1, results.Count).Select(num => GetTestMethod(num, results[num - 1].Outcome == TestOutcome.Ignored))))
         {
             ParserState.OnParseRequested(this);
@@ -139,8 +139,8 @@ End Sub";
         public Mock<ITypeLibWrapperProvider> WrapperProvider { get; } = new Mock<ITypeLibWrapperProvider>();
 
         public static string GetTestMethod(int number, bool ignored = false, string category = null) =>
-            category is null 
-                ? string.Format(ignored ? IgnoredTestTemplate : TestMethodTemplate, number) 
+            category is null
+                ? string.Format(ignored ? IgnoredTestTemplate : TestMethodTemplate, number)
                 : string.Format(ignored ? IgnoredTestCategoryTemplate : TestMethodCategoryTemplate, number, category);
 
         public void SetupAssertCompleted(Action action)

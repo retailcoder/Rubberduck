@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
-using Rubberduck.Parsing.UIContext;
+﻿using Rubberduck.Parsing.UIContext;
 using Rubberduck.VBEditor.ComManagement.TypeLibs.Abstract;
+using System.Collections.Generic;
 
 namespace Rubberduck.Parsing.PreProcessing
 {
@@ -26,13 +26,14 @@ namespace Rubberduck.Parsing.PreProcessing
         private Dictionary<string, short> GetUserDefinedCompilationArguments(string projectId)
         {
             // use the TypeLib API to grab the user defined compilation arguments; must be obtained on the main thread.
-            var task = _uiDispatcher.StartTask(() => {
+            var task = _uiDispatcher.StartTask(() =>
+            {
                 using (var typeLib = _typeLibWrapperProvider.TypeLibWrapperFromProject(projectId))
                 {
                     return typeLib?.VBEExtensions.ConditionalCompilationArguments ?? new Dictionary<string, short>();
                 }
             });
-            return task.Result;
+            return task.GetAwaiter().GetResult();
         }
     }
 }

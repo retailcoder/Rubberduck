@@ -50,5 +50,11 @@
         public const string TimesProgId = BaseNamespace + "Times";
 
         public const string DebugAddinObject = BaseNamespace + "VBETypeLibsAPI";
+
+        public const string RubberduckCIProgId = BaseNamespace + "RubberduckCI";
+        public const string TestOutputProgId = BaseNamespace + "TestOutput";
+        public const string TestInfoProgId = BaseNamespace + "TestInfo";
+        public const string RubberduckInspectionResultsProgId = BaseNamespace + "InspectionResults";
+        public const string RubberduckInspectionResultProgId = BaseNamespace + "InspectionResult";
     }
 }

@@ -1,14 +1,4 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Globalization;
-using Path = System.IO.Path;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using Antlr4.Runtime.Tree;
+﻿using Antlr4.Runtime.Tree;
 using NLog;
 using Rubberduck.CodeAnalysis.Inspections.Attributes;
 using Rubberduck.CodeAnalysis.Settings;
@@ -17,6 +7,16 @@ using Rubberduck.Parsing.VBA.Parsing;
 using Rubberduck.Resources;
 using Rubberduck.SettingsProvider;
 using Rubberduck.VBEditor;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Path = System.IO.Path;
 
 namespace Rubberduck.CodeAnalysis.Inspections.Logistics
 {
@@ -56,6 +56,9 @@ namespace Rubberduck.CodeAnalysis.Inspections.Logistics
         }
 
         public async Task<IEnumerable<IInspectionResult>> FindIssuesAsync(RubberduckParserState state, CancellationToken token)
+            => await FindIssuesAsync(state, CodeInspectionSeverity.DoNotShow, token);
+
+        public async Task<IEnumerable<IInspectionResult>> FindIssuesAsync(RubberduckParserState state, CodeInspectionSeverity minSeverity, CancellationToken token)
         {
             if (state == null || !state.AllUserDeclarations.Any())
             {
@@ -72,7 +75,7 @@ namespace Rubberduck.CodeAnalysis.Inspections.Logistics
             token.ThrowIfCancellationRequested();
 
             var parseTreeInspections = _inspections
-                .Where(inspection => inspection.Severity != CodeInspectionSeverity.DoNotShow)
+                .Where(inspection => inspection.Severity != CodeInspectionSeverity.DoNotShow && inspection.Severity >= minSeverity)
                 .OfType<IParseTreeInspection>()
                 .ToArray();
             token.ThrowIfCancellationRequested();
@@ -99,6 +102,7 @@ namespace Rubberduck.CodeAnalysis.Inspections.Logistics
 
             var inspectionsToRun = _inspections.Where(inspection =>
                 inspection.Severity != CodeInspectionSeverity.DoNotShow &&
+                inspection.Severity >= minSeverity &&
                 RequiredLibrariesArePresent(inspection, state) &&
                 RequiredHostIsPresent(inspection));
 

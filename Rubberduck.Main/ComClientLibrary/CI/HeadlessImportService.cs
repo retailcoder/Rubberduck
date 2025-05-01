@@ -82,11 +82,13 @@ namespace Rubberduck.ComClientLibrary.CI
                     throw new HeadlessImportException("Could not find an active VBA project.");
                 }
 
-                var suspendResult = _parseManager.OnSuspendParser(this, new[] { ParserState.Ready }, () => ImportSourceFiles(sourceFiles, project));
+                var suspendResult = _parseManager.OnSuspendParser(this, new[] { ParserState.Pending, ParserState.Ready }, () => ImportSourceFiles(sourceFiles, project));
                 if (suspendResult.Outcome != SuspensionOutcome.Completed)
                 {
                     throw new HeadlessImportException("Failed to suspend parser for import.");
                 }
+
+                _parseManager.OnParseRequested(this);
             }
         }
 

@@ -224,7 +224,7 @@ namespace Rubberduck.UnitTesting
             var task = _state.OnParseRequested(this);
             task.ConfigureAwait(false).GetAwaiter().GetResult(); // .Wait() will absolutely deadlock
 
-            return Tests;
+            return Tests ?? [];
         }
 
 

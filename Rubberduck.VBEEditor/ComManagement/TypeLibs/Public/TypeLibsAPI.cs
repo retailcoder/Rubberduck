@@ -14,49 +14,49 @@ using ComTypes = System.Runtime.InteropServices.ComTypes;
 // ReSharper disable once CheckNamespace
 namespace Rubberduck.VBEditor.ComManagement.TypeLibs
 {
-    [
-        ComVisible(true),
-        Guid(RubberduckGuid.RubberduckInspectionResultInterfaceGuid),
-        InterfaceType(ComInterfaceType.InterfaceIsDual),
-        EditorBrowsable(EditorBrowsableState.Always)
-    ]
-    public interface ICodeInspectionResult
-    {
-        [DispId(1)]
-        string Inspection { get; }
+    //[
+    //    ComVisible(true),
+    //    Guid(RubberduckGuid.RubberduckInspectionResultInterfaceGuid),
+    //    InterfaceType(ComInterfaceType.InterfaceIsDual),
+    //    EditorBrowsable(EditorBrowsableState.Always)
+    //]
+    //public interface ICodeInspectionResult
+    //{
+    //    [DispId(1)]
+    //    string Inspection { get; }
 
-        [DispId(2)]
-        string Description { get; }
+    //    [DispId(2)]
+    //    string Description { get; }
 
-        [DispId(3)]
-        string ProjectName { get; }
+    //    [DispId(3)]
+    //    string ProjectName { get; }
 
-        [DispId(4)]
-        string ModuleName { get; }
+    //    [DispId(4)]
+    //    string ModuleName { get; }
 
-        [DispId(5)]
-        string Location { get; }
-    }
+    //    [DispId(5)]
+    //    string Location { get; }
+    //}
 
 
-    [
-        ComVisible(true),
-        Guid(RubberduckGuid.RubberduckInspectionResultsInterfaceGuid),
-        InterfaceType(ComInterfaceType.InterfaceIsDual),
-        EditorBrowsable(EditorBrowsableState.Always)
-    ]
-    public interface ICodeInspectionResults
-    {
-        [DispId(1)]
-        ICodeInspectionResult[] InspectionResults { get; }
-    }
+    //[
+    //    ComVisible(true),
+    //    Guid(RubberduckGuid.RubberduckInspectionResultsInterfaceGuid),
+    //    InterfaceType(ComInterfaceType.InterfaceIsDual),
+    //    EditorBrowsable(EditorBrowsableState.Always)
+    //]
+    //public interface ICodeInspectionResults
+    //{
+    //    [DispId(1)]
+    //    ICodeInspectionResult[] InspectionResults { get; }
+    //}
 
-    [
-        ComVisible(true),
-        Guid(RubberduckGuid.RubberduckTestInfoInterfaceGuid),
-        InterfaceType(ComInterfaceType.InterfaceIsDual),
-        EditorBrowsable(EditorBrowsableState.Always)
-    ]
+    //[
+    //    ComVisible(true),
+    //    Guid(RubberduckGuid.RubberduckTestInfoInterfaceGuid),
+    //    InterfaceType(ComInterfaceType.InterfaceIsDual),
+    //    EditorBrowsable(EditorBrowsableState.Always)
+    //]
     public interface ITestInfo
     {
 
@@ -123,8 +123,8 @@ namespace Rubberduck.VBEditor.ComManagement.TypeLibs
         [DispId(2)]
         ITestOutput RunAllTests();
 
-        [DispId(3)]
-        ICodeInspectionResults RunInspections();
+        //[DispId(3)]
+        //ICodeInspectionResults RunInspections();
     }
 
 

@@ -6,39 +6,39 @@ using System.Runtime.InteropServices;
 
 namespace Rubberduck.UnitTesting
 {
-    [
-        ComVisible(true),
-        Guid(RubberduckGuid.RubberduckInspectionResultClassGuid),
-        ProgId(RubberduckProgId.RubberduckInspectionResultProgId),
-        ClassInterface(ClassInterfaceType.None),
-        ComDefaultInterface(typeof(ITestInfo)),
-        EditorBrowsable(EditorBrowsableState.Always)
-    ]
-    public class HeadlessInspectionResult : ICodeInspectionResult
-    {
-        public string Inspection { get; set; }
+    //[
+    //    ComVisible(true),
+    //    Guid(RubberduckGuid.RubberduckInspectionResultClassGuid),
+    //    ProgId(RubberduckProgId.RubberduckInspectionResultProgId),
+    //    ClassInterface(ClassInterfaceType.None),
+    //    ComDefaultInterface(typeof(ITestInfo)),
+    //    EditorBrowsable(EditorBrowsableState.Always)
+    //]
+    //public class HeadlessInspectionResult : ICodeInspectionResult
+    //{
+    //    public string Inspection { get; set; }
 
-        public string Description { get; set; }
+    //    public string Description { get; set; }
 
-        public string ProjectName { get; set; }
+    //    public string ProjectName { get; set; }
 
-        public string ModuleName { get; set; }
+    //    public string ModuleName { get; set; }
 
-        public string Location { get; set; }
-    }
+    //    public string Location { get; set; }
+    //}
 
-    [
-        ComVisible(true),
-        Guid(RubberduckGuid.RubberduckInspectionResultsClassGuid),
-        ProgId(RubberduckProgId.RubberduckInspectionResultsProgId),
-        ClassInterface(ClassInterfaceType.None),
-        ComDefaultInterface(typeof(ITestInfo)),
-        EditorBrowsable(EditorBrowsableState.Always)
-    ]
-    public class HeadlessInspectionResults : ICodeInspectionResults
-    {
-        public ICodeInspectionResult[] InspectionResults { get; set; }
-    }
+    //[
+    //    ComVisible(true),
+    //    Guid(RubberduckGuid.RubberduckInspectionResultsClassGuid),
+    //    ProgId(RubberduckProgId.RubberduckInspectionResultsProgId),
+    //    ClassInterface(ClassInterfaceType.None),
+    //    ComDefaultInterface(typeof(ITestInfo)),
+    //    EditorBrowsable(EditorBrowsableState.Always)
+    //]
+    //public class HeadlessInspectionResults : ICodeInspectionResults
+    //{
+    //    public ICodeInspectionResult[] InspectionResults { get; set; }
+    //}
 
     [
         ComVisible(true),
